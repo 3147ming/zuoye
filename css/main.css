@@ -1,0 +1,308 @@
+/* ============================================================
+   WorldHub · 全局样式
+   画面本体全部在 Canvas 里；CSS 只负责「舞台装裱」与 HUD 文本
+   ============================================================ */
+
+:root {
+  --ink: #08060f;
+  --ink-2: #12101f;
+  --paper: #f4e8d6;
+  --paper-dim: #cdbfae;
+  --amber: #f0a76e;
+  --amber-soft: #ffd9a8;
+  --line: rgba(244, 232, 214, 0.14);
+
+  --serif: "Songti SC", "STSong", "Source Han Serif SC", "Noto Serif CJK SC", "SimSun", serif;
+  --sans: "PingFang SC", "HarmonyOS Sans SC", "Microsoft YaHei", "Hiragino Sans GB", system-ui, -apple-system, sans-serif;
+}
+
+* { box-sizing: border-box; }
+
+html, body { height: 100%; }
+
+body {
+  margin: 0;
+  min-height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: clamp(10px, 2.2vh, 34px) clamp(10px, 2vw, 34px);
+  overflow: hidden;
+  background:
+    radial-gradient(110% 80% at 50% -10%, #241c3c 0%, #120f22 42%, #08060f 78%, #050409 100%);
+  color: var(--paper);
+  font-family: var(--sans);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+/* 页面极淡的纸纹，避免大面积纯色发闷 */
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0.16;
+  background-image:
+    radial-gradient(rgba(255, 230, 200, 0.10) 1px, transparent 1px),
+    radial-gradient(rgba(255, 230, 200, 0.06) 1px, transparent 1px);
+  background-size: 39px 39px, 17px 17px;
+  background-position: 0 0, 9px 13px;
+  mix-blend-mode: overlay;
+}
+
+.frame {
+  width: 100%;
+  max-width: 1560px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+}
+
+/* ---------- 舞台：16:9 自适应，永远完整可见 ---------- */
+.stage {
+  position: relative;
+  width: min(100%, calc((100dvh - 110px) * 16 / 9));
+  aspect-ratio: 16 / 9;
+  overflow: hidden;
+  border-radius: 12px;
+  background: #0b0817;
+  container-type: inline-size;
+  box-shadow:
+    0 0 0 1px rgba(255, 214, 170, 0.12),
+    0 0 0 6px rgba(10, 8, 18, 0.85),
+    0 0 0 7px rgba(255, 214, 170, 0.06),
+    0 34px 90px -28px rgba(0, 0, 0, 0.95),
+    0 0 90px -30px rgba(240, 167, 110, 0.35);
+}
+
+.stage canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+  /* 画布内容按 CSS 尺寸缩放，双线性由 drawImage 之外的原生缩放处理 */
+  touch-action: none;
+}
+
+/* ---------- HUD ---------- */
+.hud {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  user-select: none;
+}
+
+.hud-title {
+  position: absolute;
+  left: 2.6cqw;
+  top: 2.4cqw;
+  padding-left: 1.1cqw;
+  border-left: 2px solid rgba(240, 167, 110, 0.55);
+  transition: opacity 160ms ease;
+}
+
+.hud-title h1 {
+  margin: 0;
+  font-family: var(--serif);
+  font-weight: 600;
+  font-size: 2.15cqw;
+  line-height: 1.15;
+  letter-spacing: 0.08em;
+  color: #fdf3e4;
+  text-shadow: 0 2px 14px rgba(6, 4, 12, 0.85), 0 0 30px rgba(240, 167, 110, 0.18);
+}
+
+.hud-title h1 span {
+  font-family: var(--sans);
+  font-weight: 400;
+  font-size: 0.52em;
+  letter-spacing: 0.24em;
+  color: rgba(255, 217, 168, 0.78);
+  margin-left: 0.35em;
+  vertical-align: 0.28em;
+}
+
+.hud-title p {
+  margin: 0.45cqw 0 0;
+  font-size: 0.85cqw;
+  letter-spacing: 0.22em;
+  color: rgba(244, 232, 214, 0.42);
+}
+
+.hud-keys {
+  position: absolute;
+  right: 2.6cqw;
+  top: 2.6cqw;
+  display: flex;
+  align-items: center;
+  gap: 0.9cqw;
+  font-size: 0.82cqw;
+  letter-spacing: 0.1em;
+  color: rgba(244, 232, 214, 0.5);
+  transition: opacity 160ms ease;
+}
+
+.hud-keys .sep {
+  width: 1px;
+  height: 0.9cqw;
+  background: rgba(244, 232, 214, 0.22);
+}
+
+.hud-keys kbd {
+  display: inline-block;
+  min-width: 1.5cqw;
+  padding: 0.14cqw 0.42cqw;
+  margin-right: 0.2cqw;
+  border-radius: 0.28cqw;
+  border: 1px solid rgba(255, 217, 168, 0.28);
+  background: rgba(20, 15, 36, 0.55);
+  color: rgba(255, 217, 168, 0.9);
+  font-family: var(--sans);
+  font-size: 0.9em;
+  line-height: 1.5;
+  text-align: center;
+}
+
+/* ---------- 底部提示条 ---------- */
+.toast {
+  position: absolute;
+  left: 50%;
+  bottom: 4.6cqw;
+  transform: translate(-50%, 14px);
+  max-width: 82%;
+  padding: 1.05cqw 2cqw;
+  border-radius: 999px;
+  background: rgba(244, 232, 214, 0.95);
+  color: #241d38;
+  font-size: 1.05cqw;
+  font-weight: 500;
+  letter-spacing: 0.06em;
+  white-space: nowrap;
+  opacity: 0;
+  transition:
+    opacity 200ms cubic-bezier(0.16, 1, 0.3, 1),
+    transform 260ms cubic-bezier(0.16, 1, 0.3, 1);
+  box-shadow:
+    0 10px 30px -12px rgba(0, 0, 0, 0.9),
+    0 0 0 1px rgba(255, 255, 255, 0.06),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.12);
+}
+
+.toast::before {
+  content: "";
+  display: inline-block;
+  width: 0.42em;
+  height: 0.42em;
+  margin-right: 0.7em;
+  border-radius: 50%;
+  background: #d4603f;
+  vertical-align: 0.12em;
+  box-shadow: 0 0 0 3px rgba(212, 96, 63, 0.18);
+}
+
+.toast.on {
+  opacity: 1;
+  transform: translate(-50%, 0);
+}
+
+/* ---------- 对话面板（守灯人）---------- */
+.dialogue {
+  position: absolute;
+  left: 50%;
+  bottom: 3.2cqw;
+  width: min(61cqw, 94%);
+  padding: 1.6cqw 2.1cqw 1.15cqw;
+  border-radius: 1.1cqw;
+  background: linear-gradient(180deg, rgba(33, 26, 55, 0.96), rgba(16, 12, 29, 0.96));
+  border: 1px solid rgba(240, 167, 110, 0.5);
+  box-shadow:
+    0 2.4cqw 5.2cqw -1.6cqw rgba(0, 0, 0, 0.92),
+    inset 0 0 0 1px rgba(255, 217, 168, 0.06);
+  transform: translate(-50%, 1.1cqw);
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transition:
+    opacity 170ms ease,
+    transform 240ms cubic-bezier(0.16, 1, 0.3, 1),
+    visibility 240ms;
+}
+
+.dialogue.on {
+  opacity: 1;
+  visibility: visible;
+  transform: translate(-50%, 0);
+}
+
+.dialogue-name {
+  position: absolute;
+  left: 2.1cqw;
+  top: -1.02cqw;
+  padding: 0.22cqw 0.86cqw;
+  border-radius: 999px;
+  background: #171226;
+  border: 1px solid rgba(240, 167, 110, 0.55);
+  color: #ffd9a8;
+  font-family: var(--serif);
+  font-size: 0.86cqw;
+  letter-spacing: 0.14em;
+  white-space: nowrap;
+}
+
+.dialogue-text {
+  margin: 0;
+  min-height: 3.1em;
+  font-family: var(--serif);
+  font-size: 1.34cqw;
+  line-height: 1.72;
+  letter-spacing: 0.04em;
+  color: #fdf3e4;
+}
+
+.dialogue-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 0.72cqw;
+  padding-top: 0.66cqw;
+  border-top: 1px solid rgba(244, 232, 214, 0.1);
+  font-size: 0.78cqw;
+  letter-spacing: 0.12em;
+  color: rgba(244, 232, 214, 0.36);
+}
+
+.dialogue-step {
+  font-variant-numeric: tabular-nums;
+  color: rgba(255, 217, 168, 0.58);
+}
+
+/* ---------- 进了小游戏：大厅标题与按键提示让位 ---------- */
+body[data-scene]:not([data-scene="world"]) .hud-title,
+body[data-scene]:not([data-scene="world"]) .hud-keys {
+  opacity: 0;
+}
+
+/* ---------- 台座说明 ---------- */
+.caption {
+  margin: 0;
+  font-size: 11px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: rgba(244, 232, 214, 0.26);
+}
+
+/* ---------- 窄屏：HUD 相对放大 ---------- */
+@media (max-width: 720px) {
+  .hud-title h1 { font-size: 3.4cqw; }
+  .hud-title p { font-size: 1.5cqw; }
+  .hud-keys { font-size: 1.5cqw; gap: 1.4cqw; }
+  .toast { font-size: 2cqw; padding: 2cqw 3.4cqw; bottom: 5.5cqw; }
+  .caption { display: none; }
+  .stage { width: 100%; }
+}
+
+/* ---------- 降低动效偏好 ---------- */
+@media (prefers-reduced-motion: reduce) {
+  .toast { transition-duration: 1ms; }
+}
