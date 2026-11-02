@@ -18,6 +18,14 @@ import {
   invalidatePlatformLayer,
   project,
   pickAt,
+  setZoom,
+  setPan,
+  getZoom,
+  zoomIn,
+  zoomOut,
+  resetView,
+  focusOnGrid,
+  ZOOM_LEVELS,
 } from './render.js';
 import { createInteraction } from './interact.js';
 import {
@@ -1322,8 +1330,10 @@ export function initBoard(options) {
     hoverGroup: null,
     wiring: null,
     pointer: null,
+    pointerInside: false,
     ghost: null,
     dangling: new Set(),
+    lens: { on: false },
   };
 
   board = {
@@ -1507,6 +1517,27 @@ export function initBoard(options) {
       return true;
     },
     requestRender,
+    // 视图缩放 / 平移 / 放大镜（包 7A）：全部为渲染层状态，不触碰 model
+    zoom: {
+      levels: () => ZOOM_LEVELS.slice(),
+      level: () => getZoom(view),
+      set: (scale) => { setZoom(view, scale); requestRender(); },
+      in: () => { zoomIn(view); requestRender(); },
+      out: () => { zoomOut(view); requestRender(); },
+      reset: () => { resetView(view); requestRender(); },
+      pan: (x, y) => { setPan(view, x, y); requestRender(); },
+    },
+    focus: {
+      enable: (mode) => { if (scene.lens) { scene.lens.on = true; requestRender(); } },
+      disable: () => { if (scene.lens) { scene.lens.on = false; requestRender(); } },
+      onGrid: (gx, gy, scale) => { focusOnGrid(view, gx, gy, scale); requestRender(); },
+    },
+    lens: {
+      on: () => { if (scene.lens) { scene.lens.on = true; requestRender(); } },
+      off: () => { if (scene.lens) { scene.lens.on = false; requestRender(); } },
+      isOn: () => Boolean(scene.lens && scene.lens.on),
+      setPointer: (x, y) => { scene.pointer = { x, y }; requestRender(); },
+    },
   };
 
   if (saved) {

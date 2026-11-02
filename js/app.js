@@ -61,6 +61,11 @@ const dom = {
   schemArea: document.getElementById('schematic-area'),
   btnViewBench: document.getElementById('btn-view-bench'),
   btnViewSchematic: document.getElementById('btn-view-schematic'),
+  btnZoomIn: document.getElementById('btn-zoom-in'),
+  btnZoomOut: document.getElementById('btn-zoom-out'),
+  btnZoomReset: document.getElementById('btn-zoom-reset'),
+  btnLens: document.getElementById('btn-lens'),
+  zoomLevel: document.getElementById('zoom-level'),
   toastHost: document.getElementById('toast-host'),
   modalHost: document.getElementById('modal-host'),
 };
@@ -824,6 +829,67 @@ function bindEvents() {
       || target.tagName === 'SELECT')) return;
     event.preventDefault();
     stepClockNow();
+  });
+
+  bindZoomControls();
+}
+
+/** 更新工具栏倍率读数 */
+function setZoomReadout(level) {
+  if (dom.zoomLevel) dom.zoomLevel.textContent = `${Number(level).toFixed(level % 1 === 0 ? 0 : 2)}×`;
+}
+
+/** 更新放大镜按钮的按下态 */
+function setLensPressed(on) {
+  if (!dom.btnLens) return;
+  dom.btnLens.setAttribute('aria-pressed', String(on));
+  dom.btnLens.classList.toggle('is-active', on);
+}
+
+/** 绑定视图缩放 / 放大镜工具栏（包 7A） */
+function bindZoomControls() {
+  const zoomApi = () => (window.__labBoard && window.__labBoard.zoom) ? window.__labBoard.zoom : null;
+  const lensApi = () => (window.__labBoard && window.__labBoard.lens) ? window.__labBoard.lens : null;
+
+  if (dom.btnZoomIn) {
+    dom.btnZoomIn.addEventListener('click', () => {
+      const api = zoomApi();
+      if (!api) return;
+      api.in();
+      setZoomReadout(api.level());
+    });
+  }
+  if (dom.btnZoomOut) {
+    dom.btnZoomOut.addEventListener('click', () => {
+      const api = zoomApi();
+      if (!api) return;
+      api.out();
+      setZoomReadout(api.level());
+    });
+  }
+  if (dom.btnZoomReset) {
+    dom.btnZoomReset.addEventListener('click', () => {
+      const api = zoomApi();
+      if (!api) return;
+      api.reset();
+      setZoomReadout(api.level());
+    });
+  }
+  if (dom.btnLens) {
+    dom.btnLens.addEventListener('click', () => {
+      const api = lensApi();
+      if (!api) return;
+      if (api.isOn()) { api.off(); setLensPressed(false); }
+      else { api.on(); setLensPressed(true); }
+    });
+  }
+
+  // 缩放 / 放大镜状态由交互层（键盘、智能聚焦）驱动，这里只做读数同步
+  window.addEventListener('viewzoom', (event) => {
+    if (event.detail && typeof event.detail.level === 'number') setZoomReadout(event.detail.level);
+  });
+  window.addEventListener('lensstate', (event) => {
+    if (event.detail && typeof event.detail.on === 'boolean') setLensPressed(event.detail.on);
   });
 }
 

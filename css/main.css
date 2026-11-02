@@ -604,6 +604,52 @@ button {
   color: var(--text-faint);
 }
 
+/* 包 7A：画布工具栏（缩放 / 放大镜） */
+.canvas-tools {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.tool-btn {
+  font: inherit;
+  font-size: 12px;
+  line-height: 1;
+  padding: 4px 8px;
+  border-radius: 6px;
+  border: 1px solid var(--line-soft);
+  background: var(--panel);
+  color: var(--text-soft);
+  cursor: pointer;
+  transition: background 0.12s, color 0.12s, border-color 0.12s;
+}
+
+.tool-btn:hover {
+  background: var(--panel-soft);
+  color: var(--text);
+}
+
+.tool-btn.is-active,
+.tool-btn[aria-pressed="true"] {
+  background: var(--accent-soft, rgba(242, 169, 59, 0.16));
+  border-color: var(--accent, #f2a93b);
+  color: var(--accent, #f2a93b);
+}
+
+.zoom-level {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  min-width: 30px;
+  text-align: center;
+  color: var(--text-faint);
+  user-select: none;
+}
+
+@media (max-width: 560px) {
+  .panel-head { flex-wrap: wrap; }
+  .canvas-tools { order: 3; width: 100%; justify-content: flex-start; }
+}
+
 .panel-body {
   padding: 16px;
   flex: 1;

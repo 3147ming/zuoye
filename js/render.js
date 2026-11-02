@@ -60,7 +60,18 @@ export function themeOf(platformId) {
    视图与投影
    ========================================================================== */
 
-/** 创建视图对象（持有 canvas 与投影参数） */
+/** 缩放档位：1× 为基准（fit 视图），向上放大 */
+export const ZOOM_LEVELS = [1, 1.5, 2, 3];
+const ZOOM_MIN = ZOOM_LEVELS[0];
+const ZOOM_MAX = ZOOM_LEVELS[ZOOM_LEVELS.length - 1];
+
+/**
+ * 创建视图对象（持有 canvas 与投影参数）。
+ * zoom/panX/panY 是「渲染层」状态：缩放与平移只改变投影，不触碰 model 数据，
+ * 因此 serializeCircuit 前后（以及刷新后）必然一致。
+ * fit* 字段保存「适配画布」的基准投影（zoom=1 时的值），applyZoomPan 在它之上
+ * 折叠 zoom/pan，得到真正用于绘制与拾取的 tileW/originX/originY。
+ */
 export function createView(canvas) {
   return {
     canvas,
@@ -68,18 +79,34 @@ export function createView(canvas) {
     dpr: 1,
     width: 0,
     height: 0,
+    // 折叠后的实时投影（绘制 / 拾取都用它）
     originX: 0,
     originY: 0,
     tileW: BASE_TILE_W,
     tileH: BASE_TILE_H,
     scale: 1,
+    // 渲染层视图状态（纯视觉）
+    zoom: ZOOM_MIN,
+    panX: 0,
+    panY: 0,
+    // fit（zoom=1）基准投影，缩放/平移在其上叠加
+    fitTileW: BASE_TILE_W,
+    fitTileH: BASE_TILE_H,
+    fitOriginX: 0,
+    fitOriginY: 0,
+    fitScale: 1,
     platformId: null,
   };
 }
 
 /**
- * 按平台尺寸与画布尺寸计算缩放与原点，让整个平台刚好落在画布内。
- * 返回 true 表示几何参数发生了变化（需要重建平台层缓存）。
+ * 按平台尺寸与画布尺寸计算「适配（fit）」基准投影，让整个平台刚好落在画布内，
+ * 再把当前 zoom/pan 折叠进去得到实时投影。
+ * 返回 true 表示 fit 基准（与缩放无关的几何）发生了变化，需要重建平台层缓存。
+ *
+ * 关键设计：平台层缓存恒以 zoom=1 的 fit 投影绘制（见 ensurePlatformLayer），
+ * 缩放/平移只在 renderScene 贴回时用 drawImage 的矩阵实现——这样无论怎么放大，
+ * 平台孔位都不会被裁剪，pickAt 也走同一套 project/unproject 自动对齐。
  */
 export function layoutView(view, platform, cssWidth, cssHeight, options) {
   if (!view) return false;
@@ -95,28 +122,29 @@ export function layoutView(view, platform, cssWidth, cssHeight, options) {
   const baseH = (cols + rows) * BASE_TILE_H / 2;
   const scale = Math.max(0.16, Math.min(availW / baseW, availH / baseH, 2.2));
 
-  const tileW = BASE_TILE_W * scale;
-  const tileH = BASE_TILE_H * scale;
-  const boardW = (cols + rows) * tileW / 2;
-  const boardH = (cols + rows) * tileH / 2;
+  const fitTileW = BASE_TILE_W * scale;
+  const fitTileH = BASE_TILE_H * scale;
+  const boardW = (cols + rows) * fitTileW / 2;
+  const boardH = (cols + rows) * fitTileH / 2;
 
-  const originX = pad + Math.max(0, (availW - boardW) / 2) + rows * tileW / 2;
-  const originY = pad + Math.max(0, (availH - boardH) / 2);
+  const fitOriginX = pad + Math.max(0, (availW - boardW) / 2) + rows * fitTileW / 2;
+  const fitOriginY = pad + Math.max(0, (availH - boardH) / 2);
 
-  const changed = Math.abs(view.tileW - tileW) > 0.01
-    || Math.abs(view.originX - originX) > 0.01
-    || Math.abs(view.originY - originY) > 0.01
+  const changed = Math.abs(view.fitTileW - fitTileW) > 0.01
+    || Math.abs(view.fitOriginX - fitOriginX) > 0.01
+    || Math.abs(view.fitOriginY - fitOriginY) > 0.01
     || view.width !== cssWidth
     || view.height !== cssHeight
     || view.platformId !== (platform ? platform.id : null);
 
   view.width = cssWidth;
   view.height = cssHeight;
-  view.tileW = tileW;
-  view.tileH = tileH;
+  view.fitTileW = fitTileW;
+  view.fitTileH = fitTileH;
+  view.fitOriginX = fitOriginX;
+  view.fitOriginY = fitOriginY;
+  view.fitScale = scale;
   view.scale = scale;
-  view.originX = originX;
-  view.originY = originY;
   view.platformId = platform ? platform.id : null;
 
   const dpr = Math.min(window.devicePixelRatio || 1, 2);
@@ -128,7 +156,81 @@ export function layoutView(view, platform, cssWidth, cssHeight, options) {
     view.canvas.height = targetH;
   }
 
+  applyZoomPan(view);
   return changed;
+}
+
+/**
+ * 把 zoom/pan 折叠进实时投影 tileW/originX/originY。
+ * 缩放以画布中心为锚点：pan=0 时，画布中心对应的那个网格点在缩放前后屏幕坐标不变；
+ * pan 在其上叠加一个屏幕像素平移。project/unproject 只认这三者，故拾取与绘制天然统一。
+ */
+export function applyZoomPan(view) {
+  const z = view.zoom;
+  view.tileW = view.fitTileW * z;
+  view.tileH = view.fitTileH * z;
+  const cx = view.width / 2;
+  const cy = view.height / 2;
+  // 以中心为锚：O_z = fitOrigin + (z-1)*(fitOrigin - C)
+  const anchorX = (z - 1) * (view.fitOriginX - cx);
+  const anchorY = (z - 1) * (view.fitOriginY - cy);
+  view.originX = view.fitOriginX + anchorX + view.panX;
+  view.originY = view.fitOriginY + anchorY + view.panY;
+}
+
+/** 设定绝对缩放值（夹在档位区间内） */
+export function setZoom(view, z) {
+  view.zoom = Math.max(ZOOM_MIN, Math.min(ZOOM_MAX, z));
+  applyZoomPan(view);
+}
+
+/** 设定平移偏移（屏幕像素） */
+export function setPan(view, x, y) {
+  view.panX = x;
+  view.panY = y;
+  applyZoomPan(view);
+}
+
+/** 当前缩放倍数 */
+export function getZoom(view) {
+  return view.zoom;
+}
+
+/** 复位到 fit（zoom=1、无平移） */
+export function resetView(view) {
+  view.zoom = ZOOM_MIN;
+  view.panX = 0;
+  view.panY = 0;
+  applyZoomPan(view);
+}
+
+/** 升一档（优先取大于当前的最近档，否则停在最大档） */
+export function zoomIn(view) {
+  const idx = ZOOM_LEVELS.findIndex((level) => level > view.zoom + 1e-6);
+  setZoom(view, idx < 0 ? ZOOM_LEVELS[ZOOM_LEVELS.length - 1] : ZOOM_LEVELS[idx]);
+}
+
+/** 降一档（优先取小于当前的最近档，否则停在最底档） */
+export function zoomOut(view) {
+  let idx = -1;
+  for (let i = ZOOM_LEVELS.length - 1; i >= 0; i -= 1) {
+    if (ZOOM_LEVELS[i] < view.zoom - 1e-6) { idx = i; break; }
+  }
+  setZoom(view, idx < 0 ? ZOOM_LEVELS[0] : ZOOM_LEVELS[idx]);
+}
+
+/**
+ * 以某个网格坐标点为锚做聚焦缩放：设定 zoom 后，把 (gx,gy) 投影到画布中心。
+ * 用于放大镜开启时的「点击聚焦」。
+ */
+export function focusOnGrid(view, gx, gy, zoom) {
+  const z = Math.max(ZOOM_MIN, Math.min(ZOOM_MAX, zoom));
+  view.zoom = z;
+  applyZoomPan(view);
+  const cx = view.width / 2;
+  const cy = view.height / 2;
+  const before = project(view, gx, gy);
+  setPan(view, cx - before.x, cy - before.y);
 }
 
 /** 网格 → 屏幕 */
@@ -192,12 +294,16 @@ function platePrism(ctx, view, gx0, gy0, gx1, gy1, height, top, side1, side2, ed
 
 const platformLayer = { key: '', canvas: null };
 
-/** 平台层缓存键：平台 / 尺寸 / dpr / 缩放任一变化都要重建 */
+/**
+ * 平台层缓存键：平台 / 视口尺寸 / dpr / fit 缩放任一变化才重建。
+ * 注意用 fitTileW 而非折叠后的 tileW——平台层恒以 zoom=1 绘制，缩放由
+ * renderScene 的 drawImage 矩阵负责，所以 zoom 改变不该触发平台层重建。
+ */
 function layerKey(view) {
-  return `${view.platformId}|${view.width}x${view.height}|${view.dpr}|${view.tileW.toFixed(2)}`;
+  return `${view.platformId}|${view.width}x${view.height}|${view.dpr}|${view.fitTileW.toFixed(2)}`;
 }
 
-/** 取（必要时重建）平台层 */
+/** 取（必要时重建）平台层。平台层固定以 fit（zoom=1）投影绘制。 */
 export function ensurePlatformLayer(view, platform) {
   const key = layerKey(view);
   if (platformLayer.canvas && platformLayer.key === key) return platformLayer.canvas;
@@ -211,7 +317,24 @@ export function ensurePlatformLayer(view, platform) {
   const ctx = canvas.getContext('2d');
   ctx.setTransform(view.dpr, 0, 0, view.dpr, 0, 0);
   ctx.clearRect(0, 0, view.width, view.height);
-  if (platform) drawPlatform(ctx, view, platform);
+  if (platform) {
+    // 临时切到 fit 投影绘制平台内容；绘制完立即还原，不影响后续的动态层（用实时折叠投影）。
+    const saved = {
+      tileW: view.tileW,
+      tileH: view.tileH,
+      originX: view.originX,
+      originY: view.originY,
+    };
+    view.tileW = view.fitTileW;
+    view.tileH = view.fitTileH;
+    view.originX = view.fitOriginX;
+    view.originY = view.fitOriginY;
+    drawPlatform(ctx, view, platform);
+    view.tileW = saved.tileW;
+    view.tileH = saved.tileH;
+    view.originX = saved.originX;
+    view.originY = saved.originY;
+  }
 
   platformLayer.canvas = canvas;
   platformLayer.key = key;
@@ -650,7 +773,15 @@ export function renderScene(view, scene) {
   const platform = scene.platform;
   if (platform) {
     const layer = ensurePlatformLayer(view, platform);
-    ctx.drawImage(layer, 0, 0, layer.width, layer.height, 0, 0, view.width, view.height);
+    // 平台层以 zoom=1 绘制；这里按当前 zoom 缩放、按 pan 平移贴回视口中心。
+    // dest 用 CSS 像素（ctx 已带 dpr 变换），source 用平台层自身的设备像素。
+    const destX = view.width / 2 - view.width * view.zoom / 2 + view.panX;
+    const destY = view.height / 2 - view.height * view.zoom / 2 + view.panY;
+    ctx.drawImage(
+      layer,
+      0, 0, layer.width, layer.height,
+      destX, destY, view.width * view.zoom, view.height * view.zoom,
+    );
   }
 
   const theme = themeOf(platform ? platform.id : 'exp-box');
@@ -661,6 +792,9 @@ export function renderScene(view, scene) {
   drawGhost(ctx, view, scene, theme);
   drawSelection(ctx, view, scene);
   drawPendingWire(ctx, view, scene);
+  drawWireHoverEnds(ctx, view, scene);
+  drawConnectableHints(ctx, view, scene);
+  drawMagnifier(ctx, view, scene);
 }
 
 /** 悬停孔位 → 高亮整组（让"哪些孔天然连通"一眼可见） */
@@ -856,6 +990,107 @@ function drawPendingWire(ctx, view, scene) {
   ctx.lineWidth = Math.max(1.6, view.tileW * 0.08);
   ctx.strokeStyle = 'rgba(242, 169, 59, 0.85)';
   strokePath(ctx, wirePath(view, from, to));
+  ctx.restore();
+}
+
+/* ==========================================================================
+   端子标签 / 导线悬停端点 / 可连提示 / 放大镜
+   ========================================================================== */
+
+/** 在 (x,y) 上方画一个端子名小标签（胶囊底衬） */
+function drawTerminalLabel(ctx, x, y, text, color) {
+  const size = 10;
+  ctx.font = `${size}px "Cascadia Mono", Consolas, monospace`;
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  const w = ctx.measureText(text).width;
+  const padX = 5;
+  const pillW = w + padX * 2;
+  const pillH = size + 4;
+  ctx.beginPath();
+  if (typeof ctx.roundRect === 'function') {
+    ctx.roundRect(x - pillW / 2, y - pillH / 2, pillW, pillH, pillH / 2);
+  } else {
+    roundRectPath(ctx, x - pillW / 2, y - pillH / 2, pillW, pillH, pillH / 2);
+  }
+  ctx.fillStyle = 'rgba(18, 20, 26, 0.86)';
+  ctx.fill();
+  ctx.fillStyle = color || '#f2a93b';
+  ctx.fillText(text, x, y);
+}
+
+/** 悬停导线：高亮导线 + 两端端子端点标记与端子名（应用 zoom/pan 变换） */
+function drawWireHoverEnds(ctx, view, scene) {
+  if (!scene.hover || scene.hover.type !== 'wire') return;
+  const wire = scene.circuit.wires.find((item) => item.id === scene.hover.wireId);
+  if (!wire) return;
+  [wire.a, wire.b].forEach((ref) => {
+    const resolved = resolveRef(ref);
+    const pos = resolved ? resolved.pos : refFallbackPos(ref);
+    if (!pos) return;
+    const p = project(view, pos.x, pos.y);
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, Math.max(4, view.tileW * 0.2), 0, Math.PI * 2);
+    ctx.fillStyle = 'rgba(143, 216, 234, 0.95)';
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(20, 30, 40, 0.6)';
+    ctx.lineWidth = 1;
+    ctx.stroke();
+    drawTerminalLabel(ctx, p.x, p.y - view.tileH * 0.5 - 8, resolved ? resolved.label : '?', '#8fd8ea');
+  });
+}
+
+/** 智能聚焦连线：起点态下，给所有「可连」端子画弱高亮 + 端子名 */
+function drawConnectableHints(ctx, view, scene) {
+  const wire = scene.wiring;
+  if (!wire || !wire.from || !wire.connectable) return;
+  wire.connectable.forEach((hint) => {
+    const p = project(view, hint.x, hint.y);
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, Math.max(3, view.tileW * 0.14), 0, Math.PI * 2);
+    ctx.fillStyle = 'rgba(242, 169, 59, 0.16)';
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(242, 169, 59, 0.7)';
+    ctx.lineWidth = 1;
+    ctx.stroke();
+    drawTerminalLabel(ctx, p.x, p.y - view.tileH * 0.5 - 8, `${hint.componentId}.${hint.terminal}`, '#f2a93b');
+  });
+}
+
+/** 放大镜：在指针处画一个 2× 的圆形放大窗口，内容取自已渲染的主画布 */
+function drawMagnifier(ctx, view, scene) {
+  if (!scene.lens || !scene.lens.on || !scene.pointer || !scene.pointerInside) return;
+  const px = scene.pointer.x;
+  const py = scene.pointer.y;
+  const radius = 80;
+  const mag = 2;
+  const srcRadius = radius / mag;
+  const dpr = view.dpr;
+
+  ctx.save();
+  ctx.beginPath();
+  ctx.arc(px, py, radius, 0, Math.PI * 2);
+  ctx.clip();
+  // 主画布自身即源：把以指针为中心 srcRadius 区域放大到 radius 正方形
+  ctx.drawImage(
+    view.canvas,
+    (px - srcRadius) * dpr, (py - srcRadius) * dpr, srcRadius * 2 * dpr, srcRadius * 2 * dpr,
+    px - radius, py - radius, radius * 2, radius * 2,
+  );
+  ctx.strokeStyle = 'rgba(255, 255, 255, 0.5)';
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.moveTo(px - 8, py); ctx.lineTo(px + 8, py);
+  ctx.moveTo(px, py - 8); ctx.lineTo(px, py + 8);
+  ctx.stroke();
+  ctx.restore();
+
+  ctx.save();
+  ctx.beginPath();
+  ctx.arc(px, py, radius, 0, Math.PI * 2);
+  ctx.strokeStyle = 'rgba(40, 44, 54, 0.9)';
+  ctx.lineWidth = 2;
+  ctx.stroke();
   ctx.restore();
 }
 
