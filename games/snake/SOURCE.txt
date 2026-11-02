@@ -1,0 +1,7 @@
+名称：javascript-snakes（贪吃蛇）
+仓库：https://github.com/jakesgordon/javascript-snakes
+许可：MIT（仓库根目录 LICENSE 文件已原样保留）
+本地目录：games/snake/
+接入改动：
+  - 无。index.html / snakes.min.js / snakes.min.css / images / sounds 全部原样拷贝。
+  - 未拷贝 fonts/（装饰性 webfont，2.9MB）与 packaged/、vendor/、experiments/、js/、css/（源分片，运行时不加载）。

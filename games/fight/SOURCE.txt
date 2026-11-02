@@ -1,0 +1,12 @@
+名称：mk.js（格斗）
+仓库：https://github.com/mgechev/mk.js
+许可：MIT —— 仓库无独立 LICENSE 文件，但 readme.md 明确写着
+      "mk.js is distributed under the terms of the MIT license"；此处依据该声明。
+本地目录：games/fight/
+接入改动（仅 3 处，玩法代码 src/mk.js 与 src/movement.js 未改一行）：
+  1. 删除 index.html 里的 <script src="/socket.io/socket.io.js">：file:// 下没有 socket 服务端。
+  2. mk.start 的 gameType 由 'network' 改为 'multiplayer'：上游 demo 只有联机入口，
+     multiplayer 是 mk.js 自带的本地双人控制器（P1 G/J/Y/H + S/D/F，P2 方向键 + [ ] \）。
+  3. 去掉「是否房主 / 房间名」两个 prompt、摄像头列与长说明，改成 1280×720 单屏版式。
+按键：P1 G/J/Y/H 移动跳跃 · S 低拳 · D 低踢 · F 高拳 · Shift 防御
+      P2 ←/→/↑/↓ 移动跳跃 · [ 低拳 · ] 低踢 · \ 高拳 · Ctrl 防御 · 空格 重开

@@ -1,0 +1,7 @@
+名称：2048
+仓库：https://github.com/gabrielecirulli/2048
+许可：MIT（LICENSE.txt 已原样保留）
+本地目录：games/game2048/
+接入改动：
+  - 无。index.html / js/（10 个） / style/main.css + style/fonts / meta/ / favicon.ico 原样拷贝。
+  - 未拷贝 Rakefile、*.scss（构建期文件）与 README/CONTRIBUTING。

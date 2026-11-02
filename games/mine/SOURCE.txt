@@ -1,0 +1,8 @@
+名称：minesweeper（扫雷）
+仓库：https://github.com/michaelbutler/minesweeper
+许可：GPL-3.0（仓库内 license.txt 已原样保留；本项目只做目录内引用，未修改源码）
+本地目录：games/mine/
+接入改动（仅 2 处）：
+  1. jQuery 由 Google CDN（ajax.googleapis.com 1.7.2）改为本地 vendor/jquery.min.js（3.7.1）。
+  2. 移除右上角 GitHub 角标 <img>（s3.amazonaws.com 外链，离线必然 404；纯装饰）。
+  其余 index.html / css / js / images / load.gif 原样。

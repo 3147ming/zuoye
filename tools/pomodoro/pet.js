@@ -1,0 +1,890 @@
+/* =============================================================
+   pet.js — Cat Companion mini-game
+   Phase 3: core game logic (petState, images, feed, EXP)
+   Phase 4: energy + sleep mechanic (Zzz, play, doPet)
+   Phase 5: real-time drift-proof decay + robust persistence
+     - Tunable per-30-min rates for awake and asleep states
+     - Mood drains 2× when hungry (<25) OR tired (<20)
+     - Auto-wake at full energy; asleep mood gently rises
+     - Save on visibilitychange, beforeunload, and every action
+     - Storage event keeps coin display in sync across tabs
+
+   第五阶段：精确实时衰减 + 可靠持久化
+     - 按每 30 分钟可调节的衰减速率，清醒 / 睡眠分开计算
+     - 饥饿 < 25 或 精力 < 20 时心情衰减加倍
+     - 精力满自动醒来；睡眠期间心情微升
+     - 切换标签 / 关闭窗口时立即存档；storage 事件跨标签同步金币
+   ============================================================= */
+
+
+/* =============================================================
+   SECTION 0: CONSTANTS
+   All magic numbers in one place — easy to tune later.
+   所有魔法数字集中管理，便于后期调整。
+   ============================================================= */
+
+// Feed tab item catalogue. Sorted by cost; special flags: favorite, catnip, minLevel.
+// Feed 标签页食物目录，按费用排序；特殊字段：favorite / catnip / minLevel。
+const FOOD_ITEMS = [
+  // ── Budget ───────────────────────────────────────────────────────────────
+  { id: "bargain",    label: "Bargain Bits", emoji: "🗑️", cost:   5, hunger: 40, mood:  0, exp:  3, energy:  0 },
+  { id: "tomato",     label: "Tomato",       emoji: "🍅", cost:   8, hunger:  8, mood: 15, exp:  5, energy:  0, favorite: true },
+  { id: "fish",       label: "Dried Fish",   emoji: "🐟", cost:  10, hunger: 15, mood:  5, exp:  8, energy:  0 },
+  { id: "milk",       label: "Milk",         emoji: "🥛", cost:  15, hunger: 10, mood:  5, exp:  5, energy: 15 },
+  // ── Mid-tier ─────────────────────────────────────────────────────────────
+  { id: "churu",      label: "Churu",        emoji: "🐾", cost:  20, hunger: 15, mood: 20, exp: 12, energy:  0 },
+  { id: "can",        label: "Cat Can",      emoji: "🥫", cost:  25, hunger: 35, mood: 10, exp: 20, energy:  0 },
+  { id: "chicken",    label: "Chicken",      emoji: "🍗", cost:  30, hunger: 30, mood:  8, exp: 25, energy:  0 },
+  { id: "catnip_tea", label: "Catnip Tea",   emoji: "🫖", cost:  35, hunger:  0, mood: 20, exp: 10, energy: 25, catnip: true },
+  { id: "cake",       label: "Mini Cake",    emoji: "🎂", cost:  40, hunger: 10, mood: 30, exp: 30, energy:  0 },
+  { id: "shrimp",     label: "Shrimp",       emoji: "🦐", cost:  45, hunger: 35, mood: 18, exp: 35, energy:  0 },
+  { id: "sushi",      label: "Sashimi",      emoji: "🍣", cost:  60, hunger: 50, mood: 25, exp: 50, energy:  0 },
+  // ── Premium (level-gated) ────────────────────────────────────────────────
+  { id: "lobster",    label: "Lobster",      emoji: "🦞", cost:  90, hunger: 55, mood: 30, exp: 70, energy:  0, minLevel: 4 },
+  { id: "wagyu",      label: "Wagyu",        emoji: "🥩", cost: 120, hunger: 60, mood: 35, exp: 90, energy:  0, minLevel: 6 },
+];
+
+const PLAY_ACTION = { cost: 15, mood: 12, energy: -15, exp: 6 };
+// Play costs 15 coins, raises mood, lowers energy.
+// 玩耍消耗 15 金币，提升心情，明显降低精力。
+
+// Accessories removed — emoji overlays on the cat image felt out of place.
+const ACCESSORIES = [];
+
+// Backgrounds — CSS gradient applied behind the cat image. / 猫咪背景渐变，显示在图片后方。
+const BACKGROUNDS = [
+  { id: "starry",  label: "Starry Night",   emoji: "🌙", cost:  80, minLevel: 2, bg: "radial-gradient(circle at 50% 40%, #1b1b40, #08081c)" },
+  { id: "sunny",   label: "Sunny Window",   emoji: "🌤️", cost:  80, minLevel: 2, bg: "radial-gradient(circle at 50% 20%, #fff9e0, #ffd566)" },
+  { id: "sakura",  label: "Cherry Blossom", emoji: "🌸", cost: 150, minLevel: 4, bg: "radial-gradient(circle at 50% 40%, #ffe0ea, #f5b8cc)" },
+  { id: "garden",  label: "Garden",         emoji: "🌿", cost: 150, minLevel: 4, bg: "radial-gradient(circle at 50% 40%, #d0f0c0, #9ac878)" },
+  { id: "xmas",    label: "Christmas",      emoji: "🎄", cost: 200, minLevel: 5, bg: "radial-gradient(circle at 50% 40%, #1c4020, #0a1e0a)" },
+  { id: "beach",   label: "Beach",          emoji: "🏖️", cost: 200, minLevel: 5, bg: "linear-gradient(180deg, #87ceeb 50%, #f0e68c 50%)" },
+  { id: "space",   label: "Space",          emoji: "🚀", cost: 300, minLevel: 7, bg: "radial-gradient(circle at 50% 50%, #0a0a30, #000008)" },
+  { id: "castle",  label: "Castle",         emoji: "🏰", cost: 300, minLevel: 7, bg: "radial-gradient(circle at 50% 40%, #c8b090, #a08060)" },
+];
+
+// Beds — emoji shown below the cat when she sleeps. / 睡眠时显示在猫咪下方的猫窝 emoji。
+const BEDS = [
+  { id: "basket",  label: "Wicker Basket", emoji: "🧺", cost:  60, minLevel: 2 },
+  { id: "softbed", label: "Soft Bed",      emoji: "🛏️", cost: 120, minLevel: 4 },
+  { id: "villa",   label: "Cat Villa",     emoji: "🏠", cost: 250, minLevel: 6 },
+];
+
+// Skins — emoji placeholder; real cat-image art to be swapped in later.
+// 皮肤 emoji 占位，等美术资源到位后替换为真实图片。
+const SKINS = [
+  { id: "default", label: "Natural",      emoji: "🐱", cost:   0, minLevel: 1 },
+  { id: "orange",  label: "Orange Tabby", emoji: "🐱", cost: 100, minLevel: 1 },
+  { id: "tiger",   label: "Tiger Stripe", emoji: "🐯", cost: 180, minLevel: 3 },
+  { id: "cow",     label: "Cow Cat",      emoji: "🐮", cost: 260, minLevel: 5 },
+  { id: "lion",    label: "Lion King",    emoji: "🦁", cost: 400, minLevel: 8 },
+];
+
+// Bundles removed along with accessories.
+const BUNDLES = [];
+
+// Milestone gifts — granted automatically when the cat first reaches a level.
+// 等级里程碑：首次到达指定等级时自动赠送背景。
+const MILESTONES = [
+  { level: 6, giftId: "castle", msg: "🎉 Reached Lv.6 — got Castle background!" },
+  { level: 8, giftId: "space",  msg: "🎉 Reached Lv.8 — got Space background!"  },
+];
+
+// All rates are per real-world minute. Awake and asleep are tracked separately.
+// 所有速率单位为每真实分钟。清醒与睡眠状态分开计算。
+const DECAY = {
+  // ── Awake ─────────────────────────────────────────────────────
+  hunger:        10 / 30,   // –10 per 30 min            / 清醒每 30 分钟 –10 饱食
+  mood:           5 / 30,   // –5  per 30 min (base)     / 清醒每 30 分钟 –5  心情（基础值）
+  energyAwake:   10 / 30,   // –10 per 30 min            / 清醒每 30 分钟 –10 精力
+  // ── Asleep ────────────────────────────────────────────────────
+  energyAsleep: 100 / 60,   // full charge in ~60 min    / 约 60 分钟充满精力
+  moodAsleep:     3 / 60,   // +3 per 60 min (gentle)    / 睡眠每小时 +3 心情（微升）
+  hungerAsleep:   5 / 30,   // –5  per 30 min (half)     / 睡眠每 30 分钟 –5 饱食（半速）
+};
+
+// freshEquipped — empty slot map; null = nothing worn in that slot.
+// 空槽位映射；null = 该槽位未穿戴任何配饰。
+function freshEquipped() {
+  return { head: null, eyes: null, neck: null, held: null, background: null, bed: null, skin: null };
+}
+
+// freshState — default new-game state. / 全新游戏的默认初始状态。
+function freshState() {
+  return {
+    level: 1, exp: 0, hunger: 80, mood: 80, energy: 80,
+    asleep: false, lastSeen: Date.now(),
+    name: "Luna",
+    owned: [], equipped: freshEquipped(), inventory: {},
+  };
+}
+
+// EXP needed to advance from `level` to `level+1`.
+// 从当前等级升到下一级所需经验：50 + (level-1)×40
+// Level 1→2: 50,  Level 2→3: 90,  Level 3→4: 130, …
+function expForLevel(level) {
+  return 50 + (level - 1) * 40;
+}
+
+
+/* =============================================================
+   SECTION 1: STATE PERSISTENCE
+   petState 的 localStorage 读写封装。
+   ============================================================= */
+
+function loadState() {
+  const raw = localStorage.getItem("petState");
+  if (!raw) return freshState();
+  try {
+    const s = JSON.parse(raw);
+    if (!Array.isArray(s.owned)) s.owned = [];
+    if (!s.inventory || typeof s.inventory !== "object" || Array.isArray(s.inventory)) s.inventory = {};
+
+    // Migrate: pre-Phase 6b saves had equipped as null or a single string id.
+    // 迁移：Phase 6b 之前的存档 equipped 为 null 或单个字符串 id。
+    if (typeof s.equipped !== "object" || s.equipped === null) {
+      const oldId = typeof s.equipped === "string" ? s.equipped : null;
+      s.equipped  = freshEquipped();
+      if (oldId) {
+        const acc = ACCESSORIES.find(a => a.id === oldId);
+        if (acc) s.equipped[acc.slot] = oldId;
+      }
+    } else {
+      // Backfill any slot keys added in later phases. / 补充后续阶段新增的槽位字段。
+      const blank = freshEquipped();
+      for (const k of Object.keys(blank)) {
+        if (!(k in s.equipped)) s.equipped[k] = blank[k];
+      }
+    }
+    return s;
+  } catch {
+    return freshState(); // corrupt JSON → reset / 数据损坏时优雅重置
+  }
+}
+
+function saveState(state) {
+  state.lastSeen = Date.now();
+  localStorage.setItem("petState", JSON.stringify(state));
+}
+
+
+/* =============================================================
+   SECTION 2: TIME-BASED DECAY
+   Apply stat changes proportional to minutes elapsed since lastSeen.
+   按距上次访问的分钟数等比例衰减属性，上限 8 小时防止一次归零。
+   ============================================================= */
+
+function applyDecay(state) {
+  const now     = Date.now();
+  const minutes = Math.min((now - (state.lastSeen || now)) / 60000, 480);
+  // Cap at 8 h so a very long absence doesn't wipe all stats at once.
+  // 最多计算 480 分钟（8 小时），防止长时间离开后一次归零。
+
+  if (state.asleep) {
+    // ── Asleep: energy recovers; mood gently rises; hunger still drains (slowly)
+    // 睡眠中：精力恢复，心情微升，饱食缓慢下降
+    state.energy = Math.min(100, state.energy + DECAY.energyAsleep * minutes);
+    state.mood   = Math.min(100, state.mood   + DECAY.moodAsleep   * minutes);
+    state.hunger = Math.max(0,   state.hunger - DECAY.hungerAsleep  * minutes);
+    if (state.energy >= 100) state.asleep = false; // auto-wake at full energy / 精力满自动醒来
+  } else {
+    // ── Awake: hunger and energy drain; mood drains 2× when hungry OR tired
+    // 清醒中：饱食和精力下降；饥饿（<25）或疲惫（<20）时心情衰减加倍
+    state.hunger = Math.max(0, state.hunger - DECAY.hunger      * minutes);
+    state.energy = Math.max(0, state.energy - DECAY.energyAwake * minutes);
+
+    const moodDecay = (state.hunger < 25 || state.energy < 20)
+      ? DECAY.mood * 2
+      : DECAY.mood;
+    state.mood = Math.max(0, state.mood - moodDecay * minutes);
+  }
+
+  return state;
+}
+
+
+/* =============================================================
+   SECTION 3: CAT IMAGE SELECTION
+   Priority rules that map the current state to one image file.
+   Uses the 6 images already in cats/ — no new assets needed.
+
+   优先级规则，将当前状态映射到对应图片。
+   ============================================================= */
+
+let flashAction   = null;  // "fed" | "played" | null — not persisted / 不持久化
+let flashTimer    = null;
+let checkInNotice = null;  // set for 4 s on first daily visit / 每日首次访问时设置 4 秒
+
+function getCatImage(state) {
+  if (flashAction === "fed")                          return "cats/done-cat.png";
+  if (flashAction === "played")                       return "cats/paused-cat.png";
+  if (state.asleep)                                   return "cats/longbreak-cat.png";
+  if (state.hunger < 40)                              return "cats/idle-cat.png";
+  if (state.mood >= 70 && state.energy >= 30)         return "cats/shortbreak-cat.png";
+  return "cats/focus-cat.png";
+}
+
+
+/* =============================================================
+   SECTION 4: RENDER
+   Push state → DOM. Idempotent — safe to call any time.
+   将状态写入 DOM，幂等函数，随时可调用。
+   ============================================================= */
+
+let petState; // module-level reference, assigned in init() / 模块级引用，在 init() 中赋值
+
+function render() {
+  const s = petState;
+
+  // ── Coins ────────────────────────────────────────────────────
+  const coins = parseInt(localStorage.getItem("coins") || "0", 10);
+  document.getElementById("coinAmount").textContent = coins;
+
+  // ── Cat image ────────────────────────────────────────────────
+  document.getElementById("petCatImg").src = getCatImage(s);
+
+  // ── Speech bubble ────────────────────────────────────────────
+  const bubbleEl   = document.getElementById("speechBubble");
+  const bubbleText = getSpeechBubbleText(s);
+  bubbleEl.textContent = bubbleText;
+  bubbleEl.classList.toggle("visible", bubbleText.length > 0);
+
+  // ── Name + Level ─────────────────────────────────────────────
+  document.getElementById("catName").textContent = s.name || "Luna";
+  document.getElementById("catLv").textContent = "Lv. " + s.level;
+
+  // ── EXP bar ──────────────────────────────────────────────────
+  const needed = expForLevel(s.level);
+  const pct    = Math.min(100, (s.exp / needed) * 100);
+  document.getElementById("expFill").style.width  = pct + "%";
+  document.getElementById("expLabel").textContent = s.exp + " / " + needed + " EXP";
+
+  // ── Stat bars ────────────────────────────────────────────────
+  setStat("Fullness", s.hunger);
+  setStat("Mood",     s.mood);
+  setStat("Energy",   s.energy);
+
+  // ── Sleep button label ───────────────────────────────────────
+  document.getElementById("btnSleep").textContent = s.asleep ? "☀️ Wake" : "💤 Sleep";
+  document.getElementById("btnPlay").textContent  = "🎾 Play · 🪙" + PLAY_ACTION.cost;
+  document.getElementById("btnFeed").textContent  = "🍖 Feed";
+
+  // ── Disabled states ──────────────────────────────────────────
+  document.getElementById("btnFeed").disabled = false; // always opens feed tab
+  document.getElementById("btnPlay").disabled = s.asleep || s.energy < 10;
+  // Play also blocked when energy < 10 even if awake. / 精力低于 10 时也无法玩耍。
+
+  // ── Zzz bubble ───────────────────────────────────────────────
+  const zzzEl = document.getElementById("zzzCue");
+  if (s.asleep) zzzEl.classList.add("active");
+  else          zzzEl.classList.remove("active");
+
+  // ── Sleepy status line / level-up celebration ────────────────
+  if (levelUpPending !== null) {
+    // Show level-up message briefly, then clear so it doesn't linger
+    document.getElementById("statusLine").textContent = `🎉 Level up! Now Lv.${levelUpPending}!`;
+    const img = document.getElementById("petCatImg");
+    img.classList.remove("cat-bounce");
+    void img.offsetWidth; // force reflow so animation re-fires
+    img.classList.add("cat-bounce");
+    setTimeout(() => img.classList.remove("cat-bounce"), 400);
+    levelUpPending = null;
+  } else {
+    document.getElementById("statusLine").textContent =
+      (!s.asleep && s.energy < 20) ? "😴 Sleepy... put me to bed!" : "";
+  }
+
+  // ── Bed + Background overlays ────────────────────────────────
+  const eq      = s.equipped;
+  const bedItem = eq.bed ? BEDS.find(b => b.id === eq.bed) : null;
+  document.getElementById("accBed").textContent = (s.asleep && bedItem) ? bedItem.emoji : "";
+
+  // Background gradient applied to cat-bg div / 背景渐变写入 cat-bg
+  const bgItem = eq.background ? BACKGROUNDS.find(b => b.id === eq.background) : null;
+  document.getElementById("catBg").style.background = bgItem ? bgItem.bg : "";
+}
+
+function setStat(name, rawValue) {
+  const val = Math.round(rawValue);
+  const el  = document.getElementById("fill" + name);
+  el.style.width = val + "%";
+  el.classList.toggle("stat-low",      val < 25);
+  el.classList.toggle("stat-critical", val < 10);
+  document.getElementById("val" + name).textContent = val;
+}
+
+
+
+/* =============================================================
+   SECTION 5: LEVELLING
+   Deduct EXP thresholds and increment level until EXP < threshold.
+   扣除经验阈值并递增等级，直到经验低于下一级所需。
+   ============================================================= */
+
+let levelUpPending = null; // Set when cat levels up; read by render() to show celebration
+
+function checkLevelUp(state) {
+  let needed = expForLevel(state.level);
+  while (state.exp >= needed) {
+    state.exp   -= needed;
+    state.level += 1;
+    needed       = expForLevel(state.level);
+    checkMilestones(state);
+    levelUpPending = state.level; // remember the new level so render() can celebrate
+  }
+}
+
+// Grant milestone rewards the first time the cat reaches a threshold level.
+// 首次到达里程碑等级时自动将奖励道具加入 owned 列表。
+function checkMilestones(state) {
+  MILESTONES.forEach(m => {
+    if (state.level === m.level && !state.owned.includes(m.giftId)) {
+      state.owned.push(m.giftId);
+    }
+  });
+}
+
+
+/* =============================================================
+   SECTION 6: COIN CHECK HELPER
+   Deducts coins if available; shakes the coin display if not.
+   金币足够则扣除，不足则抖动金币显示框给予视觉反馈。
+   ============================================================= */
+
+function trySpendCoins(amount) {
+  const coins = parseInt(localStorage.getItem("coins") || "0", 10);
+  if (coins < amount) {
+    const el = document.getElementById("coinDisplay");
+    el.classList.remove("shake"); // reset so re-trigger works / 先移除以便重新触发
+    void el.offsetWidth;          // force reflow / 强制重排
+    el.classList.add("shake");
+    setTimeout(() => el.classList.remove("shake"), 500);
+    return false;
+  }
+  localStorage.setItem("coins", String(coins - amount));
+  return true;
+}
+
+
+/* =============================================================
+   SECTION 6a: SPEECH BUBBLE
+   Returns the cat's current "thought" based on state priority.
+   ============================================================= */
+
+function getSpeechBubbleText(s) {
+  if (checkInNotice)            return checkInNotice;
+  if (flashAction === "fed")    return "Yummy! 😋";
+  if (flashAction === "played") return "That was fun! 🎾";
+  if (s.asleep)                 return "";
+  if (s.hunger < 25)            return "I'm starving... 🍖";
+  if (s.energy < 20)            return "I need sleep... 😴";
+  if (s.mood < 25)              return "I'm so bored... 😔";
+  if (s.mood > 85 && s.hunger > 70 && s.energy > 50) return "This is the life~ 😻";
+  return "";
+}
+
+
+/* =============================================================
+   SECTION 6b: FLOATING STAT POPUP
+   Creates a short-lived div above the cat showing stat gains.
+   items = array of { text, cls } e.g. { text: "+25🍖", cls: "popup-hunger" }
+   ============================================================= */
+
+function showFloatPopup(items) {
+  const wrapper = document.querySelector(".cat-wrapper");
+  const el = document.createElement("div");
+  el.className = "float-popup";
+  items.forEach(({ text, cls }) => {
+    const span = document.createElement("span");
+    span.className = cls;
+    span.textContent = text;
+    el.appendChild(span);
+  });
+  wrapper.appendChild(el);
+  setTimeout(() => el.remove(), 1200);
+}
+
+
+/* =============================================================
+   SECTION 6c: DAILY CHECK-IN BONUS
+   First visit each calendar day awards +20 coins.
+   每个自然日首次访问自动奖励 20 金币。
+   ============================================================= */
+
+function checkDailyBonus() {
+  const today = new Date().toDateString();
+  if (localStorage.getItem("lastCheckIn") === today) return;
+
+  const coins = parseInt(localStorage.getItem("coins") || "0", 10);
+  localStorage.setItem("coins", String(coins + 20));
+  localStorage.setItem("lastCheckIn", today);
+
+  checkInNotice = "Daily bonus! +20🪙";
+  setTimeout(() => { checkInNotice = null; render(); }, 4000);
+}
+
+
+/* =============================================================
+   SECTION 7: ACTIONS
+   ============================================================= */
+
+// ── Buy food → add to inventory ──────────────────────────────
+function doBuyFood(itemId) {
+  const item = FOOD_ITEMS.find(f => f.id === itemId);
+  if (!item) return;
+  if (item.minLevel && petState.level < item.minLevel) return;
+  if (!trySpendCoins(item.cost)) return;
+
+  petState.inventory[itemId] = (petState.inventory[itemId] || 0) + 1;
+  saveState(petState);
+  render();        // update coin display
+  renderFeedTab(); // refresh pantry + buy sections
+}
+
+// ── Use food from inventory → apply effects ───────────────────
+function doUseFood(itemId) {
+  const item = FOOD_ITEMS.find(f => f.id === itemId);
+  if (!item || petState.asleep) return;
+  if (item.minLevel && petState.level < item.minLevel) return;
+
+  const qty = petState.inventory[itemId] || 0;
+  if (qty < 1) return;
+  petState.inventory[itemId] = qty - 1;
+
+  petState.hunger = Math.min(100, Math.max(0, petState.hunger + item.hunger));
+  const moodGain = item.favorite ? Math.round(item.mood * 1.5) : item.mood;
+  petState.mood   = Math.min(100, Math.max(0, petState.mood + moodGain));
+  if (item.energy) {
+    petState.energy = Math.min(100, Math.max(0, petState.energy + item.energy));
+  }
+  petState.exp += item.exp;
+  checkLevelUp(petState);
+
+  const popups = [];
+  if (item.hunger > 0) popups.push({ text: "+" + item.hunger + "🍖", cls: "popup-hunger" });
+  if (moodGain > 0)    popups.push({ text: "+" + moodGain   + "💗", cls: "popup-mood"   });
+  if (item.energy > 0) popups.push({ text: "+" + item.energy + "⚡", cls: "popup-energy" });
+  popups.push({ text: "+" + item.exp + "✨", cls: "popup-exp" });
+  showFloatPopup(popups);
+
+  saveState(petState);
+
+  if (item.catnip) {
+    flashAction = "played";
+    clearTimeout(flashTimer);
+    flashTimer = setTimeout(() => {
+      flashAction = null;
+      petState.energy = Math.max(0, petState.energy - 10);
+      saveState(petState);
+      render();
+    }, 1500);
+  } else {
+    flashAction = "fed";
+    clearTimeout(flashTimer);
+    flashTimer = setTimeout(() => { flashAction = null; render(); }, 1000);
+  }
+
+  render();
+  renderFeedTab();
+}
+
+// Rename the cat — prompts user for a new name and persists it.
+// 重命名猫咪，弹出输入框并持久化保存。
+function startRename() {
+  const input   = prompt("Enter your cat's name:", petState.name || "Luna");
+  if (input === null) return;
+  const trimmed = input.trim();
+  if (!trimmed) return;
+  petState.name = trimmed.slice(0, 20);
+  saveState(petState);
+  render();
+}
+
+// ── Play ─────────────────────────────────────────────────────
+function doPlay() {
+  if (petState.asleep) return;
+  if (petState.energy < 10) return;  // too tired to play / 精力不足，无法玩耍
+  if (!trySpendCoins(PLAY_ACTION.cost)) return;
+
+  petState.mood   = Math.min(100, petState.mood   + PLAY_ACTION.mood);
+  petState.energy = Math.max(0,   petState.energy + PLAY_ACTION.energy);
+  petState.exp   += PLAY_ACTION.exp;
+  checkLevelUp(petState);
+  showFloatPopup([
+    { text: "+" + PLAY_ACTION.mood + "💗",  cls: "popup-mood" },
+    { text: PLAY_ACTION.energy + "⚡",       cls: "popup-neg"  },
+  ]);
+  saveState(petState);
+
+  flashAction = "played";
+  clearTimeout(flashTimer);
+  flashTimer = setTimeout(() => { flashAction = null; render(); }, 1000);
+
+  render();
+}
+
+// ── Pet (click the cat image) ────────────────────────────────
+// Asleep: wakes the cat. Awake: mood +2 + brief bounce animation.
+// 睡觉中点击：唤醒。清醒时点击：心情 +2 并触发弹跳动画。
+function doPet() {
+  if (petState.asleep) {
+    petState.asleep = false;
+    saveState(petState);
+    render();
+    renderFeedTab();
+    return;
+  }
+
+  petState.mood = Math.min(100, petState.mood + 2);
+  saveState(petState);
+
+  const img = document.getElementById("petCatImg");
+  img.classList.remove("cat-bounce");
+  void img.offsetWidth;  // force reflow so re-clicks retrigger the animation / 强制重排
+  img.classList.add("cat-bounce");
+  setTimeout(() => img.classList.remove("cat-bounce"), 400);
+
+  render();
+}
+
+// ── Sleep / Wake toggle ──────────────────────────────────────
+function doSleep() {
+  petState.asleep = !petState.asleep;
+  saveState(petState);
+  render();
+  renderFeedTab(); // update disabled state on food cards / 更新食物卡片的禁用状态
+}
+
+
+/* =============================================================
+   SECTION 8: FEED TAB — dynamic item cards
+   Builds the 2-column grid of food cards from FOOD_ITEMS data.
+   从 FOOD_ITEMS 数据动态构建 Feed 标签页的食物卡片网格。
+   ============================================================= */
+
+function renderFeedTab() {
+  const pane  = document.getElementById("paneFeed");
+  const coins = parseInt(localStorage.getItem("coins") || "0", 10);
+  let html    = "";
+
+  // ── Pantry: owned food items ──────────────────────────────────
+  const pantryItems = FOOD_ITEMS.filter(f => (petState.inventory[f.id] || 0) > 0);
+  if (pantryItems.length > 0) {
+    html += '<div class="shop-section"><div class="shop-section-title">🧺 My Pantry</div>' +
+      '<div class="feed-grid">';
+    pantryItems.forEach(item => {
+      const qty   = petState.inventory[item.id];
+      const isDim = petState.asleep;
+      html +=
+        '<div class="food-card' + (isDim ? " food-card-dim" : "") + '">' +
+        '<div class="food-qty">×' + qty + '</div>' +
+        '<div class="food-emoji">' + item.emoji + '</div>' +
+        '<div class="food-name">'  + item.label + '</div>' +
+        '<button class="btn-food-use" data-id="' + item.id + '" data-action="use"' +
+          (isDim ? " disabled" : "") + ">Feed 🍽️</button>" +
+        "</div>";
+    });
+    html += "</div></div>";
+  }
+
+  // ── Buy: full catalogue ───────────────────────────────────────
+  html += '<div class="shop-section"><div class="shop-section-title">🛒 Buy Food</div>' +
+    '<div class="feed-grid">';
+
+  FOOD_ITEMS.forEach(item => {
+    const canAfford = coins >= item.cost;
+    const isLocked  = !!(item.minLevel && petState.level < item.minLevel);
+    const isDim     = !canAfford || isLocked;
+
+    const badges =
+      (item.favorite ? '<span class="food-badge food-fav">❤️ Fav ×1.5</span>' : "") +
+      (item.catnip   ? '<span class="food-badge food-catnip">🌿 Catnip</span>'  : "");
+
+    const hungerCls = item.hunger < 0 ? ' class="stat-neg"' : "";
+    const moodCls   = item.mood   < 0 ? ' class="stat-neg"' : "";
+    let statsHtml =
+      "<span" + hungerCls + ">🍖 " + (item.hunger > 0 ? "+" : "") + item.hunger + "</span>" +
+      "<span" + moodCls   + ">💗 " + (item.mood   > 0 ? "+" : "") + item.mood   + "</span>" +
+      "<span>✨ +" + item.exp + "</span>";
+    if (item.energy) {
+      statsHtml += "<span>⚡ " + (item.energy > 0 ? "+" : "") + item.energy + "</span>";
+    }
+
+    const btnLabel = isLocked ? "🔒 Lv." + item.minLevel : "Buy 🪙" + item.cost;
+
+    html +=
+      '<div class="food-card' + (isDim ? " food-card-dim" : "") + '">' +
+      (badges ? '<div class="food-badges">' + badges + "</div>" : "") +
+      '<div class="food-emoji">' + item.emoji + "</div>" +
+      '<div class="food-name">'  + item.label + "</div>" +
+      '<div class="food-stats">' + statsHtml + "</div>" +
+      '<button class="btn-food-use" data-id="' + item.id + '" data-action="buy"' +
+        (isDim ? " disabled" : "") + ">" + btnLabel + "</button>" +
+      "</div>";
+  });
+
+  html += "</div></div>";
+  pane.innerHTML = html;
+
+  pane.querySelectorAll(".btn-food-use").forEach(btn => {
+    btn.addEventListener("click", () => {
+      if (btn.dataset.action === "use") doUseFood(btn.dataset.id);
+      else                              doBuyFood(btn.dataset.id);
+    });
+  });
+}
+
+
+/* =============================================================
+   SECTION 9: TAB SWITCHING
+   标签页切换逻辑。
+   ============================================================= */
+
+function initTabs() {
+  const tabBar     = document.getElementById("tabBar");
+  const tabButtons = tabBar.querySelectorAll(".tab-btn");
+  // Map tab names → render functions so switching always shows fresh data.
+  // 标签名称映射到渲染函数，切换时始终刷新内容。
+  const tabRender  = { feed: renderFeedTab, shop: renderShopTab, closet: renderClosetTab };
+
+  tabButtons.forEach(btn => {
+    btn.addEventListener("click", () => {
+      tabButtons.forEach(b => b.classList.remove("active"));
+      document.querySelectorAll(".tab-pane").forEach(p => p.classList.remove("active"));
+      btn.classList.add("active");
+      const tabName = btn.dataset.tab;
+      const paneId  = "pane" + tabName.charAt(0).toUpperCase() + tabName.slice(1);
+      document.getElementById(paneId).classList.add("active");
+      if (tabRender[tabName]) tabRender[tabName](); // re-render on switch / 切换时刷新
+    });
+  });
+}
+
+
+/* =============================================================
+   SECTION 10: SHOP TAB + CLOSET TAB
+   Shop: sectioned by category (accessories / backgrounds / beds / skins / bundles).
+   Closet: owned items grouped by slot; default skin always shown.
+
+   商店：按品类分区（配饰 / 背景 / 猫窝 / 皮肤 / 套装）。
+   衣柜：已拥有物品按槽位分组，默认皮肤始终显示。
+   ============================================================= */
+
+// Unified item lookup across all catalogues. / 跨所有目录的统一查找函数。
+function findItemById(id) {
+  return ACCESSORIES.find(x => x.id === id) ||
+         BACKGROUNDS.find(x => x.id === id) ||
+         BEDS.find(x => x.id === id)        ||
+         SKINS.find(x => x.id === id)       || null;
+}
+
+// Build a single shop card HTML string. / 构建单个商店道具卡片的 HTML 字符串。
+function makeShopCard(item, coins) {
+  const owned     = petState.owned.includes(item.id);
+  const locked    = petState.level < (item.minLevel || 1);
+  const canAfford = coins >= item.cost;
+  const dim       = owned || locked || !canAfford;
+
+  let btnLabel, btnDisabled;
+  if (owned)        { btnLabel = "Owned ✓";              btnDisabled = true; }
+  else if (locked)  { btnLabel = "🔒 Lv." + item.minLevel; btnDisabled = true; }
+  else              { btnLabel = "Buy 🪙" + item.cost;    btnDisabled = !canAfford; }
+
+  return '<div class="acc-card' + (dim ? " acc-card-dim" : "") + '">' +
+    '<div class="acc-emoji">' + item.emoji + '</div>' +
+    '<div class="acc-name">'  + item.label + '</div>' +
+    (!owned ? '<div class="acc-cost">🪙 ' + item.cost + '</div>' : '') +
+    '<button class="btn-acc-buy" data-id="' + item.id + '"' +
+      (btnDisabled ? ' disabled' : '') + '>' + btnLabel + '</button>' +
+    '</div>';
+}
+
+// Build a bundle card with strikethrough full price → discounted price.
+// 构建套装卡片，展示划线原价与折后价。
+function makeBundleCard(bundle, coins) {
+  const items       = bundle.items.map(id => findItemById(id)).filter(Boolean);
+  const fullPrice   = items.reduce((s, it) => s + it.cost, 0);
+  const unowned     = items.filter(it => !petState.owned.includes(it.id));
+  const actualPrice = Math.ceil(unowned.reduce((s, it) => s + it.cost, 0) * bundle.discount);
+  const allOwned    = unowned.length === 0;
+  const canAfford   = coins >= actualPrice;
+  const dim         = allOwned || !canAfford;
+
+  const itemNames = items.map(it => it.emoji + ' ' + it.label).join(', ');
+  let btnLabel, btnDisabled;
+  if (allOwned) { btnLabel = "Owned ✓"; btnDisabled = true; }
+  else          { btnLabel = "Buy 🪙" + actualPrice; btnDisabled = !canAfford; }
+
+  return '<div class="acc-card' + (dim ? " acc-card-dim" : "") + '">' +
+    '<div class="acc-emoji">' + bundle.emoji + '</div>' +
+    '<div class="acc-name">'  + bundle.label + '</div>' +
+    '<div class="bundle-items">' + itemNames + '</div>' +
+    '<div class="acc-cost bundle-note">' +
+      '<s>🪙 ' + fullPrice + '</s> → 🪙 ' + actualPrice + ' (20% off)' +
+    '</div>' +
+    '<button class="btn-bundle-buy" data-id="' + bundle.id + '"' +
+      (btnDisabled ? ' disabled' : '') + '>' + btnLabel + '</button>' +
+    '</div>';
+}
+
+// Render the Shop tab, divided into labelled sections. / 渲染商店标签页，按品类添加分区标题。
+function renderShopTab() {
+  const pane  = document.getElementById("paneShop");
+  const coins = parseInt(localStorage.getItem("coins") || "0", 10);
+
+  const section = (title, items, cardFn) =>
+    '<div class="shop-section">' +
+    '<div class="shop-section-title">' + title + '</div>' +
+    '<div class="acc-grid">' + items.map(it => cardFn(it, coins)).join('') + '</div>' +
+    '</div>';
+
+  pane.innerHTML =
+    section("🌄 Backgrounds", BACKGROUNDS,                                    makeShopCard) +
+    section("🛌 Beds",         BEDS,                                           makeShopCard) +
+    section("🐱 Skins (coming soon)", SKINS.filter(s => s.id === "default"),  makeShopCard);
+
+  pane.querySelectorAll('.btn-acc-buy').forEach(btn => {
+    btn.addEventListener('click', () => doBuyAcc(btn.dataset.id));
+  });
+}
+
+// Render the Closet tab, grouped by slot. Default skin always shown.
+// 渲染衣柜标签页，按槽位分组；默认皮肤始终可见。
+function renderClosetTab() {
+  const pane = document.getElementById('paneCloset');
+
+  const closetSection = (title, items, slotKey) => {
+    if (!items.length) return '';
+    const cards = items.map(item => {
+      const isEquipped = petState.equipped[slotKey] === item.id;
+      return '<div class="acc-card' + (isEquipped ? ' acc-card-equipped' : '') + '">' +
+        '<div class="acc-emoji">'  + item.emoji + '</div>' +
+        '<div class="acc-name">'   + item.label + '</div>' +
+        (isEquipped ? '<div class="acc-equipped-label">Wearing ✨</div>' : '') +
+        '<button class="btn-acc-equip" data-id="' + item.id + '" data-slot="' + slotKey + '">' +
+          (isEquipped ? 'Take Off' : 'Wear') +
+        '</button>' +
+        '</div>';
+    }).join('');
+    return '<div class="shop-section">' +
+      '<div class="shop-section-title">' + title + '</div>' +
+      '<div class="acc-grid">' + cards + '</div>' +
+      '</div>';
+  };
+
+  const ownedBg    = BACKGROUNDS.filter(b => petState.owned.includes(b.id));
+  const ownedBeds  = BEDS.filter(b => petState.owned.includes(b.id));
+  const ownedSkins = SKINS.filter(s => s.id === "default" || petState.owned.includes(s.id));
+
+  const hasAnything = ownedBg.length > 0 || ownedBeds.length > 0;
+
+  if (!hasAnything && ownedSkins.length <= 1) {
+    pane.innerHTML = '<p class="pane-empty">🛍️ Nothing yet — visit the Shop!</p>';
+    return;
+  }
+
+  pane.innerHTML =
+    closetSection("🌄 Background",  ownedBg,    "background") +
+    closetSection("🛌 Bed",         ownedBeds,  "bed") +
+    closetSection("🐱 Skin",        ownedSkins, "skin");
+
+  pane.querySelectorAll('.btn-acc-equip').forEach(btn => {
+    btn.addEventListener('click', () => doEquipAcc(btn.dataset.id, btn.dataset.slot));
+  });
+}
+
+// Buy any single item from any catalogue. / 购买任意单件道具。
+function doBuyAcc(itemId) {
+  const item = findItemById(itemId);
+  if (!item || petState.owned.includes(itemId)) return;
+  if (petState.level < (item.minLevel || 1)) return;
+  if (!trySpendCoins(item.cost)) return;
+
+  petState.owned.push(itemId);
+  saveState(petState);
+  render();
+  renderShopTab();
+  renderClosetTab();
+}
+
+// Buy a bundle — charge only unowned items × discount. / 购买套装，仅对未拥有道具收取折扣价。
+function doBuyBundle(bundleId) {
+  const bundle  = BUNDLES.find(b => b.id === bundleId);
+  if (!bundle) return;
+  const unowned = bundle.items.filter(id => !petState.owned.includes(id));
+  if (!unowned.length) return; // all already owned / 全部已拥有
+
+  const items       = unowned.map(id => findItemById(id)).filter(Boolean);
+  const actualPrice = Math.ceil(items.reduce((s, it) => s + it.cost, 0) * bundle.discount);
+  if (!trySpendCoins(actualPrice)) return;
+
+  unowned.forEach(id => petState.owned.push(id));
+  saveState(petState);
+  render();
+  renderShopTab();
+  renderClosetTab();
+}
+
+// Toggle equip / unequip in a specific slot. / 在指定槽位切换穿戴 / 取下。
+function doEquipAcc(itemId, slotKey) {
+  petState.equipped[slotKey] = (petState.equipped[slotKey] === itemId) ? null : itemId;
+  saveState(petState);
+  render();
+  renderClosetTab();
+}
+
+
+/* =============================================================
+   PAGE LOAD SEQUENCE
+   所有函数定义完成后，按顺序执行初始化调用。
+   ============================================================= */
+
+function init() {
+  petState = loadState();     // 1. Load saved state (or defaults)    / 加载保存的状态
+  applyDecay(petState);       // 2. Apply time-based decay             / 应用时间衰减
+  saveState(petState);        // 3. Persist updated lastSeen           / 写回更新后的时间戳
+  checkDailyBonus();          // 4. Award first-visit bonus if new day / 新的一天自动发放签到金币
+  render();                   // 5. Draw all UI                        / 渲染界面
+  renderFeedTab();            // 6. Build food item cards              / 构建食物卡片
+  renderShopTab();            // 7. Build shop accessory cards         / 构建商店配饰卡片
+  renderClosetTab();          // 8. Build closet                       / 构建衣柜
+
+  document.getElementById("btnFeed").addEventListener("click", () => {
+    // Open the Feed tab so user picks from pantry or buys food
+    document.querySelectorAll(".tab-btn").forEach(b => b.classList.remove("active"));
+    document.querySelectorAll(".tab-pane").forEach(p => p.classList.remove("active"));
+    document.querySelector('.tab-btn[data-tab="feed"]').classList.add("active");
+    document.getElementById("paneFeed").classList.add("active");
+    renderFeedTab();
+  });
+  document.getElementById("btnPlay").addEventListener("click",   doPlay);
+  document.getElementById("btnSleep").addEventListener("click",  doSleep);
+  document.getElementById("petCatImg").addEventListener("click", doPet);
+
+  initTabs();                 // 8. Wire tab switching                 / 绑定标签切换
+
+  // Reapply decay + re-render every 60 s while page is open.
+  // 页面开着时每 60 秒重新衰减并刷新界面。
+  setInterval(() => {
+    applyDecay(petState);
+    saveState(petState);
+    render();
+    renderFeedTab();
+  }, 60000);
+
+  // ── Robust persistence ───────────────────────────────────────
+  // Save the moment the tab loses focus or the window closes.
+  // 切换标签页或关闭窗口时立即存档，防止状态丢失。
+  document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState === "hidden") saveState(petState);
+  });
+  window.addEventListener("beforeunload", () => saveState(petState));
+
+  // Keep coin display in sync if the timer page earns coins while both tabs are open.
+  // 计时器页同时开着时，storage 事件同步金币显示，无需刷新。
+  window.addEventListener("storage", (e) => {
+    if (e.key === "coins") render();
+  });
+}
+
+init();

@@ -1,0 +1,11 @@
+名称：pomodoro-timer-with-game（番茄钟 + 宠物）
+仓库：https://github.com/VV0611/pomodoro-timer-with-game
+许可：仓库内未检出 LICENSE 文件 —— 未声明许可，仅供学习展示，按原样引用并注明来源，
+      本作业不对其重新授权。
+本地目录：tools/pomodoro/
+接入改动（仅入口名）：
+  - 上游入口是 timer.html；区块门统一指向 <目录>/index.html，
+    因此新增 index.html 作为一次同目录跳转（pet.html 回链 timer.html 仍然有效），
+    timer.html / timer.js / timer.css / pet.* / cats / sounds 原样保留。
+  - 未拷贝 demo.gif（14MB）与几张 README 截图。
+  - 页面里的 Google Fonts 外链在离线环境不会加载，仅影响字体，不影响计时/宠物/音效。

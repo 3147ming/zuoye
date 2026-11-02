@@ -17,13 +17,15 @@
       <div class="hud">
         <div class="hud-title">
           <h1>世界大厅 <span>World Hub</span></h1>
-          <p>横版世界 · 五道传送门 · 五个世界</p>
+          <p>区块世界 · 左工具 · 右游戏</p>
         </div>
 
         <div class="hud-keys">
           <span><kbd>A</kbd><kbd>D</kbd> 移动</span>
           <span class="sep"></span>
           <span><kbd>空格</kbd> 跳跃</span>
+          <span class="sep"></span>
+          <span><kbd>E</kbd> 进入</span>
           <span class="sep"></span>
           <span><kbd>H</kbd> 帮助</span>
         </div>
@@ -51,11 +53,11 @@
   <script src="js/npc.js"></script>
   <script src="js/save.js"></script>
   <script src="js/world.js"></script>
-  <script src="js/games/snake.js"></script>
-  <script src="js/games/fireice.js"></script>
-  <script src="js/games/fight.js"></script>
-  <script src="js/games/cards.js"></script>
-  <script src="js/games/memory.js"></script>
+  <script src="js/iframeScene.js"></script>
+  <!--
+    第四批：五款内置小游戏（games/*.js）不再加载，大厅改成 iframe 接入开源页面。
+    历史文件仍保留在 js/games/ 与 js/games/*.js 里，只是没有 <script> 引用。
+  -->
   <script>
   (function () {
     'use strict';

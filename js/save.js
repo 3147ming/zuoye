@@ -3,25 +3,32 @@
  *
  * 独立于任何场景对象：谁需要谁调用 window.Save，场景销毁不影响存档。
  * 只做三件事：
- *   1) 记住角色在大厅里的位置（进传送门时写，回大厅时读）；
- *   2) 记住哪几扇门通过关（三门：fireice / fight / cards）；
+ *   1) 记住角色在哪个区块、区块内的哪个位置（进门前写，回大厅时读）；
+ *   2) 兼容历史：记下三款内置小游戏的「已通关」标记（第四批起大厅不再画吊牌）；
  *   3) 读写全程 try/catch —— file:// 下 localStorage 可能被浏览器策略禁用，
  *      隐私模式下 setItem 也可能抛 QuotaExceeded，任何一种都不能把游戏搞崩。
  *
- * 贪吃蛇是无尽模式，不写入 doors，最高分仍由 snake.js 自己的 readBest 管。
+ * 第四批新增 zone 字段：值必须是 ZONES（world.js）里存在的区块 id，否则回落 plaza。
  * ============================================================ */
 (function (global) {
   'use strict';
 
-  /* 角色合法的横向范围，与 world.js 里 player.bounds 保持一致（地图 2800 - 44） */
-  var X_MIN = 44;
-  var X_MAX = 2756;
+  /* 角色合法的横向范围。第四批改成「每区块一屏 1280」，
+     所以 x 是区块内本地坐标，范围就是 [40, 1240]（与 world.js 的 EDGE_L / EDGE_R 一致）。 */
+  var X_MIN = 40;
+  var X_MAX = 1240;
 
-  /* 只有这三扇门参与「已通关」标记 */
+  /* 只有这三扇门参与「已通关」标记（历史三款内置小游戏；开源 iframe 版不参与） */
   var DOORS = { fireice: 1, fight: 1, cards: 1 };
 
+  /* 区块 id 白名单：必须和 world.js 的 ZONES 一一对应，多一个少一个都算存档脏数据 */
+  var ZONES = {
+    plaza: 1, noise: 1, pomodoro: 1,
+    snake: 1, game2048: 1, tetris: 1, fight: 1, mine: 1, gomoku: 1, breakout: 1
+  };
+
   function defaults() {
-    return { v: 1, player: null, doors: {} };
+    return { v: 1, player: null, doors: {}, zone: 'plaza' };
   }
 
   var Save = {
@@ -57,6 +64,10 @@
         }
         s.doors = clean;
 
+        /* 第四批：区块 id。旧存档没有这个字段 → 回中心广场；
+           写了不存在的 id 也回中心广场（白名单外一律不认） */
+        if (typeof s.zone !== 'string' || !ZONES[s.zone]) s.zone = 'plaza';
+
         return s;
       } catch (e) {
         return def;
@@ -73,13 +84,14 @@
       }
     },
 
-    /* 记录角色位置：进传送门前调用 */
-    setPlayer: function (x, facing) {
+    /* 记录角色位置：进门前调用。zoneId 可选，旧调用方式（只传 x/facing）保持可用 */
+    setPlayer: function (x, facing, zoneId) {
       var s = this.get();
       var px = Number(x);
       if (!isFinite(px)) return;
       px = Math.max(X_MIN, Math.min(X_MAX, px));
       s.player = { x: px, facing: (facing === 1 || facing === -1) ? facing : 1 };
+      if (typeof zoneId === 'string' && ZONES[zoneId]) s.zone = zoneId;
       this.set(s);
     },
 

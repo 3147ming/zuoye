@@ -1,0 +1,10 @@
+名称：白噪音 · 专注台（自研实现）
+上游参考：Kanso —— https://dev.to/lnz79d612/how-i-built-a-7kb-offline-focus-brown-noise-synth-inside-a-single-html-file-no-mp3s-just-web-53bf
+         作者仓库 https://github.com/lnz79d612/kanso-desk 只有 README，成品 .html 仅在 Gumroad
+         （Pay-What-You-Want）发放，未提供可直接下载的裸文件，因此**未取得上游源文件**。
+本地目录：tools/noise/
+说明：本目录 index.html 是按上述文章公开描述的功能自行实现的一版（非上游产物）：
+  - 棕噪音：白噪声逐样本一阶积分 + BiquadFilter 低通（120–1500Hz），3 秒缓冲循环；
+  - 专注计时 25 / 50 分钟，结束播 528Hz 双音提示；
+  - 本地便签，400ms 防抖写入 localStorage（key: worldhub.noise.note），可导出 .txt。
+许可：自研代码，随本作业一并提交。

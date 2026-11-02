@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="utf-8">
+    <title>mk.js · 格斗</title>
+    <!--
+      适配说明（WorldHub 第四批接入，仅此三处，玩法代码零改动）：
+      1) 删除上游的 <script src="/socket.io/socket.io.js"></script>：
+         file:// 下没有 socket 服务端，保留会 404 并让 io 未定义。
+      2) mk.start 的 gameType 由 'network' 改为 'multiplayer'：
+         上游 demo 页只有联机入口，multiplayer 是 mk.js 自带的本地双人控制器。
+      3) 去掉「是否做房主 / 房间名」两个 prompt 与摄像头列、长说明，
+         改成 1280×720 里放得下的单屏版式（纯排版，不含逻辑）。
+      按键沿用 upstream：P1 G/J/Y/H 移动跳跃 · S 低拳 · D 低踢 · F 高拳 · Shift 防御
+                          P2 ←/→/↑/↓ 移动跳跃 · [ 低拳 · ] 低踢 · \ 高拳 · Ctrl 防御
+    -->
+    <script src="src/movement.js"></script>
+    <script src="src/mk.js"></script>
+    <link rel="stylesheet" href="styles/styles.css">
+    <style>
+        html, body { height: 100%; margin: 0; background: #07060c; }
+        body {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            overflow: hidden;
+            font-family: "PingFang SC", "Microsoft YaHei", system-ui, sans-serif;
+        }
+        #parent { flex: 0 0 auto; }
+        .keys {
+            display: flex;
+            gap: 26px;
+            font-size: 12px;
+            letter-spacing: 0.06em;
+            color: rgba(233, 226, 245, 0.62);
+            text-align: center;
+        }
+        .keys b { color: #ffd9a8; font-weight: 600; }
+        .keys span { white-space: nowrap; }
+    </style>
+</head>
+<body>
+    <table>
+        <thead>
+            <th>Arena</th>
+        </thead>
+        <tbody>
+            <tr>
+                <td>
+                    <div id="parent">
+                        <div id="utils">
+                            <div id="player1Name" class="playerName">Sub-Zero</div>
+                            <div id="player1LifeBar" class="lifebar"><div class="life" id="player1Life"></div></div>
+                            <div id="player2Name" class="playerName">Kano</div>
+                            <div id="player2LifeBar" class="lifebar"><div class="life" id="player2Life"></div></div>
+                        </div>
+                        <div id="arena">
+                        </div>
+                        <div id="loading">
+                            <span class="loadingLabel">Loading...</span>
+                        </div>
+                    </div>
+                </td>
+            </tr>
+        </tbody>
+    </table>
+
+    <div class="keys">
+        <span>P1 <b>G J Y H</b> 移动跳跃 · <b>S</b> 低拳 · <b>D</b> 低踢 · <b>F</b> 高拳 · <b>Shift</b> 防御</span>
+        <span>P2 <b>← → ↑ ↓</b> 移动跳跃 · <b>[</b> 低拳 · <b>]</b> 低踢 · <b>\</b> 高拳 · <b>Ctrl</b> 防御</span>
+        <span><b>空格</b> 重开</span>
+    </div>
+
+    <script>
+        (function () {
+
+            function $(id) {
+                return document.getElementById(id);
+            }
+
+            function setLife(container, life) {
+                container.style.width = life + '%';
+            }
+
+            /* 上游 demo 的「空格重开整页」保留：mk.js 本身不用空格 */
+            document.onkeydown = function (e) {
+                if (e.keyCode === 32) {
+                    window.location.reload();
+                }
+            };
+
+            (function () {
+                var startGame = function () {
+                    $('loading').style.visibility = 'hidden';
+                    $('arena').style.visibility = 'visible';
+                    $('utils').style.visibility = 'visible';
+                };
+
+                var options = {
+                    arena: {
+                        container: document.getElementById('arena'),
+                        arena: mk.arenas.types.THRONE_ROOM
+                    },
+                    fighters: [{ name: 'Subzero' }, { name: 'Kano' }],
+                    callbacks: {
+                        attack: function (f, o, l) {
+                            if (o.getName() === 'kano') {
+                                setLife($('player2Life'), o.getLife());
+                            } else {
+                                setLife($('player1Life'), o.getLife());
+                            }
+                        }
+                    },
+                    gameType: 'multiplayer'   /* 本地双人；上游此处为 'network' + socket.io */
+                };
+
+                mk.start(options).ready(function () {
+                    startGame();
+                });
+            }());
+
+        }());
+    </script>
+</body>
+</html>

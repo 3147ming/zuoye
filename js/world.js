@@ -1,9 +1,17 @@
 /* ============================================================
- * world.js —— 横版世界大厅（大厅场景）
+ * world.js —— 世界大厅（区块化横版地图）
  * ------------------------------------------------------------
  * 场景接口：init(ctx) / update(dt) / render(ctx) / destroy()
- * 地图 2800×720，摄像机只能左右移动。
- * 画面语言：剪纸黄昏 —— 分层剪影 + 背光暖边 + 纸纹
+ *
+ * 第四批改造：
+ *   1) 不再是单张 2800 像素的卷轴，而是「一屏一个区块」（1280×720 本地坐标）。
+ *      走 A/D 到屏幕左右边缘会自动切到相邻区块，摄像机固定、不再滚动。
+ *   2) 区块表 ZONES 全数据化：加一个区块 = 往数组里加一段配置。
+ *      顺序：noise → pomodoro → plaza → snake → game2048 → tetris → fight
+ *            → mine → gomoku → breakout
+ *   3) 门不再是「走近就切」，改成「站到门前提示，按 E 进入」；
+ *      进入后由 js/iframeScene.js 用 iframe 加载 games/ 或 tools/ 下的开源页面。
+ *   4) 画面语言不变：剪纸黄昏 —— 分层剪影 + 背光暖边 + 纸纹 + mulberry32 确定性生成。
  * ============================================================ */
 (function (global) {
   'use strict';
@@ -11,10 +19,15 @@
   /* ---------------- 常量 ---------------- */
   var VIEW_W = 1280;
   var VIEW_H = 720;
-  var MAP_W = 2800;
-  var MAP_H = 720;
   var GROUND_Y = 566;
-  var SEED = 20261102;
+
+  /* 走到这个范围外就切区块；回来时从另一侧 40 / 1240 进入 */
+  var EDGE_L = 40;
+  var EDGE_R = 1240;
+  var DOOR_HIT = 62;
+
+  var NPC_X = 470;
+  var NPC_RANGE = 80;
 
   var SERIF = '"Songti SC", "STSong", "Source Han Serif SC", "SimSun", serif';
   var SANS = '"Microsoft YaHei", "PingFang SC", "Hiragino Sans GB", sans-serif';
@@ -28,18 +41,6 @@
     } catch (e) { /* 音效失败不影响玩法 */ }
   }
 
-  /* 帮助面板内容：必须和真实键位逐字一致，改键位请同步改这里 */
-  var HELP_ROWS = [
-    ['大厅', 'A / D 移动 · 空格 跳跃 · E 与守灯人对话 · H 帮助'],
-    ['贪吃蛇', '方向键 转向 · R 重开 · Esc 回大厅'],
-    ['森林冰火人', '方向键 移动 · 空格 跳跃 · Tab 换人 · R 重开 · Esc 回大厅'],
-    ['二人格斗', 'P1  A D W 移动跳跃 · J 拳 · K 踢 · L 必杀'],
-    ['', 'P2  ← → ↑ 移动跳跃 · 1 拳 · 2 踢 · 3 必杀'],
-    ['与 AI 打牌', '单击选牌 · 双击直接出 · 空格 出牌 · F 提示 · Esc 回大厅'],
-    ['记忆翻牌', '单击翻牌 · 再点同一张无效 · Esc 回大厅'],
-    ['通用', 'Esc 回大厅 · H 关掉这块面板']
-  ];
-
   function mulberry32(a) {
     return function () {
       a |= 0; a = (a + 0x6D2B79F5) | 0;
@@ -52,6 +53,15 @@
   function rgba(hex, a) {
     var n = parseInt(hex.slice(1), 16);
     return 'rgba(' + ((n >> 16) & 255) + ',' + ((n >> 8) & 255) + ',' + (n & 255) + ',' + a + ')';
+  }
+
+  /* k < 1 压暗、k > 1 提亮，用来按 themeSeed 做「同主题不同区块」的轻微色偏 */
+  function shade(hex, k) {
+    var n = parseInt(hex.slice(1), 16);
+    var r = clamp(Math.round(((n >> 16) & 255) * k), 0, 255);
+    var g = clamp(Math.round(((n >> 8) & 255) * k), 0, 255);
+    var b = clamp(Math.round((n & 255) * k), 0, 255);
+    return '#' + ((1 << 24) + (r << 16) + (g << 8) + b).toString(16).slice(1);
   }
 
   function roundRect(ctx, x, y, w, h, r) {
@@ -96,60 +106,156 @@
     return c;
   }
 
-  /* ---------------- 静态图层：天空 ---------------- */
-  function buildSky() {
-    var c = document.createElement('canvas');
-    c.width = VIEW_W;
-    c.height = GROUND_Y;
-    var g = c.getContext('2d');
-
-    var sky = g.createLinearGradient(0, 0, 0, GROUND_Y);
-    sky.addColorStop(0.00, '#0a0c1e');
-    sky.addColorStop(0.24, '#1a1634');
-    sky.addColorStop(0.46, '#372244');
-    sky.addColorStop(0.66, '#65334a');
-    sky.addColorStop(0.83, '#a05940');
-    sky.addColorStop(1.00, '#dd9a5f');
-    g.fillStyle = sky;
-    g.fillRect(0, 0, VIEW_W, GROUND_Y);
-
-    /* 太阳与光晕 */
-    var sx = 992, sy = 352, sr = 68;
-    var halo = g.createRadialGradient(sx, sy, sr * 0.7, sx, sy, sr * 5.2);
-    halo.addColorStop(0, 'rgba(255, 205, 145, 0.34)');
-    halo.addColorStop(0.42, 'rgba(255, 165, 100, 0.13)');
-    halo.addColorStop(1, 'rgba(255, 140, 80, 0)');
-    g.fillStyle = halo;
-    g.fillRect(0, 0, VIEW_W, GROUND_Y);
-
-    g.beginPath();
-    g.arc(sx, sy, sr, 0, Math.PI * 2);
-    var disc = g.createLinearGradient(0, sy - sr, 0, sy + sr);
-    disc.addColorStop(0, '#ffefd0');
-    disc.addColorStop(0.55, '#ffd09a');
-    disc.addColorStop(1, '#f0a066');
-    g.fillStyle = disc;
-    g.fill();
-
-    /* 剪纸云带 */
-    var bands = [
-      { x: 100, y: 206, w: 320, h: 8, a: 0.085 },
-      { x: 470, y: 258, w: 200, h: 6, a: 0.06 },
-      { x: 690, y: 164, w: 400, h: 9, a: 0.05 },
-      { x: 250, y: 328, w: 440, h: 10, a: 0.075 },
-      { x: 800, y: 392, w: 470, h: 11, a: 0.06 }
-    ];
-    if ('filter' in g) g.filter = 'blur(5px)';
-    for (var i = 0; i < bands.length; i++) {
-      var b = bands[i];
-      g.fillStyle = 'rgba(255, 222, 180, ' + b.a + ')';
-      roundRect(g, b.x, b.y, b.w, b.h, b.h / 2);
-      g.fill();
+  /* ============================================================
+   * 1. 区块配置表
+   * ------------------------------------------------------------
+   * side: left（工具区）/ center（出生广场）/ right（游戏区）
+   * themeSeed: 决定这一屏的山脊、树、路灯、天色偏移，同 seed 永远同一张图
+   * doors: 目前每区块一门；要加门就往 doors 里多写一个对象（x 会自动按 side 排）
+   * ============================================================ */
+  var ZONES = [
+    {
+      id: 'noise', side: 'left', title: '白噪音', themeSeed: 1103,
+      doors: [{
+        id: 'noise', name: '白噪音', src: 'tools/noise/index.html',
+        color: '#7fd8c8', glyph: 'noise', desc: '棕噪音 · 计时 · 便签'
+      }]
+    },
+    {
+      id: 'pomodoro', side: 'left', title: '番茄钟', themeSeed: 1104,
+      doors: [{
+        id: 'pomodoro', name: '番茄钟', src: 'tools/pomodoro/index.html',
+        color: '#f07167', glyph: 'pomodoro', desc: '专注计时 · 陪伴小猫'
+      }]
+    },
+    {
+      id: 'plaza', side: 'center', title: '中心广场', themeSeed: 0, doors: []
+    },
+    {
+      id: 'snake', side: 'right', title: '贪吃蛇', themeSeed: 1105,
+      doors: [{
+        id: 'snake', name: '贪吃蛇', src: 'games/snake/index.html',
+        color: '#5fd39a', glyph: 'snake', desc: '经典蛇 · 越吃越快'
+      }]
+    },
+    {
+      id: 'game2048', side: 'right', title: '2048', themeSeed: 1106,
+      doors: [{
+        id: 'game2048', name: '2048', src: 'games/game2048/index.html',
+        color: '#f2cc60', glyph: 'n2048', desc: '数字合璧'
+      }]
+    },
+    {
+      id: 'tetris', side: 'right', title: '俄罗斯方块', themeSeed: 1107,
+      doors: [{
+        id: 'tetris', name: '俄罗斯方块', src: 'games/tetris/index.html',
+        color: '#9b8afb', glyph: 'tetris', desc: '方块下落 · 消行'
+      }]
+    },
+    {
+      id: 'fight', side: 'right', title: '格斗', themeSeed: 1108,
+      doors: [{
+        id: 'fight', name: '格斗', src: 'games/fight/index.html',
+        color: '#e8545f', glyph: 'fight', desc: '本地双人 · 出招掉血'
+      }]
+    },
+    {
+      id: 'mine', side: 'right', title: '扫雷', themeSeed: 1109,
+      doors: [{
+        id: 'mine', name: '扫雷', src: 'games/mine/index.html',
+        color: '#6fc2ef', glyph: 'mine', desc: '翻格子 · 插旗'
+      }]
+    },
+    {
+      id: 'gomoku', side: 'right', title: '五子棋', themeSeed: 1110,
+      doors: [{
+        id: 'gomoku', name: '五子棋', src: 'games/gomoku/index.html',
+        color: '#e8b45a', glyph: 'gomoku', desc: '人机对弈 · 五连'
+      }]
+    },
+    {
+      id: 'breakout', side: 'right', title: '打砖块', themeSeed: 1111,
+      doors: [{
+        id: 'breakout', name: '打砖块', src: 'games/breakout/index.html',
+        color: '#f2a0c0', glyph: 'breakout', desc: '反弹消砖 · 逐关'
+      }]
     }
-    if ('filter' in g) g.filter = 'none';
+  ];
 
-    return c;
-  }
+  var PLAZA_IDX = 2;
+  var SIDE_NAME = { left: '工具区', right: '游戏区', center: '中心广场' };
+
+  /* 门在区块里的横向位置：右侧区块放 960（留出往回走的空间），左侧放 320 */
+  (function layoutZones() {
+    for (var i = 0; i < ZONES.length; i++) {
+      var z = ZONES[i];
+      z.doors.forEach(function (d) {
+        d.x = z.side === 'left' ? 320 : (z.side === 'right' ? 960 : 640);
+        d.w = 104;
+        d.h = 190;
+      });
+    }
+  }());
+
+  /* 三套配色：广场黄昏橙、工具区偏青绿、游戏区偏紫蓝 */
+  var THEME = {
+    left: {
+      sky: ['#03121a', '#082530', '#0f3a42', '#1c5750', '#3b7d6b', '#7cb79b'],
+      ridge: [
+        { c: '#1b3a3c', rim: 'rgba(122, 186, 166, 0.50)' },
+        { c: '#15302f', rim: 'rgba(96, 154, 138, 0.40)' },
+        { c: '#0f2624', rim: 'rgba(76, 128, 114, 0.34)' },
+        { c: '#081715', rim: 'rgba(58, 102, 90, 0.30)' }
+      ],
+      tree: ['#0c201f', '#061312'],
+      grass: '#04100f',
+      road: '#12211f',
+      roadDark: '#07100f',
+      edge: 'rgba(150, 220, 190, 0.58)',
+      mist: 'rgba(96, 168, 148, 0.10)'
+    },
+    center: {
+      sky: ['#0a0c1e', '#1a1634', '#372244', '#65334a', '#a05940', '#dd9a5f'],
+      ridge: [
+        { c: '#3b3059', rim: 'rgba(122, 100, 158, 0.55)' },
+        { c: '#2f2749', rim: 'rgba(96, 80, 130, 0.45)' },
+        { c: '#241d3b', rim: 'rgba(74, 62, 105, 0.40)' },
+        { c: '#171325', rim: 'rgba(58, 49, 80, 0.40)' }
+      ],
+      tree: ['#1d1733', '#120f1e'],
+      grass: '#0a0713',
+      road: '#1a1527',
+      roadDark: '#0c0916',
+      edge: 'rgba(240, 167, 110, 0.62)',
+      mist: 'rgba(146, 112, 114, 0.11)'
+    },
+    right: {
+      sky: ['#06081d', '#141140', '#28205a', '#44296a', '#6d4278', '#a2668e'],
+      ridge: [
+        { c: '#2b2454', rim: 'rgba(150, 118, 190, 0.52)' },
+        { c: '#221c46', rim: 'rgba(126, 98, 164, 0.44)' },
+        { c: '#191436', rim: 'rgba(100, 78, 136, 0.40)' },
+        { c: '#100e26', rim: 'rgba(78, 60, 110, 0.36)' }
+      ],
+      tree: ['#191335', '#0e0b1f'],
+      grass: '#080613',
+      road: '#1b1630',
+      roadDark: '#0b0918',
+      edge: 'rgba(196, 150, 220, 0.55)',
+      mist: 'rgba(130, 100, 156, 0.12)'
+    }
+  };
+
+  /* 帮助面板内容：必须和真实键位逐字一致，改键位请同步改这里 */
+  var HELP_ROWS = [
+    ['大厅', 'A / D 移动 · 空格 跳跃 · E 进门 / 对话 · H 帮助'],
+    ['换区块', '走到画面最左 / 最右边缘自动换区块'],
+    ['进门', '站到门前，提示条出现「按 E 进入」时按 E'],
+    ['游戏 / 工具', '右上角「← 返回大厅」按钮，或按 Esc 回大厅'],
+    ['工具区', '左侧两屏：白噪音（最左）· 番茄钟'],
+    ['游戏区', '右侧七屏：贪吃蛇 / 2048 / 俄罗斯方块 / 格斗 / 扫雷 / 五子棋 / 打砖块'],
+    ['通用', 'Esc 回大厅 · H 关掉这块面板']
+  ];
 
   /* ---------------- 静态图层：纸纹 / 暗角 ---------------- */
   function buildGrain() {
@@ -184,7 +290,7 @@
     return c;
   }
 
-  /* ---------------- 山脊 ---------------- */
+  /* ---------------- 山脊 / 装饰件 ---------------- */
   function makeRidge(rng, width, baseY, amp, minStep, maxStep) {
     var pts = [{ x: -260, y: baseY }];
     var x = -200;
@@ -192,7 +298,7 @@
     while (x < width + 260) {
       x += minStep + rng() * (maxStep - minStep);
       var t = rng();
-      if (t < 0.22) y = baseY - amp * (0.02 + rng() * 0.1);      // 落在谷底
+      if (t < 0.22) y = baseY - amp * (0.02 + rng() * 0.1);
       else y = baseY - amp * (0.28 + rng() * 0.72);
       pts.push({ x: x, y: y });
     }
@@ -234,7 +340,6 @@
     ctx.stroke();
   }
 
-  /* ---------------- 装饰件 ---------------- */
   function drawPine(ctx, x, baseY, h, w, color) {
     ctx.fillStyle = color;
     ctx.beginPath();
@@ -266,10 +371,8 @@
   }
 
   function drawLamp(ctx, x, baseY, h) {
-    /* 杆 */
     ctx.fillStyle = '#0c0916';
     ctx.fillRect(x - 2, baseY - h, 4, h);
-    /* 灯头 */
     ctx.beginPath();
     ctx.moveTo(x - 13, baseY - h + 2);
     ctx.lineTo(x + 13, baseY - h + 2);
@@ -277,7 +380,6 @@
     ctx.lineTo(x - 8, baseY - h - 20);
     ctx.closePath();
     ctx.fill();
-    /* 灯芯 */
     ctx.fillStyle = 'rgba(255, 214, 158, 0.95)';
     ctx.beginPath();
     ctx.moveTo(x - 8, baseY - h + 1);
@@ -288,7 +390,7 @@
     ctx.fill();
   }
 
-  /* ---------------- 传送门里的图腾 ---------------- */
+  /* ---------------- 门里的图腾（九种） ---------------- */
   function drawGlyph(ctx, kind, cx, cy, t) {
     ctx.save();
     ctx.strokeStyle = 'rgba(255, 255, 255, 0.86)';
@@ -319,34 +421,26 @@
       ctx.arc(px[6], py[6], 5.2, 0, Math.PI * 2);
       ctx.fill();
 
-    } else if (kind === 'fireice') {
-      /* 火：一簇水滴形外焰 */
-      var fx = cx - 15;
-      ctx.beginPath();
-      ctx.moveTo(fx - 9, cy + 15);
-      ctx.quadraticCurveTo(fx - 14, cy + 2, fx - 5, cy - 21);
-      ctx.quadraticCurveTo(fx - 3, cy - 7, fx + 3, cy - 3);
-      ctx.quadraticCurveTo(fx + 11, cy + 5, fx + 5, cy + 15);
-      ctx.quadraticCurveTo(fx - 1, cy + 21, fx - 9, cy + 15);
-      ctx.stroke();
-      /* 冰：六芒雪晶 */
-      var ix = cx + 15, iy = cy + 2;
-      for (i = 0; i < 3; i++) {
-        a = i * Math.PI / 3;
-        ctx.beginPath();
-        ctx.moveTo(ix - Math.cos(a) * 12, iy - Math.sin(a) * 12);
-        ctx.lineTo(ix + Math.cos(a) * 12, iy + Math.sin(a) * 12);
+    } else if (kind === 'n2048') {
+      /* 四块数字砖：2 0 4 8 */
+      var nums = ['2', '0', '4', '8'];
+      ctx.font = '600 17px ' + SANS;
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      for (i = 0; i < 4; i++) {
+        x = cx + (i % 2 ? 13 : -13);
+        y = cy + (i < 2 ? -13 : 13);
+        roundRect(ctx, x - 11, y - 11, 22, 22, 5);
         ctx.stroke();
+        ctx.fillText(nums[i], x, y + 1);
       }
-      for (i = 0; i < 6; i++) {
-        a = i * Math.PI / 3;
-        var ex = ix + Math.cos(a) * 9;
-        var ey = iy + Math.sin(a) * 9;
-        ctx.beginPath();
-        ctx.moveTo(ex, ey);
-        ctx.lineTo(ex - Math.cos(a - 0.7) * 4.2, ey - Math.sin(a - 0.7) * 4.2);
-        ctx.moveTo(ex, ey);
-        ctx.lineTo(ex - Math.cos(a + 0.7) * 4.2, ey - Math.sin(a + 0.7) * 4.2);
+
+    } else if (kind === 'tetris') {
+      /* 一个 S 形 + 一个方块，凑成「下落」的感觉 */
+      var blocks = [[-18, -18], [-18, 0], [0, 0], [0, 18], [18, 18], [18, 36],
+                    [18, -12], [36, -12], [36, 6], [54, 6]];
+      for (i = 0; i < blocks.length; i++) {
+        roundRect(ctx, cx - 26 + blocks[i][0], cy - 26 + blocks[i][1], 15, 15, 2.5);
         ctx.stroke();
       }
 
@@ -366,42 +460,92 @@
       ctx.arc(cx, cy, 3, 0, Math.PI * 2);
       ctx.fill();
 
-    } else if (kind === 'memory') {
-      /* 记忆翻牌：两张叠放的牌，上面一张翻出四角星 */
-      for (i = 0; i < 2; i++) {
-        ctx.save();
-        ctx.translate(cx + (i === 0 ? -9 : 9), cy + 2);
-        ctx.rotate(i === 0 ? -0.16 : 0.13);
-        roundRect(ctx, -11.5, -21, 23, 41, 3.5);
+    } else if (kind === 'mine') {
+      /* 8×8 小网格 + 一颗雷 */
+      ctx.lineWidth = 1.1;
+      for (i = 0; i <= 4; i++) {
+        ctx.beginPath();
+        ctx.moveTo(cx - 30, cy - 24 + i * 12);
+        ctx.lineTo(cx + 6, cy - 24 + i * 12);
+        ctx.moveTo(cx - 30 + i * 9, cy - 24);
+        ctx.lineTo(cx - 30 + i * 9, cy + 24);
         ctx.stroke();
-        if (i === 1) {
-          ctx.beginPath();
-          for (var mk = 0; mk < 8; mk++) {
-            a = -Math.PI / 2 + mk * Math.PI / 4;
-            var mr = (mk % 2 === 0) ? 7.4 : 3.2;
-            if (mk === 0) ctx.moveTo(Math.cos(a) * mr, Math.sin(a) * mr + 1);
-            else ctx.lineTo(Math.cos(a) * mr, Math.sin(a) * mr + 1);
-          }
-          ctx.closePath();
-          ctx.fill();
-        }
-        ctx.restore();
+      }
+      ctx.lineWidth = 2.2;
+      ctx.beginPath();
+      ctx.arc(cx + 22, cy + 4, 9, 0, Math.PI * 2);
+      ctx.stroke();
+      for (i = 0; i < 8; i++) {
+        a = i * Math.PI / 4;
+        ctx.beginPath();
+        ctx.moveTo(cx + 22 + Math.cos(a) * 9, cy + 4 + Math.sin(a) * 9);
+        ctx.lineTo(cx + 22 + Math.cos(a) * 14, cy + 4 + Math.sin(a) * 14);
+        ctx.stroke();
       }
 
-    } else {
-      /* cards：三张扇形展开的牌 */
-      for (i = 0; i < 3; i++) {
-        var off = (i - 1) * 13;
-        ctx.save();
-        ctx.translate(cx + off, cy + 2);
-        ctx.rotate((i - 1) * 0.18);
-        roundRect(ctx, -10, -20, 20, 38, 3.5);
-        ctx.stroke();
+    } else if (kind === 'gomoku') {
+      /* 斜着五连 */
+      ctx.lineWidth = 1;
+      for (i = 0; i < 4; i++) {
         ctx.beginPath();
-        ctx.arc(0, -8, 3.2, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.restore();
+        ctx.moveTo(cx - 30 + i * 20, cy - 30);
+        ctx.lineTo(cx - 30 + i * 20, cy + 30);
+        ctx.moveTo(cx - 30, cy - 30 + i * 20);
+        ctx.lineTo(cx + 30, cy - 30 + i * 20);
+        ctx.stroke();
       }
+      ctx.lineWidth = 1.8;
+      for (i = 0; i < 5; i++) {
+        x = cx - 20 + i * 10;
+        y = cy + 20 - i * 10;
+        ctx.beginPath();
+        ctx.arc(x, y, 6.5, 0, Math.PI * 2);
+        if (i % 2 === 0) ctx.fill(); else ctx.stroke();
+      }
+
+    } else if (kind === 'breakout') {
+      /* 三块砖 + 挡板 + 球 */
+      for (i = 0; i < 3; i++) {
+        roundRect(ctx, cx - 28 + i * 20, cy - 26, 17, 10, 2);
+        ctx.stroke();
+      }
+      ctx.beginPath();
+      ctx.arc(cx + 8, cy + 0, 5, 0, Math.PI * 2);
+      ctx.fill();
+      roundRect(ctx, cx - 22, cy + 22, 40, 8, 4);
+      ctx.stroke();
+
+    } else if (kind === 'noise') {
+      /* 一段振幅渐变的波形 */
+      ctx.beginPath();
+      for (i = 0; i <= 40; i++) {
+        x = cx - 30 + i * 1.5;
+        var amp = 6 + Math.sin(i * 0.42 + t * 1.6) * 4 + Math.sin(i * 0.13) * 3;
+        y = cy + Math.sin(i * 0.62 + t * 2.2) * amp;
+        if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+      }
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.moveTo(cx - 30, cy);
+      ctx.lineTo(cx + 30, cy);
+      ctx.strokeStyle = 'rgba(255, 255, 255, 0.26)';
+      ctx.stroke();
+
+    } else {
+      /* pomodoro：番茄 + 指针 */
+      ctx.beginPath();
+      ctx.arc(cx, cy + 4, 21, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.moveTo(cx - 6, cy - 18);
+      ctx.quadraticCurveTo(cx, cy - 28, cx + 8, cy - 19);
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.moveTo(cx, cy + 4);
+      ctx.lineTo(cx, cy - 8);
+      ctx.moveTo(cx, cy + 4);
+      ctx.lineTo(cx + 9, cy + 7);
+      ctx.stroke();
     }
 
     ctx.restore();
@@ -413,43 +557,210 @@
   function WorldScene() {
     this.t = 0;
     this.ctx = null;
-    this.rng = null;
 
-    this.camera = null;
+    this.zoneIdx = PLAZA_IDX;
+    this.zone = ZONES[PLAZA_IDX];
+
     this.player = null;
     this.npc = null;
-    this.portals = [];
     this.near = null;
     this.npcNear = false;
+
     this._onKey = null;
     this._onClick = null;
 
     /* 开场标题卡（2.5s，可跳过）与帮助面板 */
     this.intro = 0;
     this.help = false;
+    this.veil = 0;        /* 切区块时的一层快速淡光 */
+    this.zoneT = 0;       /* 区块标题在提示条上停留的时间 */
+    this.edgeT = 0;       /* 「已到尽头」提示保持时间 */
+    this.edgeLockL = false;
+    this.edgeLockR = false;
 
     /* 用来判断「起跳 / 落地」这一对事件，player 自己不出声 */
     this.prevGround = true;
     this.prevVy = 0;
 
-    this.hills = [];
-    this.trees = [];
-    this.grass = [];
-    this.rocks = [];
-    this.lamps = [];
     this.stars = [];
     this.motes = [];
+    this.lamps = [];
+    this.trees = [];
 
-    this.sky = null;
+    this.bg = null;              /* 当前区块预渲染的整张背景 */
+    this.bgZone = '';            /* 已经烘焙的是哪个区块 */
     this.grain = null;
     this.vignette = null;
     this.grainPattern = null;
     this.lampGlow = null;
 
     this.groundY = GROUND_Y;
-    this.mapW = MAP_W;
-    this.mapH = MAP_H;
+    this.fgPhase = 0;
+    this.hueK = 1;
   }
+
+  /* ---------------- 区块 ---------------- */
+  WorldScene.prototype.setZone = function (idx, opts) {
+    opts = opts || {};
+    this.zoneIdx = clamp(idx, 0, ZONES.length - 1);
+    this.zone = ZONES[this.zoneIdx];
+
+    var seed = this.zone.themeSeed || 1;
+    /* 同主题（左/中/右）之间再按 seed 做 ±6% 的明度偏移，让每一屏都不完全一样 */
+    this.hueK = 1 + (((seed % 7) - 3) * 0.02);
+
+    if (!opts.keepBg) this.bakeBg();
+  };
+
+  /* 预渲染整张背景：天色 / 星 / 山脊 / 林 / 雾 / 地面 —— 逐帧只做一次 drawImage */
+  WorldScene.prototype.bakeBg = function () {
+    var z = this.zone;
+    var theme = THEME[z.side] || THEME.center;
+    var rng = mulberry32(z.themeSeed || 1);
+    var k = this.hueK;
+    var i;
+
+    if (!this.bg) {
+      this.bg = document.createElement('canvas');
+      this.bg.width = VIEW_W;
+      this.bg.height = VIEW_H;
+    }
+    var g = this.bg.getContext('2d');
+    g.clearRect(0, 0, VIEW_W, VIEW_H);
+
+    /* --- 天空 --- */
+    var sky = g.createLinearGradient(0, 0, 0, GROUND_Y);
+    var stops = [0, 0.24, 0.46, 0.66, 0.83, 1];
+    for (i = 0; i < stops.length; i++) {
+      sky.addColorStop(stops[i], shade(theme.sky[i], k));
+    }
+    g.fillStyle = sky;
+    g.fillRect(0, 0, VIEW_W, GROUND_Y);
+
+    /* --- 太阳（位置随区块确定性偏移） --- */
+    var sx = z.side === 'left' ? 240 + rng() * 160 : (z.side === 'right' ? 940 + rng() * 140 : 940 + rng() * 100);
+    var sy = 300 + rng() * 80;
+    var sr = 58 + rng() * 18;
+    var halo = g.createRadialGradient(sx, sy, sr * 0.7, sx, sy, sr * 5.2);
+    halo.addColorStop(0, 'rgba(255, 205, 145, 0.30)');
+    halo.addColorStop(0.42, 'rgba(255, 165, 100, 0.11)');
+    halo.addColorStop(1, 'rgba(255, 140, 80, 0)');
+    g.fillStyle = halo;
+    g.fillRect(0, 0, VIEW_W, GROUND_Y);
+
+    g.beginPath();
+    g.arc(sx, sy, sr, 0, Math.PI * 2);
+    var disc = g.createLinearGradient(0, sy - sr, 0, sy + sr);
+    disc.addColorStop(0, '#ffefd0');
+    disc.addColorStop(0.55, '#ffd09a');
+    disc.addColorStop(1, '#f0a066');
+    g.fillStyle = disc;
+    g.fill();
+
+    /* --- 剪纸云带 --- */
+    if ('filter' in g) g.filter = 'blur(5px)';
+    for (i = 0; i < 5; i++) {
+      var bw = 180 + rng() * 300;
+      var bx = rng() * (VIEW_W - bw);
+      var by = 150 + rng() * 240;
+      g.fillStyle = 'rgba(255, 222, 180, ' + (0.05 + rng() * 0.045).toFixed(3) + ')';
+      roundRect(g, bx, by, bw, 6 + rng() * 5, 5);
+      g.fill();
+    }
+    if ('filter' in g) g.filter = 'none';
+
+    /* --- 星 --- */
+    this.stars.length = 0;
+    for (i = 0; i < 56; i++) {
+      this.stars.push({
+        x: rng() * VIEW_W,
+        y: 20 + rng() * 200,
+        r: 0.6 + rng() * 1.5,
+        p: rng() * Math.PI * 2,
+        s: 0.5 + rng() * 1.4
+      });
+    }
+
+    /* --- 山脊：远景到近景 --- */
+    var ridgeBase = [470, 508, 540, 560];
+    var ridgeAmp = [176, 140, 92, 58];
+    for (i = 0; i < 4; i++) {
+      var pts = makeRidge(rng, VIEW_W, ridgeBase[i], ridgeAmp[i], 110 + i * 4, 190 + i * 20);
+      drawRidge(g, pts, shade(theme.ridge[i].c, k), theme.ridge[i].rim, VIEW_H, i > 0);
+    }
+
+    /* --- 林：挂在后两层山脊上 --- */
+    this.trees.length = 0;
+    for (i = 0; i < 62; i++) {
+      var layer = i < 44 ? 2 : 3;
+      var th = layer === 2 ? 30 + rng() * 24 : 52 + rng() * 44;
+      this.trees.push({
+        layer: layer,
+        x: -80 + rng() * (VIEW_W + 220),
+        y: layer === 2 ? 534 + rng() * 8 : 556 + rng() * 5,
+        h: th,
+        w: th * (0.52 + rng() * 0.16),
+        color: shade(theme.tree[layer - 2], k)
+      });
+    }
+    for (i = 0; i < this.trees.length; i++) {
+      var tr = this.trees[i];
+      drawPine(g, tr.x, tr.y, tr.h, tr.w, tr.color);
+    }
+
+    /* --- 层间雾 --- */
+    var mist = g.createLinearGradient(0, 400, 0, 600);
+    mist.addColorStop(0, 'rgba(128, 100, 112, 0)');
+    mist.addColorStop(0.45, theme.mist);
+    mist.addColorStop(1, 'rgba(120, 90, 96, 0)');
+    g.fillStyle = mist;
+    g.fillRect(0, 400, VIEW_W, 200);
+
+    /* --- 地面 --- */
+    var PATH_H = 40;
+    g.fillStyle = shade(theme.road, k);
+    g.fillRect(0, GROUND_Y, VIEW_W, PATH_H);
+    g.fillStyle = shade(theme.roadDark, k);
+    g.fillRect(0, GROUND_Y + PATH_H, VIEW_W, VIEW_H - GROUND_Y - PATH_H);
+
+    g.fillStyle = theme.edge;
+    g.fillRect(0, GROUND_Y, VIEW_W, 2.5);
+    g.fillStyle = 'rgba(255, 217, 168, 0.18)';
+    g.fillRect(0, GROUND_Y + 2.5, VIEW_W, 1);
+    g.fillStyle = 'rgba(255, 217, 168, 0.07)';
+    g.fillRect(0, GROUND_Y + PATH_H, VIEW_W, 1);
+
+    /* 路面碎石 */
+    for (i = 0; i < 64; i++) {
+      var rx = rng() * VIEW_W;
+      var ry = GROUND_Y + 10 + rng() * 25;
+      var rr = 2.5 + rng() * 7;
+      g.fillStyle = shade(theme.road, k * 1.25);
+      g.beginPath();
+      g.ellipse(rx, ry, rr, rr * 0.5, 0, 0, Math.PI * 2);
+      g.fill();
+      g.fillStyle = 'rgba(255, 214, 170, 0.10)';
+      g.beginPath();
+      g.ellipse(rx, ry - rr * 0.18, rr * 0.74, rr * 0.28, 0, Math.PI, Math.PI * 2);
+      g.fill();
+    }
+
+    /* 草丛 */
+    for (i = 0; i < 120; i++) {
+      drawGrass(g, rng() * VIEW_W, GROUND_Y + 1, 9 + rng() * 15, shade(theme.grass, k));
+    }
+
+    /* --- 路灯：每屏两盏，位置由 seed 决定 --- */
+    this.lamps = [
+      { x: 140 + rng() * 130, h: 158 + rng() * 20 },
+      { x: 1010 + rng() * 130, h: 158 + rng() * 20 }
+    ];
+
+    /* 前景草的相位：同区块每次刷新一致 */
+    this.fgPhase = Math.floor(rng() * 2048);
+
+    this.bgZone = z.id;
+  };
 
   /* ---------------- init ---------------- */
   WorldScene.prototype.init = function (ctx) {
@@ -457,78 +768,48 @@
     this.ctx = ctx;
     this.t = 0;
 
-    var rng = mulberry32(SEED);
-    this.rng = rng;
-
-    /* 预渲染的静态素材 */
-    this.sky = buildSky();
     this.grain = buildGrain();
     this.vignette = buildVignette();
     this.grainPattern = ctx.createPattern(this.grain, 'repeat');
     this.lampGlow = makeGlow('#ffca8a', 256);
 
-    /* 四层山脊：远景到近景 */
-    this.hills = [
-      { pts: makeRidge(rng, MAP_W * 0.14 + VIEW_W, 470, 176, 130, 260), f: 0.10, color: '#3b3059', rim: 'rgba(122,100,158,0.55)', smooth: false },
-      { pts: makeRidge(rng, MAP_W * 0.24 + VIEW_W, 508, 140, 120, 220), f: 0.22, color: '#2f2749', rim: 'rgba(96,80,130,0.45)', smooth: true },
-      { pts: makeRidge(rng, MAP_W * 0.42 + VIEW_W, 540, 92, 110, 200), f: 0.42, color: '#241d3b', rim: 'rgba(74,62,105,0.40)', smooth: true },
-      { pts: makeRidge(rng, MAP_W * 0.68 + VIEW_W, 560, 58, 100, 190), f: 0.70, color: '#171325', rim: 'rgba(58,49,80,0.40)', smooth: true }
-    ];
-
-    /* 树：挂在后两层山脊上 */
-    var i;
-    for (i = 0; i < 78; i++) {
-      var layer = i < 54 ? 2 : 3;
-      var tx = -120 + rng() * (MAP_W * (layer === 2 ? 0.42 : 0.68) + VIEW_W + 240);
-      var th = layer === 2 ? 34 + rng() * 26 : 54 + rng() * 46;
-      this.trees.push({
-        layer: layer,
-        x: tx,
-        y: layer === 2 ? 536 + rng() * 8 : 558 + rng() * 5,
-        h: th,
-        w: th * (0.52 + rng() * 0.16),
-        color: layer === 2 ? '#1d1733' : '#120f1e'
-      });
+    var saved = (global.Save && global.Save.get) ? global.Save.get() : null;
+    var zoneIdx = PLAZA_IDX;
+    if (saved && saved.zone) {
+      for (var i = 0; i < ZONES.length; i++) {
+        if (ZONES[i].id === saved.zone) { zoneIdx = i; break; }
+      }
     }
 
-    /* 地面草丛 / 碎石 */
-    for (i = 0; i < 150; i++) {
-      this.grass.push({
-        x: rng() * (MAP_W + 200) - 100,
-        h: 9 + rng() * 15
-      });
-    }
-    for (i = 0; i < 70; i++) {
-      this.rocks.push({
-        x: rng() * (MAP_W + 200) - 100,
-        r: 2.5 + rng() * 7,
-        y: GROUND_Y + 10 + rng() * 25
-      });
-    }
+    this.setZone(zoneIdx);
 
-    /* 路灯 */
-    this.lamps = [
-      { x: 210, h: 168 },
-      { x: 900, h: 176 },
-      { x: 1420, h: 162 },
-      { x: 1900, h: 172 },
-      { x: 2290, h: 158 },
-      { x: 2700, h: 168 }
-    ];
+    this.player = new global.Player(300, GROUND_Y);
+    this.player.groundY = GROUND_Y;
+    /* 允许走出 [40,1240]：越界那一帧会被 update 抓去做区块切换 */
+    this.player.bounds = { min: 0, max: VIEW_W };
 
-    /* 星与尘埃 */
-    for (i = 0; i < 64; i++) {
-      this.stars.push({
-        x: rng() * VIEW_W,
-        y: 24 + rng() * 210,
-        r: 0.7 + rng() * 1.5,
-        p: rng() * Math.PI * 2,
-        s: 0.5 + rng() * 1.4
-      });
-    }
-    for (i = 0; i < 58; i++) {
+    this.npc = new global.NPC(NPC_X, GROUND_Y, {
+      name: '守灯人',
+      line1: '……又一位旅行者。',
+      line2: '按 E 与我说话',
+      lines: [
+        '……又一位旅行者。欢迎来到中心广场。',
+        '我是守灯人。这里不再是一条直路，而是十个区块。',
+        '往左走，是工具区：白噪音、番茄钟——写字和专注的地方。',
+        '往右走，是游戏区：贪吃蛇、2048、俄罗斯方块、格斗、扫雷、五子棋、打砖块。',
+        '走到画面边缘就会换到相邻区块，别怕走丢，路只有一条。',
+        '看到门就站过去，提示条会告诉你「按 E 进入」。',
+        '进了游戏想回来，按 Esc，或者点右上角的「返回大厅」。',
+        '灯会一直为你亮着。'
+      ]
+    });
+
+    /* 尘埃：只在本屏里飘 */
+    this.motes.length = 0;
+    var rng = mulberry32((this.zone.themeSeed || 1) + 77);
+    for (i = 0; i < 46; i++) {
       this.motes.push({
-        x: rng() * MAP_W,
+        x: rng() * VIEW_W,
         y: 150 + rng() * 420,
         r: 1 + rng() * 2.1,
         v: 6 + rng() * 20,
@@ -538,71 +819,23 @@
       });
     }
 
-    /* 角色 / NPC / 传送门 */
-    this.camera = new global.Camera(VIEW_W, VIEW_H, MAP_W, MAP_H);
-
-    this.player = new global.Player(300, GROUND_Y);
-    this.player.groundY = GROUND_Y;
-    this.player.bounds = { min: 44, max: MAP_W - 44 };
-
-    this.npc = new global.NPC(470, GROUND_Y, {
-      name: '守灯人',
-      line1: '……又一位旅行者。',
-      line2: '按 E 与我说话',
-      lines: [
-        '……又一位旅行者。欢迎来到黄昏世界的世界大厅。',
-        '我是守灯人，看管这五道传送门。灯亮着，路就在。',
-        '「贪吃蛇」——蛇会越来越快，别贪，稳着走。',
-        '「森林冰火人」——水火不容：火怕水、冰怕火，小心脚下。',
-        '「二人格斗」——大厅里切磋可以，可别伤了和气。',
-        '「与AI打牌」——牌桌上三分靠牌，七分靠记性。',
-        '好了，选一道门出发吧。',
-        '灯会一直为你亮着。'
-      ]
-    });
-
-    this.portals = [
-      { id: 'snake',   name: '贪吃蛇',     color: '#5fd39a', glyph: 'snake',   x: 706 },
-      { id: 'fireice', name: '森林冰火人', color: '#79c8ff', glyph: 'fireice', x: 1128 },
-      { id: 'fight',   name: '二人格斗',   color: '#e8545f', glyph: 'fight',   x: 1612 },
-      { id: 'cards',   name: '与AI打牌',   color: '#e8b45a', glyph: 'cards',   x: 2094 },
-      { id: 'memory',  name: '记忆翻牌',   color: '#a98ae0', glyph: 'memory',  x: 2500 }
-    ];
-
-    this.portals.forEach(function (p) {
-      p.w = 104;
-      p.h = 190;
-      p.phase = rng() * Math.PI * 2;
-      p.glow = makeGlow(p.color, 256);
-    });
-
-    this.near = null;
-    this.npcNear = false;
-
-    /* ---- 读档：把角色放回上次离开大厅的位置 ---- */
-    var saved = (global.Save && global.Save.get) ? global.Save.get() : null;
+    /* ---- 读档：回到上次的区块与位置 ---- */
     if (saved && saved.player) {
-      this.player.x = saved.player.x;
+      this.player.x = clamp(saved.player.x, EDGE_L, EDGE_R);
       this.player.facing = saved.player.facing;
       this.player.y = GROUND_Y;
       this.player.vx = 0;
       this.player.vy = 0;
       this.player.onGround = true;
-      /* 存档点本身就在门的作用范围内。先把 near 认成这扇门，否则回大厅的
-         第一帧就会被同一扇门再次吸进游戏，变成「一出来就被弹回去」的死循环。
-         走出 62px 范围后 near 自然清空，再走回来即可重新进入。 */
-      for (var pi = 0; pi < this.portals.length; pi++) {
-        if (Math.abs(this.player.x - this.portals[pi].x) < 62) {
-          this.near = this.portals[pi];
-          break;
-        }
-      }
     }
 
-    /* E / Esc 只在本场景存活期间监听，destroy 时摘掉 */
+    /* 进门要按 E，所以这里不再需要「读档后预置 near」那套防死循环的处理：
+       站在门口只会看到提示，不会自动被吸走。 */
+    this.near = null;
+    this.npcNear = false;
+
     this._onKey = function (e) { self.onKey(e); };
     this._onClick = function () {
-      /* 点一下也算跳过开场 */
       if (self.intro > 0) self.intro = 0;
     };
     global.addEventListener('keydown', this._onKey);
@@ -610,22 +843,23 @@
       global.SceneManager.canvas.addEventListener('pointerdown', this._onClick);
     }
 
-    this.camera.snap(this.player);
-
-    /* 开场：不阻塞任何逻辑，只在画面上叠一张标题卡 */
     this.intro = 2.5;
     this.help = false;
+    this.veil = 0;
+    this.zoneT = 1.6;
+    this.edgeT = 0;
+    this.edgeLockL = false;
+    this.edgeLockR = false;
     this.prevGround = this.player.onGround;
     this.prevVy = this.player.vy;
 
     if (global.HUD) global.HUD.toast('');
   };
 
-  /* ---------------- 对话键盘 ---------------- */
+  /* ---------------- 键盘 ---------------- */
   WorldScene.prototype.onKey = function (e) {
     var npc = this.npc;
 
-    /* H：帮助面板开关（任何时候都能按） */
     if (e.code === 'KeyH') {
       e.preventDefault();
       this.help = !this.help;
@@ -633,15 +867,13 @@
       return;
     }
 
-    /* Esc：帮助面板优先关，其次关对话 */
     if (e.code === 'Escape') {
       if (this.help) { e.preventDefault(); this.help = false; sfx('ui'); return; }
       if (npc && npc.state === 'talking') { e.preventDefault(); npc.closeDialog(); sfx('ui'); }
       return;
     }
 
-    /* 开场还没走完：E / 空格 / 回车 先把它跳掉。
-       这里故意不 return —— 空格该跳还是得跳，别把操作吞掉。 */
+    /* 开场还没走完：E / 空格 / 回车 先把它跳掉（不 return，空格该跳还是得跳） */
     if (this.intro > 0 &&
         (e.code === 'KeyE' || e.code === 'Space' ||
          e.code === 'Enter' || e.code === 'NumpadEnter')) {
@@ -649,43 +881,104 @@
       sfx('ui');
     }
 
-    if (!npc) return;
+    if (e.code !== 'KeyE') return;
+    e.preventDefault();
 
-    if (e.code === 'KeyE') {
-      if (npc.state === 'talking') {
-        e.preventDefault();
-        npc.advance();
-        sfx('talk');
-        return;
-      }
-      if (Math.abs(this.player.x - npc.x) <= 80 && this.player.onGround) {
-        e.preventDefault();
-        npc.openDialog();
-        sfx('talk');
-      }
+    /* E 的优先级写死：对话 > 进门 */
+    if (npc && npc.state === 'talking') {
+      npc.advance();
+      sfx('talk');
       return;
     }
+    if (npc && this.zone.side === 'center' &&
+        Math.abs(this.player.x - npc.x) <= NPC_RANGE && this.player.onGround) {
+      npc.openDialog();
+      sfx('talk');
+      return;
+    }
+    if (this.near) this.enterDoor(this.near);
+  };
+
+  /* ---------------- 进门 ---------------- */
+  WorldScene.prototype.enterDoor = function (d) {
+    if (!d) return;
+    if (global.Save && global.Save.setPlayer) {
+      global.Save.setPlayer(this.player.x, this.player.facing, this.zone.id);
+    }
+    sfx('portal');
+    if (global.HUD) global.HUD.toast('');
+    if (global.SceneManager && global.SceneManager.has('iframe')) {
+      global.SceneManager.change('iframe', { title: d.name, src: d.src });
+    } else if (global.HUD) {
+      global.HUD.toast('场景壳（iframeScene.js）没加载，进不去');
+    }
+  };
+
+  /* ---------------- 换区块 ----------------
+   * 走到最左/最右再往外走：不切换，夹住位置并提示「已到尽头」。
+   * 这里用一个方向锁防止「按着方向键 → 每帧都触发一次」的提示与音效风暴：
+   * 锁在玩家往回走 60px 之后自动解开。
+   */
+  WorldScene.prototype.trySwitch = function (dir) {
+    var next = this.zoneIdx + dir;
+
+    if (next < 0 || next >= ZONES.length) {
+      this.player.x = dir < 0 ? EDGE_L : EDGE_R;
+      this.player.vx = 0;
+      this.edgeT = 0.6;
+      if (dir < 0) this.edgeLockL = true; else this.edgeLockR = true;
+      sfx('miss');
+      return;
+    }
+
+    if (this.npc && this.npc.state === 'talking') this.npc.closeDialog();
+
+    this.setZone(next);
+
+    this.player.x = dir < 0 ? EDGE_R : EDGE_L;
+    this.player.y = GROUND_Y;
+    this.player.vx = 0;
+    this.player.vy = 0;
+    this.player.onGround = true;
+
+    this.near = null;
+    this.npcNear = false;
+    this.edgeT = 0;
+    this.zoneT = 1.8;
+    this.veil = 1;
+    this.edgeLockL = false;
+    this.edgeLockR = false;
+
+    sfx('portal');
   };
 
   /* ---------------- update ---------------- */
   WorldScene.prototype.update = function (dt) {
     this.t += dt;
 
-    /* 开场计时：只影响那层遮罩，不拦任何逻辑 */
     if (this.intro > 0) this.intro = Math.max(0, this.intro - dt);
+    if (this.veil > 0) this.veil = Math.max(0, this.veil - dt * 2.6);
+    if (this.zoneT > 0) this.zoneT = Math.max(0, this.zoneT - dt);
+    if (this.edgeT > 0) this.edgeT = Math.max(0, this.edgeT - dt);
 
     var prevGround = this.prevGround;
 
     this.player.update(dt, this);
 
-    /* 起跳 / 落地：world 自己判，不往 player.js 里塞音频代码 */
     if (prevGround && this.player.vy < -60) sfx('jump');
     if (!prevGround && this.player.onGround) sfx('land');
     this.prevGround = this.player.onGround;
     this.prevVy = this.player.vy;
 
-    this.camera.follow(this.player, dt);
-    this.npc.update(dt);
+    /* ---- 区块边界 ---- */
+    if (this.edgeLockL && this.player.x > EDGE_L + 60) this.edgeLockL = false;
+    if (this.edgeLockR && this.player.x < EDGE_R - 60) this.edgeLockR = false;
+
+    if (!this.edgeLockL && this.player.x <= EDGE_L && this.player.facing < 0) {
+      this.trySwitch(-1);
+    } else if (!this.edgeLockR && this.player.x >= EDGE_R && this.player.facing > 0) {
+      this.trySwitch(1);
+    }
 
     /* 尘埃漂浮 */
     var m, i;
@@ -693,62 +986,57 @@
       m = this.motes[i];
       m.y -= m.v * dt;
       m.x += Math.sin(this.t * m.s + m.p) * m.amp * dt;
-      if (m.y < 120) {
-        m.y = 600;
-        m.x = this.camera.x + Math.random() * VIEW_W;
-      }
+      if (m.y < 120) { m.y = 600; m.x = Math.random() * VIEW_W; }
+      if (m.x < -20) m.x = VIEW_W + 20;
+      if (m.x > VIEW_W + 20) m.x = -20;
     }
 
-    /* ---- NPC：用距离驱动 idle / prompt 两态（talking 由 E 键进入） ---- */
+    /* ---- NPC：只有中心广场有 ---- */
     var npc = this.npc;
     var npcNear = false;
     if (npc) {
-      npcNear = Math.abs(this.player.x - npc.x) <= 80 && this.player.onGround;
-      this.npcNear = npcNear;
-
-      if (npc.state === 'talking') {
-        /* 走远了自动收起；再靠近可以重新从头讲 */
-        if (Math.abs(this.player.x - npc.x) > 120) npc.closeDialog();
-      } else if (npcNear) {
-        npc.state = 'prompt';
-      } else if (npc.state === 'prompt') {
+      if (this.zone.side !== 'center') {
+        if (npc.state === 'talking') npc.closeDialog();
         npc.state = 'idle';
-      }
-    }
-
-    /* ---- 传送门：已注册的场景走进去就直接切 ---- */
-    var hit = null;
-    for (i = 0; i < this.portals.length; i++) {
-      if (Math.abs(this.player.x - this.portals[i].x) < 62) {
-        hit = this.portals[i];
-        break;
-      }
-    }
-
-    if (hit !== this.near) {
-      this.near = hit;
-      if (hit && global.SceneManager && global.SceneManager.has(hit.id)) {
-        /* 先把位置写进存档：游戏里按 Esc 回大厅时角色就站在门口 */
-        if (global.Save && global.Save.setPlayer) {
-          global.Save.setPlayer(this.player.x, this.player.facing);
+      } else {
+        npc.update(dt);
+        npcNear = Math.abs(this.player.x - npc.x) <= NPC_RANGE && this.player.onGround;
+        if (npc.state === 'talking') {
+          if (Math.abs(this.player.x - npc.x) > 120) npc.closeDialog();
+        } else if (npcNear) {
+          npc.state = 'prompt';
+        } else if (npc.state === 'prompt') {
+          npc.state = 'idle';
         }
-        sfx('portal');
-        global.SceneManager.change(hit.id);
-        return;            // 本场景已被 destroy，update 剩下的逻辑全部作废
       }
+      this.npcNear = npcNear;
     }
 
-    /* ---- 提示条：对话提示优先于传送门提示 ---- */
+    /* ---- 门：只标记 near，不再自动切场景 ---- */
+    var hit = null;
+    var doors = this.zone.doors;
+    for (i = 0; i < doors.length; i++) {
+      if (Math.abs(this.player.x - doors[i].x) < DOOR_HIT) { hit = doors[i]; break; }
+    }
+    this.near = hit;
+
+    /* ---- 底部提示条 ---- */
     if (global.HUD) {
       var msg = '';
-      if (npc && npc.state === 'talking') msg = '';
-      else if (npcNear) msg = '按 E 与守灯人对话';
-      else if (hit) {
-        /* 只有站在门口且没被切走时才会走到这里：刚读档回来的那一帧，
-           near 已经被认成这扇门，需要提示玩家怎么重新进去 */
-        msg = (global.SceneManager && global.SceneManager.has(hit.id))
-          ? '走出门口再走回来，可再次进入《' + hit.name + '》'
-          : '《' + hit.name + '》该游戏后续开放，敬请期待';
+      if (npc && npc.state === 'talking') {
+        msg = '';
+      } else if (npcNear) {
+        msg = '按 E 与守灯人对话';
+      } else if (hit) {
+        msg = '按 E 进入《' + hit.name + '》';
+      } else if (this.edgeT > 0) {
+        msg = this.zoneIdx === 0 ? '已到尽头 · 左边没有路了' : '已到尽头 · 右边没有路了';
+      } else if (this.zoneT > 0) {
+        msg = this.zone.side === 'center'
+          ? '中心广场 · 左工具 · 右游戏'
+          : SIDE_NAME[this.zone.side] + ' · ' + this.zone.title;
+      } else if (this.zone.side !== 'center') {
+        msg = '走回画面边缘可离开本区块';
       }
       global.HUD.toast(msg);
     }
@@ -756,13 +1044,16 @@
 
   /* ---------------- render ---------------- */
   WorldScene.prototype.render = function (ctx) {
-    var cam = this.camera;
-    var i, l;
+    /* 1. 本区块背景（预渲染） */
+    if (this.bg) ctx.drawImage(this.bg, 0, 0);
+    else {
+      ctx.fillStyle = '#0a0814';
+      ctx.fillRect(0, 0, VIEW_W, VIEW_H);
+    }
 
-    /* 1. 天空 */
-    ctx.drawImage(this.sky, 0, 0);
+    var i;
 
-    /* 2. 星 */
+    /* 2. 星（会呼吸） */
     ctx.save();
     ctx.globalCompositeOperation = 'lighter';
     for (i = 0; i < this.stars.length; i++) {
@@ -775,77 +1066,37 @@
     }
     ctx.restore();
 
-    /* 3. 山脊 + 树（带视差） */
-    for (i = 0; i < this.hills.length; i++) {
-      l = this.hills[i];
-      ctx.save();
-      ctx.translate(-cam.x * l.f, 0);
-      drawRidge(ctx, l.pts, l.color, l.rim, VIEW_H, l.smooth);
-      ctx.restore();
-    }
-
-    /* 4. 森林剪影：按层叠在山脊前 */
-    var order = [this.trees.filter(function (t) { return t.layer === 2; }),
-                 this.trees.filter(function (t) { return t.layer === 3; })];
-    var factors = [this.hills[2].f, this.hills[3].f];
-    for (var oi = 0; oi < order.length; oi++) {
-      ctx.save();
-      ctx.translate(-cam.x * factors[oi], 0);
-      var arr = order[oi];
-      for (i = 0; i < arr.length; i++) {
-        var tr = arr[i];
-        if (tr.x < cam.x * factors[oi] - 160) continue;
-        if (tr.x > cam.x * factors[oi] + VIEW_W + 160) continue;
-        drawPine(ctx, tr.x, tr.y, tr.h, tr.w, tr.color);
-      }
-      ctx.restore();
-    }
-
-    /* 层间雾：只铺一次，避免叠加出横向色阶 */
-    var mist = ctx.createLinearGradient(0, 400, 0, 600);
-    mist.addColorStop(0, 'rgba(128, 100, 112, 0)');
-    mist.addColorStop(0.45, 'rgba(146, 112, 114, 0.11)');
-    mist.addColorStop(1, 'rgba(120, 90, 96, 0)');
-    ctx.fillStyle = mist;
-    ctx.fillRect(0, 400, VIEW_W, 200);
-
-    /* 5. 地面 */
-    this.drawGround(ctx, cam);
-
-    /* 6. 路灯（含光晕） */
+    /* 3. 路灯 + 光晕 */
     for (i = 0; i < this.lamps.length; i++) {
-      var lp = this.lamps[i];
-      if (lp.x < cam.x - 120 || lp.x > cam.x + VIEW_W + 120) continue;
-      drawLamp(ctx, lp.x, GROUND_Y + 4, lp.h);
+      drawLamp(ctx, this.lamps[i].x, GROUND_Y + 4, this.lamps[i].h);
     }
     ctx.save();
     ctx.globalCompositeOperation = 'lighter';
     for (i = 0; i < this.lamps.length; i++) {
       var lq = this.lamps[i];
-      if (lq.x < cam.x - 200 || lq.x > cam.x + VIEW_W + 200) continue;
       var flicker = 0.82 + Math.sin(this.t * 2.3 + lq.x) * 0.06;
       ctx.globalAlpha = 0.5 * flicker;
       ctx.drawImage(this.lampGlow, lq.x - 130, GROUND_Y + 4 - lq.h - 132, 260, 260);
     }
     ctx.restore();
 
-    /* 7~9. 世界对象统一进摄像机坐标系：门 / NPC / 角色 / 尘埃 */
-    cam.begin(ctx);
+    /* 4. 路标牌 */
+    this.drawSign(ctx);
 
-    for (i = 0; i < this.portals.length; i++) {
-      var p = this.portals[i];
-      if (p.x + 140 < cam.x || p.x - 140 > cam.x + VIEW_W) continue;
-      this.drawPortal(ctx, p);
+    /* 5. 门 */
+    for (i = 0; i < this.zone.doors.length; i++) {
+      this.drawPortal(ctx, this.zone.doors[i]);
     }
 
-    if (this.npc) this.npc.render(ctx);
+    /* 6. NPC（仅中心广场） */
+    if (this.npc && this.zone.side === 'center') this.npc.render(ctx);
     if (this.player) this.player.render(ctx);
 
+    /* 7. 尘埃 */
     ctx.save();
     ctx.globalCompositeOperation = 'lighter';
     for (i = 0; i < this.motes.length; i++) {
       var mo = this.motes[i];
-      if (mo.x < cam.x - 40 || mo.x > cam.x + VIEW_W + 40) continue;
       var ma = 0.10 + 0.30 * Math.abs(Math.sin(this.t * mo.s + mo.p));
       ctx.fillStyle = 'rgba(255, 206, 140, ' + ma.toFixed(3) + ')';
       ctx.beginPath();
@@ -854,12 +1105,10 @@
     }
     ctx.restore();
 
-    cam.end(ctx);
+    /* 8. 前景草叶：两层，视差基准是本区块的固定相位（不滚动） */
+    this.drawForeground(ctx);
 
-    /* 10. 前景草叶：两层视差 > 1，压住画面下沿并制造纵深 */
-    this.drawForeground(ctx, cam);
-
-    /* 11. 暗角 + 纸纹 */
+    /* 9. 暗角 + 纸纹 */
     ctx.drawImage(this.vignette, 0, 0);
     if (this.grainPattern) {
       ctx.save();
@@ -870,22 +1119,255 @@
       ctx.restore();
     }
 
-    /* 12. 覆盖层：开场标题卡 / 帮助面板 */
+    /* 10. 切换区块时的一层暖光 */
+    if (this.veil > 0) {
+      ctx.save();
+      ctx.globalAlpha = 0.34 * this.veil;
+      ctx.fillStyle = '#f6dcc0';
+      ctx.fillRect(0, 0, VIEW_W, VIEW_H);
+      ctx.restore();
+    }
+
+    /* 11. 覆盖层 */
     if (this.intro > 0) this.drawIntro(ctx);
     if (this.help) this.drawHelp(ctx);
   };
 
-  /* ---------------- 开场标题卡（2.5s，可跳过） ---------------- */
+  /* ---------------- 路标牌 ---------------- */
+  WorldScene.prototype.drawSign = function (ctx) {
+    var z = this.zone;
+    var text;
+    var align;
+
+    if (z.side === 'right') {
+      text = '→ ' + SIDE_NAME.right + ' · ' + z.title;
+      align = 'left';
+    } else if (z.side === 'left') {
+      text = SIDE_NAME.left + ' · ' + z.title + ' ←';
+      align = 'right';
+    } else {
+      text = '中心广场 · 左工具 · 右游戏';
+      align = 'center';
+    }
+
+    var anchorX = z.side === 'right' ? 62 : (z.side === 'left' ? VIEW_W - 62 : VIEW_W / 2);
+    var theme = THEME[z.side] || THEME.center;
+
+    ctx.save();
+    ctx.font = '600 17px ' + SERIF;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+
+    var tw = ctx.measureText(text).width;
+    var w = tw + 40;
+    var h = 40;
+    var bx = align === 'left' ? anchorX : (align === 'right' ? anchorX - w : anchorX - w / 2);
+    /* 广场的路标挂高一点：守灯人的对话气泡正好占着中段 */
+    var by = GROUND_Y - (z.side === 'center' ? 300 : 206);
+
+    /* 立柱 */
+    ctx.fillStyle = 'rgba(10, 8, 18, 0.92)';
+    ctx.fillRect(anchorX - 2.5, by + h, 5, GROUND_Y - by - h + 4);
+
+    /* 板面 */
+    roundRect(ctx, bx, by, w, h, 7);
+    ctx.fillStyle = 'rgba(14, 11, 24, 0.9)';
+    ctx.fill();
+    ctx.strokeStyle = rgba(this.zone.doors.length ? this.zone.doors[0].color : '#e8b45a', 0.45);
+    ctx.lineWidth = 1.2;
+    ctx.stroke();
+
+    /* 钉子 */
+    ctx.fillStyle = 'rgba(255, 226, 190, 0.35)';
+    ctx.beginPath();
+    ctx.arc(bx + 9, by + h / 2, 2, 0, Math.PI * 2);
+    ctx.arc(bx + w - 9, by + h / 2, 2, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.fillStyle = 'rgba(253, 243, 228, 0.92)';
+    ctx.fillText(text, bx + w / 2, by + h / 2 + 1);
+    ctx.restore();
+  };
+
+  /* ---------------- 门 ---------------- */
+  WorldScene.prototype.drawPortal = function (ctx, p) {
+    var cx = p.x;
+    var top = GROUND_Y - p.h;
+    var left = cx - p.w / 2;
+    var pulse = 0.5 + 0.5 * Math.sin(this.t * 1.6 + (p.x % 7));
+    var near = this.near === p;
+
+    if (!p.glow) p.glow = makeGlow(p.color, 256);
+
+    /* 光晕 */
+    ctx.save();
+    ctx.globalCompositeOperation = 'lighter';
+    ctx.globalAlpha = 0.40 + pulse * 0.24 + (near ? 0.26 : 0);
+    var gs = 300 + pulse * 24;
+    ctx.drawImage(p.glow, cx - gs / 2, GROUND_Y - p.h * 0.5 - gs / 2, gs, gs);
+    ctx.restore();
+
+    /* 底座 */
+    ctx.fillStyle = '#171226';
+    roundRect(ctx, left - 16, GROUND_Y - 12, p.w + 32, 16, 5);
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(255, 210, 160, 0.14)';
+    ctx.lineWidth = 1;
+    ctx.stroke();
+
+    /* 门框石 */
+    archPath(ctx, left, top, p.w, p.h);
+    ctx.fillStyle = '#100c1c';
+    ctx.fill();
+
+    /* 能量腔 */
+    var vx = left + 8;
+    var vy = top + 8;
+    var vw = p.w - 16;
+    var vh = p.h - 8;
+
+    ctx.save();
+    archPath(ctx, vx, vy, vw, vh);
+    ctx.clip();
+
+    var grd = ctx.createLinearGradient(0, vy, 0, vy + vh);
+    grd.addColorStop(0, rgba(p.color, 0.10));
+    grd.addColorStop(0.5, rgba(p.color, 0.40));
+    grd.addColorStop(1, rgba(p.color, 0.14));
+    ctx.fillStyle = grd;
+    ctx.fillRect(vx, vy, vw, vh);
+
+    /* 上升流光 */
+    for (var k = 0; k < 6; k++) {
+      var yy = vy + vh - ((this.t * 30 + k * 40 + p.x * 0.3) % (vh + 60));
+      ctx.fillStyle = rgba(p.color, 0.13);
+      ctx.fillRect(vx, yy, vw, 5);
+    }
+
+    /* 中心一抹亮 */
+    var core = ctx.createRadialGradient(cx, vy + vh * 0.55, 0, cx, vy + vh * 0.55, vw * 0.8);
+    core.addColorStop(0, 'rgba(255, 255, 255, ' + (0.10 + pulse * 0.10).toFixed(3) + ')');
+    core.addColorStop(1, 'rgba(255, 255, 255, 0)');
+    ctx.fillStyle = core;
+    ctx.fillRect(vx, vy, vw, vh);
+
+    ctx.restore();
+
+    /* 图腾 */
+    drawGlyph(ctx, p.glyph, cx, top + 104, this.t);
+
+    /* 边框 */
+    archPath(ctx, left, top, p.w, p.h);
+    ctx.strokeStyle = 'rgba(255, 226, 190, 0.18)';
+    ctx.lineWidth = 3;
+    ctx.stroke();
+
+    archPath(ctx, vx, vy, vw, vh);
+    ctx.strokeStyle = rgba(p.color, near ? 0.95 : 0.5 + pulse * 0.28);
+    ctx.lineWidth = 2;
+    ctx.stroke();
+
+    /* 名牌：名字 + 说明合成一块卡片，免得小字悬在日光上看不清 */
+    ctx.save();
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+
+    ctx.font = '600 21px ' + SERIF;
+    var nw = ctx.measureText(p.name).width;
+    ctx.font = '400 12px ' + SANS;
+    var dw = ctx.measureText(p.desc).width;
+    var cw = Math.max(nw, dw) + 36;
+    var ch = 56;
+    var cy0 = top - 30 - ch;
+
+    roundRect(ctx, cx - cw / 2, cy0, cw, ch, 12);
+    ctx.fillStyle = 'rgba(10, 8, 18, 0.78)';
+    ctx.fill();
+    ctx.strokeStyle = rgba(p.color, 0.40);
+    ctx.lineWidth = 1;
+    ctx.stroke();
+
+    ctx.fillStyle = '#fdf3e4';
+    ctx.font = '600 21px ' + SERIF;
+    ctx.fillText(p.name, cx, cy0 + 20);
+
+    ctx.font = '400 12px ' + SANS;
+    ctx.fillStyle = rgba(p.color, 0.92);
+    ctx.fillText(p.desc, cx, cy0 + 42);
+    ctx.restore();
+
+    /* 站在门前：地面提示环 + 一枚 E 键帽 */
+    if (near) {
+      ctx.save();
+      ctx.strokeStyle = rgba(p.color, 0.55);
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.ellipse(cx, GROUND_Y + 2, 52 + Math.sin(this.t * 4) * 3, 11, 0, 0, Math.PI * 2);
+      ctx.stroke();
+
+      var capY = top - 30 - 56 - 14 - 15;
+      roundRect(ctx, cx - 15, capY - 15, 30, 30, 8);
+      ctx.fillStyle = 'rgba(9, 7, 16, 0.86)';
+      ctx.fill();
+      ctx.strokeStyle = rgba(p.color, 0.85);
+      ctx.lineWidth = 1.4;
+      ctx.stroke();
+
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.font = '600 16px ' + SANS;
+      ctx.fillStyle = p.color;
+      ctx.fillText('E', cx, capY + 1);
+      ctx.restore();
+    }
+  };
+
+  /* ---------------- 前景草叶 ---------------- */
+  WorldScene.prototype.drawForeground = function (ctx) {
+    var layers = [
+      { f: 1.12, base: 724, h0: 22, h1: 62, step: 47, skip: 6 },
+      { f: 1.34, base: 734, h0: 56, h1: 122, step: 133, skip: 9 }
+    ];
+    var span = 2048;
+    var theme = THEME[this.zone.side] || THEME.center;
+
+    for (var li = 0; li < layers.length; li++) {
+      var L = layers[li];
+      var off = -((this.fgPhase * L.f) % span);
+      ctx.fillStyle = li === 0 ? shade(theme.grass, 0.9) : '#050309';
+      ctx.beginPath();
+      for (var i = 0; i < 52; i++) {
+        if ((i * 7 + li * 3) % L.skip === 0) continue;
+        var jitter = ((i * 29) % 41) - 20;
+        var bx = ((i * L.step + jitter + off) % span + span) % span - 300;
+        if (bx < -70 || bx > VIEW_W + 70) continue;
+        var h = L.h0 + ((i * 37 + li * 23) % Math.max(1, L.h1 - L.h0));
+        var lean = ((i * 13) % 9) - 4;
+        ctx.moveTo(bx - 10, L.base);
+        ctx.quadraticCurveTo(bx - 3 + lean * 0.5, L.base - h * 0.6, bx + lean, L.base - h);
+        ctx.quadraticCurveTo(bx + 6 + lean * 0.4, L.base - h * 0.45, bx + 11, L.base);
+        ctx.closePath();
+        if (i % 4 === 0) {
+          ctx.moveTo(bx + 8, L.base);
+          ctx.quadraticCurveTo(bx + 5, L.base - h * 0.3, bx - 2, L.base - h * 0.5);
+          ctx.quadraticCurveTo(bx + 2, L.base - h * 0.28, bx + 1, L.base);
+          ctx.closePath();
+        }
+      }
+      ctx.fill();
+    }
+  };
+
+  /* ---------------- 开场标题卡 ---------------- */
   WorldScene.prototype.drawIntro = function (ctx) {
-    var k = this.intro;                       /* 2.5 → 0 */
-    var p = 1 - k / 2.5;                      /* 0 → 1 */
+    var k = this.intro;
+    var p = 1 - k / 2.5;
     var a = Math.min(1, p / 0.2) * Math.min(1, k / 0.6);
     if (a <= 0.001) return;
 
     ctx.save();
     ctx.globalAlpha = a;
 
-    /* 黑幕：由中心向外散开，别做成生硬的整屏黑 */
     var veil = ctx.createRadialGradient(VIEW_W / 2, VIEW_H / 2, 40, VIEW_W / 2, VIEW_H / 2, 760);
     veil.addColorStop(0, 'rgba(5, 4, 11, 0.94)');
     veil.addColorStop(0.62, 'rgba(5, 4, 11, 0.86)');
@@ -896,7 +1378,6 @@
     var cx = VIEW_W / 2;
     var cy = VIEW_H / 2 - 10;
 
-    /* 上下两条细线，把标题框起来 */
     ctx.strokeStyle = 'rgba(240, 167, 110, 0.42)';
     ctx.lineWidth = 1;
     ctx.beginPath();
@@ -922,9 +1403,8 @@
 
     ctx.fillStyle = 'rgba(253, 243, 228, 0.62)';
     ctx.font = '400 17px ' + SANS;
-    ctx.fillText('五道门，五个世界', cx, cy + 30);
+    ctx.fillText('左工具 · 右游戏 · 十个区块', cx, cy + 30);
 
-    /* 底部跳过提示：最后 0.6 秒就淡出，别跟着一起消失得那么突然 */
     ctx.globalAlpha = a * Math.min(1, k / 0.6);
     ctx.fillStyle = 'rgba(255, 217, 168, 0.72)';
     ctx.font = '400 14px ' + SANS;
@@ -935,8 +1415,8 @@
 
   /* ---------------- 帮助面板 ---------------- */
   WorldScene.prototype.drawHelp = function (ctx) {
-    var w = 780;
-    var rowH = 42;
+    var w = 820;
+    var rowH = 44;
     var h = 116 + HELP_ROWS.length * rowH + 44;
     var x = (VIEW_W - w) / 2;
     var y = (VIEW_H - h) / 2;
@@ -971,7 +1451,6 @@
     ctx.font = '400 13px ' + SANS;
     ctx.fillText('HELP · 全部按键一览', cx, y + 78);
 
-    /* 分隔线 */
     ctx.strokeStyle = 'rgba(240, 167, 110, 0.20)';
     ctx.lineWidth = 1;
     ctx.beginPath();
@@ -985,15 +1464,14 @@
       var label = HELP_ROWS[i][0];
 
       ctx.textAlign = 'right';
-      ctx.textBaseline = 'middle';
       ctx.font = '600 16px ' + SANS;
       ctx.fillStyle = label ? 'rgba(255, 217, 168, 0.92)' : 'rgba(255, 217, 168, 0.28)';
-      ctx.fillText(label || '·', x + 196, ry);
+      ctx.fillText(label || '·', x + 176, ry);
 
       ctx.textAlign = 'left';
       ctx.font = '400 15px ' + SANS;
       ctx.fillStyle = 'rgba(253, 243, 228, 0.78)';
-      ctx.fillText(HELP_ROWS[i][1], x + 220, ry);
+      ctx.fillText(HELP_ROWS[i][1], x + 200, ry);
     }
 
     ctx.textAlign = 'center';
@@ -1002,223 +1480,6 @@
     ctx.fillText('H 或 Esc 关闭', cx, y + h - 30);
 
     ctx.restore();
-  };
-
-  /* ---------------- 地面 ---------------- */
-  WorldScene.prototype.drawGround = function (ctx, cam) {
-    var i;
-    var PATH_H = 40;
-
-    /* 路面 */
-    ctx.fillStyle = '#1a1527';
-    ctx.fillRect(0, GROUND_Y, VIEW_W, PATH_H);
-    ctx.fillStyle = '#0c0916';
-    ctx.fillRect(0, GROUND_Y + PATH_H, VIEW_W, VIEW_H - GROUND_Y - PATH_H);
-
-    /* 背光暖边 */
-    ctx.fillStyle = 'rgba(240, 167, 110, 0.62)';
-    ctx.fillRect(0, GROUND_Y, VIEW_W, 2.5);
-    ctx.fillStyle = 'rgba(255, 217, 168, 0.18)';
-    ctx.fillRect(0, GROUND_Y + 2.5, VIEW_W, 1);
-    /* 路沿 */
-    ctx.fillStyle = 'rgba(255, 217, 168, 0.07)';
-    ctx.fillRect(0, GROUND_Y + PATH_H, VIEW_W, 1);
-
-    ctx.save();
-    ctx.translate(-cam.x, 0);
-
-    /* 路面碎石 */
-    for (i = 0; i < this.rocks.length; i++) {
-      var r = this.rocks[i];
-      if (r.x < cam.x - 40 || r.x > cam.x + VIEW_W + 40) continue;
-      ctx.fillStyle = '#241c38';
-      ctx.beginPath();
-      ctx.ellipse(r.x, r.y, r.r, r.r * 0.5, 0, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.fillStyle = 'rgba(255, 214, 170, 0.12)';
-      ctx.beginPath();
-      ctx.ellipse(r.x, r.y - r.r * 0.18, r.r * 0.74, r.r * 0.28, 0, Math.PI, Math.PI * 2);
-      ctx.fill();
-    }
-
-    /* 草丛（画在地面线上，压住硬边） */
-    for (i = 0; i < this.grass.length; i++) {
-      var g = this.grass[i];
-      if (g.x < cam.x - 30 || g.x > cam.x + VIEW_W + 30) continue;
-      drawGrass(ctx, g.x, GROUND_Y + 1, g.h, '#0a0713');
-    }
-
-    ctx.restore();
-  };
-
-  /* ---------------- 前景草叶 ---------------- */
-  WorldScene.prototype.drawForeground = function (ctx, cam) {
-    var layers = [
-      { f: 1.12, base: 724, h0: 22, h1: 62, step: 47, color: '#0b0815', skip: 6 },
-      { f: 1.34, base: 734, h0: 56, h1: 122, step: 133, color: '#050309', skip: 9 }
-    ];
-    var span = 2048;
-
-    for (var li = 0; li < layers.length; li++) {
-      var L = layers[li];
-      var off = -cam.x * L.f;
-      ctx.fillStyle = L.color;
-      ctx.beginPath();
-      for (var i = 0; i < 52; i++) {
-        if ((i * 7 + li * 3) % L.skip === 0) continue;
-        var jitter = ((i * 29) % 41) - 20;
-        var bx = ((i * L.step + jitter + off) % span + span) % span - 300;
-        if (bx < -70 || bx > VIEW_W + 70) continue;
-        var h = L.h0 + ((i * 37 + li * 23) % Math.max(1, L.h1 - L.h0));
-        var lean = ((i * 13) % 9) - 4;
-        ctx.moveTo(bx - 10, L.base);
-        ctx.quadraticCurveTo(bx - 3 + lean * 0.5, L.base - h * 0.6, bx + lean, L.base - h);
-        ctx.quadraticCurveTo(bx + 6 + lean * 0.4, L.base - h * 0.45, bx + 11, L.base);
-        ctx.closePath();
-        /* 每 4 株补一丛矮草，打散节奏 */
-        if (i % 4 === 0) {
-          ctx.moveTo(bx + 8, L.base);
-          ctx.quadraticCurveTo(bx + 5, L.base - h * 0.3, bx - 2, L.base - h * 0.5);
-          ctx.quadraticCurveTo(bx + 2, L.base - h * 0.28, bx + 1, L.base);
-          ctx.closePath();
-        }
-      }
-      ctx.fill();
-    }
-  };
-
-  /* ---------------- 传送门 ---------------- */
-  WorldScene.prototype.drawPortal = function (ctx, p) {
-    var cx = p.x;
-    var top = GROUND_Y - p.h;
-    var left = cx - p.w / 2;
-    var pulse = 0.5 + 0.5 * Math.sin(this.t * 1.6 + p.phase);
-    var near = this.near === p;
-
-    /* 光晕 */
-    ctx.save();
-    ctx.globalCompositeOperation = 'lighter';
-    ctx.globalAlpha = 0.42 + pulse * 0.26 + (near ? 0.26 : 0);
-    var gs = 300 + pulse * 24;
-    ctx.drawImage(p.glow, cx - gs / 2, GROUND_Y - p.h * 0.5 - gs / 2, gs, gs);
-    ctx.restore();
-
-    /* 底座 */
-    ctx.fillStyle = '#171226';
-    roundRect(ctx, left - 16, GROUND_Y - 12, p.w + 32, 16, 5);
-    ctx.fill();
-    ctx.strokeStyle = 'rgba(255, 210, 160, 0.14)';
-    ctx.lineWidth = 1;
-    ctx.stroke();
-
-    /* 门框石：外深内浅 */
-    archPath(ctx, left, top, p.w, p.h);
-    ctx.fillStyle = '#100c1c';
-    ctx.fill();
-
-    /* 能量腔 */
-    var vx = left + 8;
-    var vy = top + 8;
-    var vw = p.w - 16;
-    var vh = p.h - 8;
-
-    ctx.save();
-    archPath(ctx, vx, vy, vw, vh);
-    ctx.clip();
-
-    var grd = ctx.createLinearGradient(0, vy, 0, vy + vh);
-    grd.addColorStop(0, rgba(p.color, 0.10));
-    grd.addColorStop(0.5, rgba(p.color, 0.40));
-    grd.addColorStop(1, rgba(p.color, 0.14));
-    ctx.fillStyle = grd;
-    ctx.fillRect(vx, vy, vw, vh);
-
-    /* 上升流光 */
-    for (var k = 0; k < 6; k++) {
-      var yy = vy + vh - ((this.t * 30 + k * 40 + p.phase * 30) % (vh + 60));
-      ctx.fillStyle = rgba(p.color, 0.13);
-      ctx.fillRect(vx, yy, vw, 5);
-    }
-
-    /* 中心一抹亮 */
-    var core = ctx.createRadialGradient(cx, vy + vh * 0.55, 0, cx, vy + vh * 0.55, vw * 0.8);
-    core.addColorStop(0, 'rgba(255, 255, 255, ' + (0.10 + pulse * 0.10).toFixed(3) + ')');
-    core.addColorStop(1, 'rgba(255, 255, 255, 0)');
-    ctx.fillStyle = core;
-    ctx.fillRect(vx, vy, vw, vh);
-
-    ctx.restore();
-
-    /* 腔体内图腾 */
-    drawGlyph(ctx, p.glyph, cx, top + 108, this.t);
-
-    /* 边框 */
-    archPath(ctx, left, top, p.w, p.h);
-    ctx.strokeStyle = 'rgba(255, 226, 190, 0.18)';
-    ctx.lineWidth = 3;
-    ctx.stroke();
-
-    archPath(ctx, vx, vy, vw, vh);
-    ctx.strokeStyle = rgba(p.color, near ? 0.95 : 0.5 + pulse * 0.28);
-    ctx.lineWidth = 2;
-    ctx.stroke();
-
-    /* 名字牌（统一抬高 6px，给下面的「已通关」吊牌留出间隙） */
-    ctx.save();
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.font = '600 21px ' + SERIF;
-    var tw = ctx.measureText(p.name).width;
-
-    roundRect(ctx, cx - tw / 2 - 15, top - 48, tw + 30, 30, 15);
-    ctx.fillStyle = 'rgba(10, 8, 18, 0.66)';
-    ctx.fill();
-    ctx.strokeStyle = rgba(p.color, 0.38);
-    ctx.lineWidth = 1;
-    ctx.stroke();
-
-    ctx.fillStyle = '#fdf3e4';
-    ctx.fillText(p.name, cx, top - 32);
-
-    /* 名字下的小点：未开放标记 */
-    ctx.fillStyle = rgba(p.color, 0.8);
-    ctx.beginPath();
-    ctx.arc(cx - tw / 2 - 4, top - 33, 2.4, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.restore();
-
-    /* 已通关：名字牌正下方挂一枚小吊牌（纯 canvas，不新增 DOM） */
-    if (global.Save && global.Save.isCleared(p.id)) {
-      ctx.save();
-      ctx.textAlign = 'center';
-      ctx.textBaseline = 'middle';
-      ctx.font = '600 13px ' + SANS;
-      var badge = '已通关 ✓';
-      var bw = ctx.measureText(badge).width + 22;
-      var by = top - 14;
-
-      roundRect(ctx, cx - bw / 2, by, bw, 21, 10.5);
-      ctx.fillStyle = 'rgba(9, 7, 16, 0.9)';
-      ctx.fill();
-      ctx.strokeStyle = rgba(p.color, 0.55);
-      ctx.lineWidth = 1;
-      ctx.stroke();
-
-      ctx.fillStyle = p.color;
-      ctx.fillText(badge, cx, by + 11);
-      ctx.restore();
-    }
-
-    /* 站立其中时的地面提示环 */
-    if (near) {
-      ctx.save();
-      ctx.strokeStyle = rgba(p.color, 0.55);
-      ctx.lineWidth = 2;
-      ctx.beginPath();
-      ctx.ellipse(cx, GROUND_Y + 2, 52 + Math.sin(this.t * 4) * 3, 11, 0, 0, Math.PI * 2);
-      ctx.stroke();
-      ctx.restore();
-    }
   };
 
   /* ---------------- destroy ---------------- */
@@ -1234,16 +1495,23 @@
 
     if (this.npc) this.npc.reset();
 
-    this.portals.length = 0;
+    this.stars.length = 0;
     this.motes.length = 0;
     this.trees.length = 0;
-    this.grass.length = 0;
-    this.rocks.length = 0;
+    this.lamps.length = 0;
     this.player = null;
     this.npc = null;
-    this.camera = null;
+    this.near = null;
+    this.bg = null;
+    this.bgZone = '';
     if (global.HUD) global.HUD.toast('');
   };
+
+  /* 供外部（探针 / README）读取的配置入口 */
+  WorldScene.ZONES = ZONES;
+  WorldScene.PLAZA_IDX = PLAZA_IDX;
+  WorldScene.EDGE_L = EDGE_L;
+  WorldScene.EDGE_R = EDGE_R;
 
   global.WorldScene = WorldScene;
 })(window);

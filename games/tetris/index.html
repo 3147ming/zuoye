@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>俄罗斯方块 · BlockRain</title>
+<!--
+  壳页说明（WorldHub 第四批接入）：
+  上游 Aerolab/blockrain.js 的 index.html 是「多个自动演示棋盘」的宣传页，
+  不是可玩的入口，因此本文件只做最小页面骨架：
+    · 一块填满视口的棋盘容器
+    · 引入本地 jQuery（vendor/jquery.min.js）+ 上游 blockrain 的 js
+    · 一行初始化代码（autoplay:false）
+  游戏逻辑全部在上游 blockrain.jquery.min.js 里，未做任何改写。
+-->
+<link rel="stylesheet" href="blockrain.css">
+<style>
+  html, body { height: 100%; margin: 0; }
+  body {
+    display: flex; align-items: center; justify-content: center;
+    background: radial-gradient(90% 70% at 50% 0%, #1d1830 0%, #0a0816 70%, #06050d 100%);
+    color: #e9e2f5;
+    font-family: "PingFang SC", "Microsoft YaHei", system-ui, sans-serif;
+    overflow: hidden;
+    user-select: none;
+  }
+  .wrap { position: relative; width: 100%; height: 100%; display: flex; flex-direction: column; }
+  .board-wrap { flex: 1 1 auto; min-height: 0; display: flex; align-items: center; justify-content: center; }
+  /* 10 列 × 26px = 260，20 行 × 26px = 520：棋盘容器给准尺寸，canvas 才是 1:1 不被拉伸 */
+  #board { width: 260px; height: 520px; }
+  .hint {
+    flex: 0 0 auto;
+    padding: 8px 0 10px;
+    text-align: center;
+    font-size: 13px;
+    letter-spacing: 0.12em;
+    color: rgba(233, 226, 245, 0.45);
+  }
+</style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="board-wrap"><div id="board"></div></div>
+    <div class="hint">← → 移动 · ↑ 旋转 · ↓ 加速 · 空格 直落 · P 暂停</div>
+  </div>
+
+  <script src="vendor/jquery.min.js"></script>
+  <script src="blockrain.jquery.min.js"></script>
+  <script src="blockrain.jquery.themes.js"></script>
+  <script>
+    $(function () {
+      $('#board').blockrain({
+        theme: 'candy',
+        autoplay: false,
+        autoBlockWidth: false,
+        blockWidth: 10,
+        autoBlockSize: 26,
+        showFieldOnStart: true
+      });
+    });
+  </script>
+</body>
+</html>

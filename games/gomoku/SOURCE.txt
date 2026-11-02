@@ -1,0 +1,6 @@
+名称：Gomoku（五子棋，人机）
+仓库：https://gitee.com/darkwing/Gomoku
+许可：MIT（仓库根目录 LICENSE 文件已原样保留）
+本地目录：games/gomoku/
+接入改动：
+  - 无。index.html / css/style.css / js/main.js / image/ 原样拷贝。

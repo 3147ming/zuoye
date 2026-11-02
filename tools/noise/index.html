@@ -1,0 +1,491 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>白噪音 · 专注台</title>
+<!--
+  说明（WorldHub 第四批 · 工具区）
+  上游 Kanso 是「单个 7KB HTML 文件」，但只在 Gumroad 以 Pay-What-You-Want 发放，
+  仓库 lnz79d612/kanso-desk 里只有 README，拿不到源文件。
+  这里按文章描述的功能自己实现一版（棕噪音合成 / 25·50 专注计时 / 本地便签 / 528Hz 提示音），
+  单文件、零依赖、file:// 直接可开，标题与致谢里都不冒称上游产物。
+-->
+<style>
+  :root {
+    --ink: #0b0a12;
+    --paper: #f4e8d6;
+    --dim: rgba(244, 232, 214, 0.46);
+    --tide: #7fd8c8;
+    --amber: #f0a76e;
+  }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; margin: 0; }
+  body {
+    background:
+      radial-gradient(120% 90% at 50% -20%, #132a2c 0%, #0b1418 45%, #07080d 100%);
+    color: var(--paper);
+    font-family: "PingFang SC", "Microsoft YaHei", system-ui, sans-serif;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 18px;
+    overflow: hidden;
+  }
+  .app {
+    width: min(1120px, 100%);
+    height: min(660px, 100%);
+    display: grid;
+    grid-template-columns: 1.05fr 1fr;
+    grid-template-rows: auto 1fr;
+    gap: 14px;
+  }
+  header {
+    grid-column: 1 / -1;
+    display: flex;
+    align-items: baseline;
+    gap: 12px;
+    padding-bottom: 6px;
+    border-bottom: 1px solid rgba(127, 216, 200, 0.18);
+  }
+  header h1 {
+    margin: 0;
+    font-size: 21px;
+    font-weight: 600;
+    letter-spacing: 0.16em;
+  }
+  header span { font-size: 12px; letter-spacing: 0.22em; color: var(--dim); }
+
+  .card {
+    position: relative;
+    border-radius: 18px;
+    border: 1px solid rgba(127, 216, 200, 0.16);
+    background: linear-gradient(180deg, rgba(22, 40, 40, 0.72), rgba(10, 16, 20, 0.72));
+    padding: 20px 22px;
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
+  }
+  .card h2 {
+    margin: 0 0 14px;
+    font-size: 13px;
+    font-weight: 500;
+    letter-spacing: 0.24em;
+    color: rgba(127, 216, 200, 0.78);
+  }
+
+  /* ---------- 噪音 ---------- */
+  .row { display: flex; align-items: center; gap: 14px; }
+  .btn {
+    appearance: none;
+    border: 1px solid rgba(127, 216, 200, 0.45);
+    background: linear-gradient(180deg, rgba(32, 62, 62, 0.9), rgba(16, 30, 34, 0.9));
+    color: #d8fff5;
+    border-radius: 999px;
+    padding: 10px 22px;
+    font: inherit;
+    font-size: 14px;
+    letter-spacing: 0.14em;
+    cursor: pointer;
+    transition: transform 120ms ease, border-color 160ms ease, box-shadow 160ms ease;
+  }
+  .btn:hover { border-color: rgba(127, 216, 200, 0.9); box-shadow: 0 8px 24px -12px rgba(127, 216, 200, 0.7); }
+  .btn:active { transform: translateY(1px); }
+  .btn.ghost {
+    border-color: rgba(244, 232, 214, 0.22);
+    background: transparent;
+    color: var(--dim);
+    padding: 8px 16px;
+    font-size: 12px;
+  }
+  .btn.playing {
+    border-color: rgba(127, 216, 200, 0.95);
+    background: linear-gradient(180deg, rgba(56, 118, 112, 0.95), rgba(22, 52, 54, 0.95));
+    box-shadow: 0 0 0 1px rgba(127, 216, 200, 0.25), 0 10px 30px -14px rgba(127, 216, 200, 0.9);
+  }
+
+  .wave {
+    flex: 1;
+    height: 62px;
+    border-radius: 10px;
+    background: radial-gradient(120% 120% at 50% 120%, rgba(127, 216, 200, 0.16), rgba(127, 216, 200, 0) 70%);
+    position: relative;
+    overflow: hidden;
+  }
+  .wave canvas { display: block; width: 100%; height: 100%; }
+
+  label.slider { display: block; margin-top: 16px; }
+  label.slider b {
+    display: flex;
+    justify-content: space-between;
+    font-size: 12px;
+    font-weight: 400;
+    letter-spacing: 0.16em;
+    color: var(--dim);
+    margin-bottom: 7px;
+  }
+  label.slider b i { font-style: normal; color: rgba(216, 255, 245, 0.8); font-variant-numeric: tabular-nums; }
+  input[type="range"] {
+    appearance: none;
+    width: 100%;
+    height: 3px;
+    border-radius: 2px;
+    background: rgba(244, 232, 214, 0.18);
+    outline: none;
+  }
+  input[type="range"]::-webkit-slider-thumb {
+    appearance: none;
+    width: 15px; height: 15px; border-radius: 50%;
+    background: #d8fff5;
+    border: 3px solid #16383a;
+    box-shadow: 0 0 0 1px rgba(127, 216, 200, 0.7);
+    cursor: pointer;
+  }
+
+  /* ---------- 计时 ---------- */
+  .clock {
+    text-align: center;
+    font-size: 60px;
+    font-weight: 300;
+    letter-spacing: 0.04em;
+    font-variant-numeric: tabular-nums;
+    margin: 4px 0 2px;
+    color: #f2fffb;
+    text-shadow: 0 6px 30px rgba(127, 216, 200, 0.24);
+  }
+  .clock small { font-size: 15px; letter-spacing: 0.2em; color: var(--dim); display: block; margin-top: 6px; }
+  .presets { display: flex; gap: 8px; justify-content: center; margin: 10px 0 14px; }
+  .presets .btn { padding: 7px 16px; font-size: 12px; }
+  .presets .btn.on { border-color: rgba(127, 216, 200, 0.9); color: #d8fff5; background: rgba(34, 70, 70, 0.8); }
+  .timer-actions { display: flex; gap: 10px; justify-content: center; margin-top: auto; }
+
+  /* ---------- 便签 ---------- */
+  .note { grid-column: 1 / -1; }
+  textarea {
+    flex: 1;
+    width: 100%;
+    min-height: 0;
+    resize: none;
+    border: 1px solid rgba(127, 216, 200, 0.14);
+    border-radius: 12px;
+    background: rgba(6, 12, 14, 0.55);
+    color: #eaf7f2;
+    font: 14px/1.75 "PingFang SC", "Microsoft YaHei", system-ui, sans-serif;
+    padding: 12px 14px;
+    outline: none;
+  }
+  textarea:focus { border-color: rgba(127, 216, 200, 0.5); }
+  .note-foot {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-top: 8px;
+    font-size: 11px;
+    letter-spacing: 0.16em;
+    color: var(--dim);
+  }
+</style>
+</head>
+<body>
+<div class="app">
+  <header>
+    <h1>白噪音 · 专注台</h1>
+    <span>BROWN NOISE · FOCUS TIMER · SCRATCHPAD</span>
+  </header>
+
+  <section class="card">
+    <h2>棕噪音</h2>
+    <div class="row">
+      <button class="btn" id="play" type="button">▶ 播放</button>
+      <div class="wave"><canvas id="wave" width="520" height="62"></canvas></div>
+    </div>
+
+    <label class="slider">
+      <b>音量 <i id="volv">55%</i></b>
+      <input id="vol" type="range" min="0" max="100" value="55">
+    </label>
+    <label class="slider">
+      <b>温暖度（低通） <i id="warmv">520 Hz</i></b>
+      <input id="warm" type="range" min="120" max="1500" value="520">
+    </label>
+    <p style="margin:auto 0 0;font-size:11.5px;line-height:1.8;color:rgba(244,232,214,0.34)">
+      白噪声逐样本积分成棕噪音，再过一级低通滤波；没有任何音频文件，全部由 Web Audio 实时合成。
+    </p>
+  </section>
+
+  <section class="card">
+    <h2>专注计时</h2>
+    <div class="clock"><span id="clock">25:00</span><small id="phase">准备开始</small></div>
+    <div class="presets">
+      <button class="btn on" id="p25" type="button">25 分钟</button>
+      <button class="btn" id="p50" type="button">50 分钟</button>
+    </div>
+    <div class="timer-actions">
+      <button class="btn" id="tstart" type="button">开始</button>
+      <button class="btn ghost" id="treset" type="button">重设</button>
+    </div>
+  </section>
+
+  <section class="card note">
+    <h2>便签</h2>
+    <textarea id="note" placeholder="想到什么先写在这里，会自动保存到本地……"></textarea>
+    <div class="note-foot">
+      <span id="saved">本地保存 · localStorage</span>
+      <button class="btn ghost" id="export" type="button">导出 .txt</button>
+    </div>
+  </section>
+</div>
+
+<script>
+(function () {
+  'use strict';
+
+  /* ============ 棕噪音 ============ */
+  var ctx = null, noiseSrc = null, noiseGain = null, noiseFilter = null;
+  var playing = false;
+
+  function ensureAudio() {
+    if (ctx) return ctx;
+    var AC = window.AudioContext || window.webkitAudioContext;
+    if (!AC) return null;
+    ctx = new AC();
+    return ctx;
+  }
+
+  function buildNoise() {
+    /* 3 秒缓冲：白噪声一阶积分 → 棕噪音，端点做淡入淡出避免循环爆音 */
+    var sr = ctx.sampleRate;
+    var len = Math.floor(sr * 3);
+    var buf = ctx.createBuffer(1, len, sr);
+    var d = buf.getChannelData(0);
+    var last = 0;
+    for (var i = 0; i < len; i++) {
+      var white = Math.random() * 2 - 1;
+      last = (last + 0.02 * white) / 1.02;
+      d[i] = last * 3.5;
+    }
+    var fade = Math.floor(sr * 0.02);
+    for (var k = 0; k < fade; k++) {
+      var g = k / fade;
+      d[k] *= g;
+      d[len - 1 - k] *= g;
+    }
+    return buf;
+  }
+
+  function startNoise() {
+    if (!ensureAudio()) return;
+    if (ctx.state === 'suspended') ctx.resume();
+    if (!noiseSrc) {
+      noiseSrc = ctx.createBufferSource();
+      noiseSrc.buffer = buildNoise();
+      noiseSrc.loop = true;
+
+      noiseFilter = ctx.createBiquadFilter();
+      noiseFilter.type = 'lowpass';
+      noiseFilter.frequency.value = Number(warm.value);
+      noiseFilter.Q.value = 0.4;
+
+      noiseGain = ctx.createGain();
+      noiseGain.gain.value = Number(vol.value) / 100 * 0.5;
+
+      noiseSrc.connect(noiseFilter);
+      noiseFilter.connect(noiseGain);
+      noiseGain.connect(ctx.destination);
+    }
+    noiseSrc.start(0);
+  }
+
+  function stopNoise() {
+    if (noiseSrc) {
+      try { noiseSrc.stop(); } catch (e) { /* 已停 */ }
+      try { noiseSrc.disconnect(); } catch (e) { /* 已断开 */ }
+      noiseSrc = null;
+    }
+  }
+
+  /* ============ 计时 ============ */
+  var total = 25 * 60;
+  var left = total;
+  var running = false;
+  var tick = 0;
+  var zhChime = false;
+
+  function fmt(s) {
+    var m = Math.floor(s / 60);
+    var ss = s % 60;
+    return (m < 10 ? '0' : '') + m + ':' + (ss < 10 ? '0' : '') + ss;
+  }
+
+  function paintClock() {
+    clockEl.textContent = fmt(Math.max(0, Math.ceil(left)));
+    phaseEl.textContent = running ? (zhChime ? '专注中' : '计时中') : (left === total ? '准备开始' : '已暂停');
+    tstart.textContent = running ? '暂停' : (left === total ? '开始' : '继续');
+  }
+
+  function chime() {
+    if (!ensureAudio()) return;
+    var t0 = ctx.currentTime;
+    [528, 792].forEach(function (f, i) {
+      var o = ctx.createOscillator();
+      var g = ctx.createGain();
+      o.type = 'sine';
+      o.frequency.value = f;
+      g.gain.setValueAtTime(0, t0 + i * 0.16);
+      g.gain.linearRampToValueAtTime(0.16 / (i + 1), t0 + i * 0.16 + 0.02);
+      g.gain.exponentialRampToValueAtTime(0.0001, t0 + i * 0.16 + 1.6);
+      o.connect(g);
+      g.connect(ctx.destination);
+      o.start(t0 + i * 0.16);
+      o.stop(t0 + i * 0.16 + 1.7);
+    });
+  }
+
+  function tickDown() {
+    if (!running) return;
+    left -= 1;
+    if (left <= 0) {
+      left = 0;
+      running = false;
+      clearInterval(tick);
+      chime();
+      zhChime = false;
+      paintClock();
+      phaseEl.textContent = '时间到 · 休息一下';
+      return;
+    }
+    paintClock();
+  }
+
+  /* ============ 元素 ============ */
+  var play = document.getElementById('play');
+  var vol = document.getElementById('vol');
+  var warm = document.getElementById('warm');
+  var volv = document.getElementById('volv');
+  var warmv = document.getElementById('warmv');
+  var clockEl = document.getElementById('clock');
+  var phaseEl = document.getElementById('phase');
+  var tstart = document.getElementById('tstart');
+  var treset = document.getElementById('treset');
+  var p25 = document.getElementById('p25');
+  var p50 = document.getElementById('p50');
+  var note = document.getElementById('note');
+  var savedEl = document.getElementById('saved');
+  var exportBtn = document.getElementById('export');
+
+  /* ---- 噪音控制 ---- */
+  play.addEventListener('click', function () {
+    playing = !playing;
+    if (playing) startNoise(); else stopNoise();
+    play.textContent = playing ? '⏸ 暂停' : '▶ 播放';
+    play.classList.toggle('playing', playing);
+  });
+
+  vol.addEventListener('input', function () {
+    volv.textContent = vol.value + '%';
+    if (noiseGain) noiseGain.gain.value = Number(vol.value) / 100 * 0.5;
+  });
+
+  warm.addEventListener('input', function () {
+    warmv.textContent = warm.value + ' Hz';
+    if (noiseFilter) noiseFilter.frequency.value = Number(warm.value);
+  });
+
+  /* ---- 计时控制 ---- */
+  tstart.addEventListener('click', function () {
+    if (running) {
+      running = false;
+      clearInterval(tick);
+      paintClock();
+      return;
+    }
+    if (left <= 0) left = total;
+    running = true;
+    zhChime = true;
+    clearInterval(tick);
+    tick = setInterval(tickDown, 1000);
+    paintClock();
+  });
+
+  treset.addEventListener('click', function () {
+    running = false;
+    clearInterval(tick);
+    left = total;
+    zhChime = false;
+    paintClock();
+  });
+
+  p25.addEventListener('click', function () {
+    total = 25 * 60; left = total; running = false; clearInterval(tick);
+    p25.classList.add('on'); p50.classList.remove('on');
+    paintClock();
+  });
+
+  p50.addEventListener('click', function () {
+    total = 50 * 60; left = total; running = false; clearInterval(tick);
+    p50.classList.add('on'); p25.classList.remove('on');
+    paintClock();
+  });
+
+  /* ---- 便签 ---- */
+  var NOTE_KEY = 'worldhub.noise.note';
+  try {
+    var raw = localStorage.getItem(NOTE_KEY);
+    if (raw) note.value = raw;
+  } catch (e) { /* 隐私模式：忽略 */ }
+
+  var saveT = 0;
+  note.addEventListener('input', function () {
+    savedEl.textContent = '正在保存…';
+    clearTimeout(saveT);
+    saveT = setTimeout(function () {
+      try {
+        localStorage.setItem(NOTE_KEY, note.value);
+        savedEl.textContent = '已保存 · ' + new Date().toLocaleTimeString();
+      } catch (e) {
+        savedEl.textContent = '无法写入本地存储（隐私模式？）';
+      }
+    }, 400);
+  });
+
+  exportBtn.addEventListener('click', function () {
+    var blob = new Blob([note.value], { type: 'text/plain;charset=utf-8' });
+    var a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = 'notes.txt';
+    document.body.appendChild(a);
+    a.click();
+    setTimeout(function () {
+      URL.revokeObjectURL(a.href);
+      a.remove();
+    }, 400);
+  });
+
+  /* ---- 波形装饰 ---- */
+  var wc = document.getElementById('wave');
+  var wg = wc.getContext('2d');
+  var seed = 0;
+  function paintWave() {
+    var w = wc.width, h = wc.height;
+    wg.clearRect(0, 0, w, h);
+    wg.beginPath();
+    for (var x = 0; x <= w; x += 3) {
+      var a = Math.sin((x * 0.021) + seed) * 0.5 + Math.sin((x * 0.007) - seed * 0.6) * 0.5;
+      var amp = playing ? 16 : 5;
+      var y = h / 2 + a * amp * (0.6 + 0.4 * Math.sin(x * 0.004 + seed * 2));
+      if (x === 0) wg.moveTo(x, y); else wg.lineTo(x, y);
+    }
+    wg.strokeStyle = playing ? 'rgba(216,255,245,0.82)' : 'rgba(127,216,200,0.30)';
+    wg.lineWidth = 1.4;
+    wg.stroke();
+    seed += 0.045;
+    requestAnimationFrame(paintWave);
+  }
+
+  paintClock();
+  paintWave();
+}());
+</script>
+</body>
+</html>

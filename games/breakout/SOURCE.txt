@@ -1,0 +1,7 @@
+名称：javascript-breakout（打砖块）
+仓库：https://github.com/jakesgordon/javascript-breakout
+许可：MIT（LICENSE 已原样保留）
+本地目录：games/breakout/
+接入改动：
+  - 无。index.html / breakout.css / breakout.js / game.js / levels.js / images/ / sound/ 原样拷贝。
+  - 未拷贝 packaged/（11MB 打包产物）。

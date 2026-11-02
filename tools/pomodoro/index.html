@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>番茄钟</title>
+<!--
+  入口壳：上游的入口文件叫 timer.html（内部 pet.html 也链接回 timer.html），
+  而 WorldHub 的区块门统一指向 <目录>/index.html。
+  这里不复制一份 app（避免两个状态源），只做一次同目录跳转。
+-->
+<meta http-equiv="refresh" content="0; url=timer.html">
+<style>
+  html, body { height: 100%; margin: 0; background: #0d0b14; }
+  body {
+    display: flex; align-items: center; justify-content: center;
+    color: rgba(233, 226, 245, 0.6);
+    font-family: "PingFang SC", "Microsoft YaHei", system-ui, sans-serif;
+    font-size: 14px; letter-spacing: 0.16em;
+  }
+  a { color: #ffd9a8; }
+</style>
+</head>
+<body>
+  <p>正在打开番茄钟 · <a href="timer.html">如果没有跳转请点这里</a></p>
+</body>
+</html>

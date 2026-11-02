@@ -1,0 +1,26 @@
+{
+  "name": "Pomodoro Timer 🍅",
+  "short_name": "Pomodoro",
+  "description": "Study timer with tasks, streaks, ambient sounds, and weekly stats",
+  "start_url": "./timer.html",
+  "display": "standalone",
+  "background_color": "#000000",
+  "theme_color": "#e0a0a8",
+  "orientation": "portrait-primary",
+  "icons": [
+    {
+      "src": "icon.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Cat Companion",
+      "short_name": "Cat",
+      "description": "Check on your cat and spend coins",
+      "url": "./pet.html"
+    }
+  ]
+}

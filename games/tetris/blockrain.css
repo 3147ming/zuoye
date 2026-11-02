@@ -1,0 +1,98 @@
+/* ============================================================
+   blockrain.css —— 上游 blockrain.js 的配套皮肤（最小重绘版）
+   ------------------------------------------------------------
+   上游仓库只带 assets/css/styles.css（宣传页用的版式），没有发行版
+   的 blockrain.css；这里按插件生成的类名补一套中性暗色皮肤，
+   只涉及「开始 / 计分 / 结束」三块覆盖层的排版与按钮外观，
+   不参与任何游戏逻辑。
+   ============================================================ */
+
+.blockrain-game-holder {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  color: #f2ecff;
+  font-size: 16px;
+  line-height: 1.4;
+}
+
+.blockrain-game-holder canvas { display: block; width: 100%; height: 100%; }
+
+/* ---------- 计分 ---------- */
+.blockrain-score-holder {
+  position: absolute;
+  top: 10px;
+  right: 14px;
+  text-align: right;
+  text-shadow: 0 2px 10px rgba(0, 0, 0, 0.7);
+  pointer-events: none;
+}
+
+.blockrain-score-msg {
+  font-size: 11px;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: rgba(242, 236, 255, 0.5);
+}
+
+.blockrain-score-num {
+  font-size: 26px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.04em;
+}
+
+/* ---------- 开始层 ---------- */
+.blockrain-start-holder {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: radial-gradient(60% 60% at 50% 45%, rgba(12, 9, 24, 0.55), rgba(6, 5, 12, 0.82));
+  backdrop-filter: blur(1px);
+}
+
+.blockrain-start { text-align: center; }
+
+.blockrain-start-btn,
+.blockrain-game-over-btn {
+  padding: 12px 26px;
+  border: 1px solid rgba(255, 214, 170, 0.55);
+  border-radius: 999px;
+  background: linear-gradient(180deg, rgba(48, 36, 78, 0.95), rgba(24, 18, 42, 0.95));
+  color: #ffe6c4;
+  font-family: inherit;
+  font-size: 15px;
+  letter-spacing: 0.18em;
+  cursor: pointer;
+  transition: transform 120ms ease, box-shadow 160ms ease, border-color 160ms ease;
+  box-shadow: 0 10px 30px -12px rgba(0, 0, 0, 0.9);
+}
+
+.blockrain-start-btn:hover,
+.blockrain-game-over-btn:hover {
+  transform: translateY(-1px);
+  border-color: rgba(255, 214, 170, 0.95);
+  box-shadow: 0 14px 34px -12px rgba(240, 167, 110, 0.5);
+}
+
+.blockrain-start-btn:active,
+.blockrain-game-over-btn:active { transform: translateY(1px); }
+
+/* ---------- 结束层 ---------- */
+.blockrain-game-over-holder {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: radial-gradient(60% 60% at 50% 45%, rgba(40, 12, 22, 0.62), rgba(6, 5, 12, 0.86));
+}
+
+.blockrain-game-over { text-align: center; }
+
+.blockrain-game-over-msg {
+  margin-bottom: 14px;
+  font-size: 28px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  color: #ffd9a8;
+  text-shadow: 0 3px 18px rgba(240, 120, 90, 0.45);
+}

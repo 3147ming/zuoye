@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>JavaScript Minesweeper</title>
+    <script src="vendor/jquery.min.js"></script>
+    <link rel="stylesheet" href="css/minesweeper.css" type="text/css" />
+    <link
+      rel="stylesheet"
+      href="css/smoothness/jquery-ui-1.9.2.custom.min.css"
+      type="text/css"
+    />
+    <!-- Source: https://github.com/michaelbutler/minesweeper -->
+    <style>
+      /* 接入适配（WorldHub）：上游是顶对齐的裸页面，嵌进 1280×720 的门里会缩在左上角
+         留一大片空白。这里只把内容整体居中，不改任何玩法/尺寸样式。 */
+      html,
+      body {
+        height: 100%;
+      }
+      body {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+      }
+    </style>
+  </head>
+  <body>
+    <!-- 上游右上角还有一枚 GitHub 角标（S3 外链图片），离线必然 404，已移除；纯装饰，不影响玩法 -->
+    <h1 class="logo">
+      JavaScript MineSweeper
+      <span class="invisible ajax-loading"
+        ><img src="load.gif" alt="Processing..."
+      /></span>
+    </h1>
+    <div id="minesweeper"></div>
+
+    <script src="js/MineSweeper.js" type="text/javascript"></script>
+    <script>
+      jQuery(function ($) {
+        // set a global instance of Minesweeper
+        minesweeper = new MineSweeper();
+
+        // init the (first) game
+        minesweeper.init();
+      });
+    </script>
+  </body>
+</html>
