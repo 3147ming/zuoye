@@ -20,8 +20,12 @@ import {
   simulateNow,
   isBoardActive,
   stepClockNow,
+  onModelChange,
 } from './board.js';
 import { createWaveView } from './waveview.js';
+import { createInstruments } from './instruments.js';
+import { setInstrumentProvider, setInstrumentRestorer } from './model.js';
+import { getPart } from './parts.js';
 
 /** 允许切换的视图 id 白名单 */
 const VIEW_IDS = ['view-list', 'view-workspace', 'view-report'];
@@ -37,6 +41,12 @@ let boardViewMode = 'bench';
 
 /** 波形查看器句柄（指令包 7）：进实验创建、离开实验销毁 */
 let waveView = null;
+
+/** 仪器面板句柄（指令包 10） */
+let instruments = null;
+
+/** 存档里带的仪器段：面板还没创建时先存这儿，创建后补恢复 */
+let pendingInstrumentData = null;
 
 /** 当前平台 id（由 board 回调同步，用于切回实验台时恢复标签） */
 let currentPlatformId = 'exp-box';
@@ -201,6 +211,117 @@ function wireWaveView() {
       // 控件值由 waveView.options() 在运行时读取，这里只留钩子
     },
   });
+}
+
+/**
+ * 创建仪器面板并接上实验台数据（指令包 10）。
+ *
+ * 数据口径：
+ *   万用表   → 每次仿真结束后的直流结果（订阅 onModelChange + 防抖延时）
+ *   示波器/逻辑分析 → __labBoard.simtrans.last()（最近一次暂态）
+ *   函数发生 → 电路里的 fgen 元件（走 model.updateParams，可撤销）
+ */
+function wireInstruments() {
+  const host = document.getElementById('instrument-panel');
+  if (!host) return;
+  if (instruments) { instruments = null; }
+  const B = () => window.__labBoard;
+
+  const netOptions = () => {
+    const board = B();
+    if (!board) return [];
+    const netlist = board.model.getNetlist();
+    const parts = [];
+    (netlist.nets || new Map()).forEach((members, netId) => {
+      const labels = [];
+      (members || []).slice(0, 2).forEach((key) => {
+        const text = String(key);
+        if (text.startsWith('c:')) {
+          const [, compId, pin] = text.split(':');
+          labels.push(`${compId}.${pin}`);
+        }
+      });
+      parts.push({ netId, label: labels.length > 0 ? `${netId}（${labels.join('、')}）` : netId });
+    });
+    return parts;
+  };
+
+  const componentOptions = () => {
+    const board = B();
+    if (!board) return [];
+    return board.model.getState().components.map((comp) => {
+      const def = getPart(comp.type);
+      return { id: comp.id, label: `${comp.id}（${def ? def.label : comp.type}）` };
+    });
+  };
+
+  instruments = createInstruments(host, {
+    model: () => (B() ? B().model : null),
+    netOptions,
+    componentOptions,
+    transient: () => {
+      const board = B();
+      return board && board.simtrans ? board.simtrans.last() : null;
+    },
+    runTransient: (opts) => {
+      const board = B();
+      if (!board) return null;
+      const res = board.simtrans.solve(opts || { duration: 0.01, dt: 0.0001 });
+      if (instruments) instruments.refresh();
+      return res;
+    },
+    fgenComponent: () => {
+      const board = B();
+      if (!board) return null;
+      return board.model.getState().components.find((comp) => comp.type === 'fgen') || null;
+    },
+    placeFgen: () => {
+      const board = B();
+      if (!board) return;
+      const platform = board.platforms.getPlatform(board.platformId);
+      for (let y = 1; y < platform.rows - 1; y += 1) {
+        for (let x = 0; x < platform.cols - 2; x += 1) {
+          const r = board.model.addComponent('fgen', x, y);
+          if (r.ok) {
+            board.requestRender();
+            simulateNow('fgen');
+            return;
+          }
+        }
+      }
+    },
+    updateFgen: (id, patch) => {
+      const board = B();
+      if (!board) return;
+      board.model.updateParams(id, patch);
+      simulateNow('fgen');
+      if (instruments) instruments.refresh();
+    },
+  });
+
+  // 存档里带的仪器段：面板创建后补恢复
+  if (pendingInstrumentData && instruments) {
+    instruments.restore(pendingInstrumentData);
+    pendingInstrumentData = null;
+  }
+
+  // 电路一改就刷新仪器（等防抖仿真跑完再读，避免读上一份结果）
+  onModelChange(() => {
+    window.setTimeout(() => {
+      if (instruments) instruments.refresh();
+    }, 360);
+  });
+
+  window.__labBoard = window.__labBoard || {};
+  window.__labBoard.instruments = instruments;
+}
+
+/** 离开实验：销毁仪器面板 */
+function destroyInstruments() {
+  const host = document.getElementById('instrument-panel');
+  if (host) host.replaceChildren();
+  instruments = null;
+  if (window.__labBoard) window.__labBoard.instruments = null;
 }
 
 /** 离开实验：销毁波形查看器 */
@@ -403,6 +524,13 @@ function openExperiment(expId) {
   activateTab('info');
   switchView('view-workspace');
 
+  // 仪器段随存档走（包 10）：model 不认识 UI，用注入的 provider/restorer
+  setInstrumentProvider(() => (instruments ? instruments.snapshot() : null));
+  setInstrumentRestorer((data) => {
+    if (instruments) instruments.restore(data);
+    else pendingInstrumentData = data;
+  });
+
   // 每次进入实验都回到实验台视图（原理图是辅助视图，不应成为默认落地页）
   switchBoardView('bench');
   // 连续放置是"一次操作习惯"，换实验时复位为关闭，避免用户莫名连放
@@ -432,10 +560,14 @@ function openExperiment(expId) {
 
   // 波形查看器（指令包 7）：进实验时挂上，用户点「运行」才跑暂态
   wireWaveView();
+
+  // 测量仪器（指令包 10）：四件仪器共用一份面板
+  wireInstruments();
 }
 
 /** 离开工作区：先清理实验台（含落盘与原理图），再切回列表 */
 function leaveWorkspace() {
+  destroyInstruments();
   destroyWaveView();
   destroyBoard();
   currentExperimentId = null;

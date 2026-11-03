@@ -1919,6 +1919,150 @@ function relErr(actual, expected) {
   }
 }
 
+/* ---------------------------------------------------------------- 测量仪器（包 10） */
+{
+  const IC = await import('../js/instruments-core.js');
+
+  const reset = () => {
+    M.createCircuit('breadboard');
+    ST.resetTransientState();
+  };
+  const wire = (a, ta, b, tb) => M.addWire(
+    { componentId: a, terminal: ta },
+    { componentId: b, terminal: tb },
+  );
+  const place = (type, x, y, params) => {
+    const r = M.addComponent(type, x, y, { params });
+    if (!r.ok) throw new Error(`${type} 放置失败：${r.error}`);
+    return r.component.id;
+  };
+
+  /* ---- 万用表：5V-1k-1k 分压 ---- */
+  {
+    reset();
+    const vs = place('vsource', 2, 2, { voltage: 5 });
+    const r1 = place('resistor', 6, 2, { resistance: 1000 });
+    const r2 = place('resistor', 10, 2, { resistance: 1000 });
+    wire(vs, '+', r1, '1');
+    wire(r1, '2', r2, '1');
+    wire(r2, '2', vs, '-');
+    const netOf = M.getNetlist().netOf;
+    const mid = netOf.get(`c:${r1}:2`);
+    const gnd = netOf.get(`c:${vs}:-`);
+    const vcc = netOf.get(`c:${vs}:+`);
+
+    const volt = IC.dmmRead(M, { mode: 'volt', netId: mid });
+    check('10 万用表电压档：分压中点 = 2.500V±0.1%',
+      volt.ok && Math.abs(volt.value - 2.5) / 2.5 <= 0.001, volt.text);
+
+    const amp = IC.dmmRead(M, { mode: 'amp', componentId: r2 });
+    check('10 万用表电流档：R 支路 = 2.500mA±0.1%',
+      amp.ok && Math.abs(Math.abs(amp.value) - 2.5e-3) / 2.5e-3 <= 0.001, amp.text);
+
+    const ohm = IC.dmmRead(M, { mode: 'ohm', netId: vcc, netB: gnd });
+    check('10 万用表电阻档：两点 = 2.000kΩ±0.5%',
+      ohm.ok && Math.abs(ohm.value - 2000) / 2000 <= 0.005, ohm.text);
+    const ohm2 = IC.dmmRead(M, { mode: 'ohm', netId: mid, netB: gnd });
+    check('10 万用表电阻档：中点对地 = 1.000kΩ±0.5%',
+      ohm2.ok && Math.abs(ohm2.value - 1000) / 1000 <= 0.005, ohm2.text);
+
+    const real = IC.dmmRead(M, { mode: 'volt', netId: mid, realInput: true });
+    check('10 内阻模式：10MΩ 并联读数差异被标注（约 -0.01%）',
+      real.ok && /内阻/.test(real.note) && Math.abs(real.value - 2.5) / 2.5 <= 0.001,
+      `${real.text} ${real.note}`);
+  }
+
+  /* ---- 二极管档 ---- */
+  {
+    reset();
+    const vs = place('vsource', 2, 2, { voltage: 5 });
+    const r = place('resistor', 6, 2, { resistance: 1000 });
+    const d = place('diode', 10, 2, { model: '1N4148' });
+    wire(vs, '+', r, '1');
+    wire(r, '2', d, 'A');
+    wire(d, 'K', vs, '-');
+    const netOf = M.getNetlist().netOf;
+    const anode = netOf.get(`c:${d}:A`);
+    const cathode = netOf.get(`c:${d}:K`);
+    const fwd = IC.dmmRead(M, { mode: 'diode', netId: anode, netB: cathode });
+    check('10 二极管档：1N4148 正向 = 0.7V±5% 且判导通',
+      fwd.ok && fwd.value >= 0.665 && fwd.value <= 0.735 && /导通/.test(fwd.text),
+      `${fwd.text}`);
+    const rev = IC.dmmRead(M, { mode: 'diode', netId: cathode, netB: anode });
+    check('10 二极管档：反向判截止（OL）', rev.ok && /截止|OL/.test(rev.text), rev.text);
+  }
+
+  /* ---- 示波器自动测量 ---- */
+  {
+    const samples = [];
+    for (let i = 0; i < 2000; i += 1) {
+      const t = i * 1e-5;
+      samples.push({ t, v: 1 + Math.sin(2 * Math.PI * 1000 * t) });
+    }
+    const m = IC.scopeMeasure(samples);
+    check('10 示波器：1kHz/2Vpp 正弦 → 频率 1.00kHz±1%',
+      m.freq && Math.abs(m.freq - 1000) / 1000 <= 0.01, String(m.freq));
+    check('10 示波器：Vpp=2.00V±1% / 周期 1.00ms±1%',
+      Math.abs(m.vpp - 2) / 2 <= 0.01 && Math.abs(m.period - 1e-3) / 1e-3 <= 0.01,
+      `${m.vpp} / ${m.period}`);
+  }
+
+  /* ---- 逻辑分析仪 UART ---- */
+  {
+    const bit = 1 / 9600;
+    const dt = 1e-5;
+    const idle = 2 * bit;
+    const samples = [];
+    for (let t = 0; t < idle + 11 * bit; t += dt) {
+      const u = t - idle;
+      let v = 1;
+      if (u >= 0 && u < bit) v = 0;
+      else if (u >= bit && u < 9 * bit) v = (0x41 >> Math.floor((u - bit) / bit)) & 1;
+      samples.push({ t, v: v * 5 });
+    }
+    const decoded = IC.decodeUart(samples, 9600);
+    check('10 逻辑分析仪：UART 9600 解码 0x41（A）',
+      decoded.ok && decoded.bytes.length === 1 && decoded.bytes[0].value === 0x41,
+      JSON.stringify(decoded.bytes));
+  }
+
+  /* ---- 函数发生器：波形与 RC 低通 ---- */
+  {
+    check('10 函数发生器：正弦 1kHz/2Vpp 在 t=0.25ms 处 = 1.000V',
+      Math.abs(IC.fgenVoltageAt(0.00025, { wave: 'sine', frequency: 1000, amplitude: 2, offset: 0 }) - 1) < 1e-9,
+      String(IC.fgenVoltageAt(0.00025, { wave: 'sine', frequency: 1000, amplitude: 2, offset: 0 })));
+    check('10 函数发生器：方波占空比 25% 在 t=0.4ms 处为低',
+      IC.fgenVoltageAt(0.0004, { wave: 'square', frequency: 1000, amplitude: 2, offset: 0, duty: 25 }) < 0,
+      String(IC.fgenVoltageAt(0.0004, { wave: 'square', frequency: 1000, amplitude: 2, offset: 0, duty: 25 })));
+
+    // 1kHz 正弦 → RC 低通（1k / 100nF，fc=1.59kHz）：|H| = 1/√(1+(f/fc)²) = 0.847
+    reset();
+    const fg = place('fgen', 2, 2, { wave: 'sine', frequency: 1000, amplitude: 2, offset: 0 });
+    const r = place('resistor', 6, 2, { resistance: 1000 });
+    const c = place('capacitor', 10, 2, { capacitance: 100e-9 });
+    wire(fg, 'OUT', r, '1');
+    wire(r, '2', c, '1');
+    wire(c, '2', fg, 'GND');
+    const res = ST.solveTransient(M, { duration: 0.01, dt: 2e-6 });
+    const capNet = M.getNetlist().netOf.get(`c:${c}:1`);
+    const outWave = res.ok ? res.waveforms.find((w) => w.netId === capNet) : null;
+    const outVpp = outWave ? (() => {
+      let hi = -Infinity;
+      let lo = Infinity;
+      outWave.samples.slice(Math.floor(outWave.samples.length / 2)).forEach((s) => {
+        if (s.v > hi) hi = s.v;
+        if (s.v < lo) lo = s.v;
+      });
+      return hi - lo;
+    })() : 0;
+    const ratio = outVpp / 2;
+    const theory = 1 / Math.sqrt(1 + (1000 / 1591.5) ** 2);
+    check('10 函数发生器 + RC 低通：输出/输入幅值比 = 0.847±3%',
+      res.ok === true && outWave && Math.abs(ratio - theory) / theory <= 0.03,
+      `实测 ${ratio.toFixed(4)} / 理论 ${theory.toFixed(4)}`);
+  }
+}
+
 /* ---------------------------------------------------------------- 汇总 */
 console.log(`\n=== model 自测：${pass}/${pass + fail} 通过 ===`);
 if (fail > 0) {

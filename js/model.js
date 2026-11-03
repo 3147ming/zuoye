@@ -663,9 +663,24 @@ export function peekStash(platformId) {
    ========================================================================== */
 
 /** 导出为可存 localStorage 的纯数组对象（端子由 parts.js 重建，不落盘） */
+let instrumentProvider = null;
+let instrumentRestorer = null;
+
+/**
+ * 仪器面板把"挂点/参数/时基"寄生在存档里（包 10）。
+ * 用注入而不是 import：model 层不认识任何 UI 模块，node 单测也不会被 DOM 牵连。
+ */
+export function setInstrumentProvider(fn) {
+  instrumentProvider = typeof fn === 'function' ? fn : null;
+}
+
+export function setInstrumentRestorer(fn) {
+  instrumentRestorer = typeof fn === 'function' ? fn : null;
+}
+
 export function serializeCircuit() {
   if (!state) return null;
-  return {
+  const data = {
     version: 3,
     platform: state.platform,
     components: state.components.map((comp) => ({
@@ -679,6 +694,11 @@ export function serializeCircuit() {
     wires: state.wires.map((wire) => ({ id: wire.id, a: { ...wire.a }, b: { ...wire.b } })),
     stash: JSON.parse(JSON.stringify(state.stash)),
   };
+  if (instrumentProvider) {
+    const instruments = instrumentProvider();
+    if (instruments) data.instruments = instruments;
+  }
+  return data;
 }
 
 /**
@@ -734,6 +754,11 @@ export function loadCircuit(data, platformId) {
       counters.wire += 1;
       report.wires += 1;
     });
+  }
+
+  // 仪器挂点/参数：等元件与网表都就绪后再恢复（面板要按 netId 找通道）
+  if (data.instruments && instrumentRestorer) {
+    try { instrumentRestorer(data.instruments); } catch (err) { /* 仪器段坏了不能拖垮电路 */ }
   }
 
   if (data.stash && typeof data.stash === 'object') {

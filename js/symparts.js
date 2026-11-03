@@ -806,6 +806,41 @@ export const SYMBOLS = {
     labelText: () => 'ADC8',
   },
 
+  fgen: {
+    id: 'fgen',
+    label: '函数发生器',
+    size: { w: 4, h: 4 },
+    pins: [
+      { name: 'OUT', dx: 4, dy: 2, side: 'right', role: 'out' },
+      { name: 'GND', dx: 0, dy: 2, side: 'left', role: 'io' },
+    ],
+    draw(ctx, comp, g) {
+      const ink = g.color.ink;
+      ctx.beginPath();
+      ctx.arc(g.p(2, 2).x, g.p(2, 2).y, g.cell * 0.95, 0, Math.PI * 2);
+      ctx.strokeStyle = ink;
+      ctx.lineWidth = 1.6;
+      ctx.stroke();
+      // 正弦符号
+      ctx.beginPath();
+      const c = g.p(2, 2);
+      for (let i = 0; i <= 24; i += 1) {
+        const x = c.x - g.cell * 0.55 + (i / 24) * g.cell * 1.1;
+        const y = c.y - Math.sin((i / 24) * Math.PI * 2) * g.cell * 0.3;
+        if (i === 0) ctx.moveTo(x, y);
+        else ctx.lineTo(x, y);
+      }
+      ctx.stroke();
+      polyline(ctx, [g.p(0, 2), g.p(1.05, 2)], ink, 1.6);
+      polyline(ctx, [g.p(2.95, 2), g.p(4, 2)], ink, 1.6);
+      void comp;
+    },
+    labelText: (comp) => {
+      const f = Number(comp.params.frequency);
+      return Number.isFinite(f) ? `FG ${f}Hz` : 'FG';
+    },
+  },
+
   /* ---- 指令包 9 ---- */
 
   diode: {

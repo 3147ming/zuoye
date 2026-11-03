@@ -1633,7 +1633,12 @@ export function initBoard(options) {
     // 暂态仿真入口（指令包 7）：与 simdc/simdig 同契约风格
     simtrans: {
       // 同步跑完返回结果（测试/一次性求解用）
-      solve: (opts) => solveTransient(model, opts || {}),
+      // 同步求解并记住结果：示波器/逻辑分析仪读的就是"最近一次"
+      solve: (opts) => {
+        const res = solveTransient(model, opts || {});
+        board.transientRun.last = res;
+        return res;
+      },
       last: () => board.transientRun.last,
       running: () => board.transientRun.active,
       // 分帧异步运行：每帧算一小段，进度回报 hooks，可随时 stop

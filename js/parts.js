@@ -848,6 +848,21 @@ function drawPot(ctx, comp, style) {
   }
 }
 
+/** 函数发生器：带波形丝印的小模块 */
+function drawFgen(ctx, comp, style) {
+  const { frame, pinLabels } = style;
+  drawSourceBase(ctx, style, true);
+  const center = lift(frame.project(frame.w / 2 - 0.5, frame.h / 2 - 0.5), 7);
+  const size = Math.max(9, Math.min(13, frame.tileW * 0.42));
+  ctx.font = `600 ${size}px "Cascadia Mono", Consolas, monospace`;
+  ctx.fillStyle = '#7fd6c2';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  const wave = comp.params && comp.params.wave;
+  ctx.fillText(wave === 'square' ? '⎍' : wave === 'triangle' ? '⋀' : '∿', center.x, center.y);
+  void pinLabels;
+}
+
 /** 电源类共用的底座：深色矮模块 + 两侧引线 */
 function drawSourceBase(ctx, style, accent) {
   const { frame } = style;
@@ -1299,6 +1314,72 @@ export const PARTS = {
     draw: drawAdc8,
   },
 
+  fgen: {
+    id: 'fgen',
+    label: '函数发生器',
+    group: '电源',
+    size: { w: 2, h: 1 },
+    terminals: [
+      { name: 'OUT', dx: 0, dy: 0, direction: 'out', role: 'signal' },
+      { name: 'GND', dx: 1, dy: 0, direction: 'out', role: 'GND' },
+    ],
+    defaultParams: { wave: 'sine', frequency: 1000, amplitude: 2, offset: 0, duty: 50 },
+    paramFields: [
+      {
+        key: 'wave',
+        label: '波形',
+        type: 'select',
+        options: [
+          { value: 'sine', label: '正弦' },
+          { value: 'square', label: '方波' },
+          { value: 'triangle', label: '三角波' },
+          { value: 'dc', label: '直流' },
+        ],
+      },
+      {
+        key: 'frequency',
+        label: '频率',
+        type: 'number',
+        unit: 'Hz',
+        factor: 1,
+        step: 100,
+        min: 0.1,
+        max: 100000,
+      },
+      {
+        key: 'amplitude',
+        label: '幅值',
+        type: 'number',
+        unit: 'Vpp',
+        factor: 1,
+        step: 0.5,
+        min: 0,
+        max: 10,
+      },
+      {
+        key: 'offset',
+        label: '偏置',
+        type: 'number',
+        unit: 'V',
+        factor: 1,
+        step: 0.5,
+        min: -5,
+        max: 5,
+      },
+      {
+        key: 'duty',
+        label: '占空比',
+        type: 'number',
+        unit: '%',
+        factor: 1,
+        step: 5,
+        min: 10,
+        max: 90,
+      },
+    ],
+    draw: drawFgen,
+  },
+
   /* ---- 指令包 9：分立 / 动态 / 机电元件 ---- */
 
   diode: {
@@ -1553,6 +1634,7 @@ export const PART_ORDER = [
   'capacitor',
   'vsource',
   'isource',
+  'fgen',
   'logic-switch',
   'pulse',
   'clock',

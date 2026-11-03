@@ -70,6 +70,7 @@ import {
   TPD_GATE,
   TPD_FF,
 } from './digmodels.js';
+import { fgenVoltageAt } from './instruments-core.js';
 import {
   collectMix,
   evalMixUnit,
@@ -150,7 +151,13 @@ function timeNow() {
 /** 模拟域视图：滤掉数字元件（clock/pulse/logic-switch/ic74xx） */
 function analogStateOf(modelApi) {
   const state = modelApi.getState();
-  return { ...state, components: state.components.filter((comp) => !isDigital(comp.type)) };
+  // 数字源与函数发生器都不进 MNA 元件表：前者由数字域驱动，后者按波形逐时刻驱动
+  return {
+    ...state,
+    components: state.components.filter(
+      (comp) => !isDigital(comp.type) && comp.type !== 'fgen',
+    ),
+  };
 }
 
 /** 网表查找：`c:<compId>:<pin>` → netId */
@@ -408,6 +415,22 @@ export function solveTransient(modelApi, opts = {}) {
           : src.comp.type === 'pulse'
             ? (t) => pulseLevelAt(t, src.comp.params)
             : () => switchLevelAt(src.comp.params),
+    });
+  });
+
+  // 函数发生器：模拟波形源（与时钟/脉冲并列，但输出是连续电压）
+  state.components.forEach((comp) => {
+    if (comp.type !== 'fgen') return;
+    const outNet = netOfPin(netOf, comp.id, 'OUT');
+    const refNet = netOfPin(netOf, comp.id, 'GND');
+    if (!outNet) return;
+    sourceDrives.push({
+      kind: 'fgen',
+      compId: comp.id,
+      comp,
+      refNet: refNet || null,
+      outNet,
+      voltageAt: (t) => fgenVoltageAt(t, comp.params),
     });
   });
 
@@ -775,8 +798,8 @@ export function solveTransient(modelApi, opts = {}) {
 
     // 2) 时变源电压（时钟/脉冲/逻辑开关）
     sourceDrives.forEach((drv) => {
-      const level = drv.levelAt(t);
-      drv.stampV = voltageOfLevel(level);
+      // 函数发生器直接给电压；时钟/脉冲/逻辑开关走"电平 → 电压"换算
+      drv.stampV = drv.voltageAt ? drv.voltageAt(t) : voltageOfLevel(drv.levelAt(t));
       if (drv.entry) drv.entry.comp.params.voltage = drv.stampV;
     });
 
@@ -964,6 +987,13 @@ export function solveTransient(modelApi, opts = {}) {
   digital.units.forEach((ui) => ui.outputs.forEach((out) => {
     if (out.net) digitalNets.add(out.net);
   }));
+  // 时钟/脉冲/逻辑开关的输出是"逻辑电平",同样按数字线画阶梯（示波器/LA 要挂得上）
+  sourceDrives.forEach((drv) => {
+    if (!drv.outNet) return;
+    if (drv.comp && (drv.comp.type === 'clock' || drv.comp.type === 'pulse' || drv.comp.type === 'logic-switch')) {
+      digitalNets.add(drv.outNet);
+    }
+  });
   mixUnits.forEach((unit) => {
     if (unit.kind === 'dac') return;
     unit.outputs.forEach((out) => {

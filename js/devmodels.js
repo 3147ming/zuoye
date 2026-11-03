@@ -764,6 +764,42 @@ export function inductanceOf(params) {
   return Number.isFinite(l) && l > 0 ? l : 0;
 }
 
+/**
+ * 函数发生器：直流工作点取 offset，暂态由 simtrans 按波形逐时刻驱动。
+ * 这里只负责"直流那一面"——学生在直流面板看到的是偏置电压。
+ */
+const fgenModel = {
+  id: 'fgen',
+  label: '函数发生器',
+  pins: ['OUT', 'GND'],
+  needsBranch: true,
+  isNonlinear: false,
+  conducts: () => true,
+  validate(params) {
+    const f = Number(params && params.frequency);
+    if (params && params.wave !== 'dc' && (!Number.isFinite(f) || f <= 0)) return '频率必须大于 0';
+    return null;
+  },
+  stampLinear(A, b, refs, params) {
+    const { pos, neg, br, size } = refs;
+    if (br < 0) return;
+    const v = Number(params && params.offset) || 0;
+    stampAdd(A, size, pos, br, 1);
+    stampAdd(A, size, neg, br, -1);
+    stampAdd(A, size, br, pos, 1);
+    stampAdd(A, size, br, neg, -1);
+    stampRhs(b, size, br, v);
+  },
+  resultOf(entry, voltageOf, x, branchOf) {
+    const br = branchOf.get(entry.comp.id);
+    return {
+      v: (voltageOf(entry.netPos) || 0) - (voltageOf(entry.netNeg) || 0),
+      i: br === undefined ? null : x[br],
+      note: '波形源（暂态由发生器驱动）',
+    };
+  },
+};
+
 /** 蜂鸣器：有源=100Ω、无源=1kΩ（只做"通电发声"的负载模型） */
 const buzzerModel = {
   id: 'buzzer',
@@ -963,6 +999,7 @@ export const MODELS = {
   transistor: transistorModel,
   opamp: opampModel,
   inductor: inductorModel,
+  fgen: fgenModel,
   buzzer: buzzerModel,
   relay: relayModel,
   dip4: dip4Model,
