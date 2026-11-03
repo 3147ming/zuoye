@@ -1,5 +1,6 @@
 # 部署包（由 tools/make-deploy.mjs 生成，可随时重建）
 deploy/
+deploy-upload.zip
 
 # 会话工作区与临时探针
 .workbuddy/
