@@ -6,7 +6,7 @@
  *   · 不压缩 JS（教学软件源码可读，便于二次开发；体积本来就 <2MB）；
  *   · 幂等：同一份源码跑两遍，产物逐字节一致（时间戳不写入产物）。
  */
-import { cp, mkdir, rm, writeFile, readFile, stat } from 'node:fs/promises';
+import { cp, mkdir, rm, writeFile, readFile, stat, readdir } from 'node:fs/promises';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -22,8 +22,13 @@ async function exists(path) {
   try { await stat(path); return true; } catch (e) { return false; }
 }
 
-await rm(DIST, { recursive: true, force: true });
+// 清空产物，但保留隐藏状态文件（.genie / .workbuddy）：
+// 它们记录"这个目录属于哪个已发布应用"，删掉会让下次发布变成新应用、分享链接失效。
 await mkdir(DIST, { recursive: true });
+for (const entry of await readdir(DIST, { withFileTypes: true })) {
+  if (entry.name.startsWith('.')) continue;
+  await rm(join(DIST, entry.name), { recursive: true, force: true });
+}
 
 for (const file of FILES) {
   await cp(join(ROOT, file), join(DIST, file));

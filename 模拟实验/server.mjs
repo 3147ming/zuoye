@@ -9,6 +9,9 @@ import { fileURLToPath } from 'node:url';
 
 const ROOT = resolve(fileURLToPath(new URL('.', import.meta.url)));
 const PORT = Number(process.env.PORT) || 5360;
+// 绑定 0.0.0.0：本地仍可用 127.0.0.1 访问，同时满足容器/反向代理部署要求
+// （只绑 127.0.0.1 时，公网发布的反向代理连不进来）
+const HOST = process.env.HOST || '0.0.0.0';
 
 /** 扩展名到 Content-Type 的映射 */
 const MIME = {
@@ -51,6 +54,7 @@ const server = createServer(async (req, res) => {
   }
 });
 
-server.listen(PORT, '127.0.0.1', () => {
-  console.log(`lab-simulator 已启动：http://127.0.0.1:${PORT}/`);
+server.listen(PORT, HOST, () => {
+  const shown = HOST === '0.0.0.0' ? '127.0.0.1' : HOST;
+  console.log(`lab-simulator 已启动：http://${shown}:${PORT}/`);
 });
