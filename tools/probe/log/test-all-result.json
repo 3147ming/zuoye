@@ -1,0 +1,125 @@
+{
+  "at": "2026-11-03T13:19:29.795Z",
+  "ok": true,
+  "totalChecks": 889,
+  "passedChecks": 889,
+  "steps": [
+    {
+      "label": "静态检查",
+      "code": 0,
+      "ms": 2980,
+      "passed": 28,
+      "total": 28,
+      "ok": true,
+      "tail": "OK   symrender.js\nOK   waveview.js\n\n=== 语法检查：28/28 通过 ==="
+    },
+    {
+      "label": "model 自测",
+      "code": 0,
+      "ms": 1082,
+      "passed": 467,
+      "total": 467,
+      "ok": true,
+      "tail": "=== model 自测：467/467 通过 ==="
+    },
+    {
+      "label": "run10",
+      "code": 0,
+      "ms": 4855,
+      "passed": 27,
+      "total": 27,
+      "ok": true,
+      "tail": "OK   10 无横向溢出 375×667\nOK   console 错误 0 条\n\n=== 探针结果：27/27 通过 ==="
+    },
+    {
+      "label": "run11",
+      "code": 0,
+      "ms": 6163,
+      "passed": 21,
+      "total": 21,
+      "ok": true,
+      "tail": "OK   11 无横向溢出 375×667\nOK   console 错误 0 条\n\n=== 探针结果：21/21 通过 ==="
+    },
+    {
+      "label": "run12",
+      "code": 0,
+      "ms": 4578,
+      "passed": 15,
+      "total": 15,
+      "ok": true,
+      "tail": "OK   12 无横向溢出 375×667\nOK   console 错误 0 条\n\n=== 探针结果：15/15 通过 ==="
+    },
+    {
+      "label": "run13",
+      "code": 0,
+      "ms": 9487,
+      "passed": 16,
+      "total": 16,
+      "ok": true,
+      "tail": "OK   13 无横向溢出 375×667\nOK   console 错误 0 条\n\n=== 探针结果：16/16 通过 ==="
+    },
+    {
+      "label": "run5",
+      "code": 0,
+      "ms": 15213,
+      "passed": 40,
+      "total": 40,
+      "ok": true,
+      "tail": "PASS | 全程无 console 报错/警告\n\n=== 探针结果：40/40 通过 ===\n性能： {\"median\":0.3999999761581421,\"max\":0.699999988079071,\"min\":0.19999998807907104,\"nodes\":1,\"engineMs\":0.8}"
+    },
+    {
+      "label": "run6",
+      "code": 0,
+      "ms": 20813,
+      "passed": 45,
+      "total": 45,
+      "ok": true,
+      "tail": "  GEO dig-narrow {\"canvas\":[258,416,241,271],\"attr\":[258,415],\"scrollY\":0,\"areaScroll\":0,\"transform\":\"none\",\"view\":{\"scale\":0.2164,\"ox\":99.6,\"oy\":156,\"tileW\":7.36},\"corners\":[[100,156],[232,222],[26,193],[158,259]]}\nPASS | 无 console 报错或异常\n\n=== 数字仿真探针：45/45 通过 ==="
+    },
+    {
+      "label": "run7",
+      "code": 0,
+      "ms": 11134,
+      "passed": 35,
+      "total": 35,
+      "ok": true,
+      "tail": "OK   7.4 分辨率 375×667 无横向溢出\nOK   console 错误 0 条\n\n=== 探针结果：35/35 通过 ==="
+    },
+    {
+      "label": "run8",
+      "code": 0,
+      "ms": 5559,
+      "passed": 40,
+      "total": 40,
+      "ok": true,
+      "tail": "OK   2.12 无横向溢出 375×667\nOK   console 错误 0 条\n\n=== 探针结果：40/40 通过 ==="
+    },
+    {
+      "label": "run9",
+      "code": 0,
+      "ms": 3914,
+      "passed": 35,
+      "total": 35,
+      "ok": true,
+      "tail": "OK   9 无横向溢出 375×667\nOK   console 错误 0 条\n\n=== 探针结果：35/35 通过 ==="
+    },
+    {
+      "label": "runA",
+      "code": 0,
+      "ms": 10129,
+      "passed": 33,
+      "total": 33,
+      "ok": true,
+      "tail": "PASS | 分辨率 375×667 无横向溢出 | {\"overflowX\":false,\"toolsOverflow\":false,\"zoomReadout\":\"1×\"}\nPASS | 无 console 报错或异常\n\n=== 7A 探针：33/33 通过 ==="
+    },
+    {
+      "label": "runB",
+      "code": 0,
+      "ms": 32368,
+      "passed": 87,
+      "total": 87,
+      "ok": true,
+      "tail": "OK   2.12 Shift+Ctrl+Z 重做生效\nOK   2.12 console 错误 0 条\n\n=== 探针结果：87/87 通过 ==="
+    }
+  ]
+}

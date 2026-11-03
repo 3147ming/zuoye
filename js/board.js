@@ -1616,6 +1616,12 @@ export function initBoard(options) {
         return comp.params.state;
       },
     },
+    // 同步渲染一帧（性能基准 B4 / 截图用；正常画面仍走 rAF 合并）
+    renderNow: () => {
+      if (!board) return false;
+      renderScene(board.view, board.scene);
+      return true;
+    },
     // 故障注入（指令包 13）：探针/配置面板设置
     simModel: () => simModel(),
     setFaults: (list) => {
