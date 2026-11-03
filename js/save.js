@@ -21,9 +21,11 @@
   /* 只有这三扇门参与「已通关」标记（历史三款内置小游戏；开源 iframe 版不参与） */
   var DOORS = { fireice: 1, fight: 1, cards: 1 };
 
-  /* 区块 id 白名单：必须和 world.js 的 ZONES 一一对应，多一个少一个都算存档脏数据 */
+  /* 场景 id 白名单：必须和 world.js 的 SCENES 一一对应。
+     自建内容（contrib）的 id 由 world.js 在 init 时用 Save.allow() 补进来。 */
   var ZONES = {
-    plaza: 1, noise: 1, pomodoro: 1,
+    'gate-tools': 1, 'plaza': 1, 'gate-games': 1,
+    noise: 1, pomodoro: 1,
     snake: 1, game2048: 1, tetris: 1, fight: 1, mine: 1, gomoku: 1, breakout: 1
   };
 
@@ -33,6 +35,16 @@
 
   var Save = {
     KEY: 'worldhub.save.v1',
+
+    /* 把额外的场景 id 补进白名单（自建内容用）。可以重复调用，幂等 */
+    allow: function (ids) {
+      if (!ids) return false;
+      if (typeof ids === 'string') ids = [ids];
+      for (var i = 0; i < ids.length; i++) {
+        if (typeof ids[i] === 'string' && ids[i]) ZONES[ids[i]] = 1;
+      }
+      return true;
+    },
 
     /* 读存档：JSON 解析失败、结构不对、字段越界，一律回落到默认值，绝不抛错 */
     get: function () {

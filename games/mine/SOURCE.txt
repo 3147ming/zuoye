@@ -1,8 +1,13 @@
 名称：minesweeper（扫雷）
 仓库：https://github.com/michaelbutler/minesweeper
-许可：GPL-3.0（仓库内 license.txt 已原样保留；本项目只做目录内引用，未修改源码）
+许可：GPL-3.0（仓库内 license.txt 已原样保留）
 本地目录：games/mine/
-接入改动（仅 2 处）：
+接入改动（3 处，均已在源码注释中标明「WorldHub 接入补丁」）：
   1. jQuery 由 Google CDN（ajax.googleapis.com 1.7.2）改为本地 vendor/jquery.min.js（3.7.1）。
   2. 移除右上角 GitHub 角标 <img>（s3.amazonaws.com 外链，离线必然 404；纯装饰）。
+  3. js/MineSweeper.js 的 initWorkers()：file:// 直开时页面为不透明源（origin 'null'），
+     浏览器拒绝 Worker 加载本地脚本（SecurityError），改为捕获后回落到主线程等价实现
+     （localRun/localTouch/localAdjacent/localCalcWin，算法逐行对应 js/cell_toucher.js）；
+     http(s) 下仍构造真 Worker，行为不变。
   其余 index.html / css / js / images / load.gif 原样。
+说明：因改动过源码，本目录内文件以 GPL-3.0 而非项目统一许可分发。
