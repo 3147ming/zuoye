@@ -1,0 +1,71 @@
+{
+  "version": 4,
+  "platform": "breadboard",
+  "components": [
+    {
+      "id": "v1",
+      "type": "vsource",
+      "x": 2,
+      "y": 2,
+      "rotation": 0,
+      "params": {
+        "voltage": 5
+      }
+    },
+    {
+      "id": "r1",
+      "type": "resistor",
+      "x": 6,
+      "y": 2,
+      "rotation": 0,
+      "params": {
+        "resistance": 10000
+      }
+    },
+    {
+      "id": "c1",
+      "type": "capacitor",
+      "x": 10,
+      "y": 2,
+      "rotation": 0,
+      "params": {
+        "capacitance": 0.00001
+      }
+    }
+  ],
+  "wires": [
+    {
+      "a": {
+        "componentId": "v1",
+        "terminal": "+"
+      },
+      "b": {
+        "componentId": "r1",
+        "terminal": "1"
+      }
+    },
+    {
+      "a": {
+        "componentId": "r1",
+        "terminal": "2"
+      },
+      "b": {
+        "componentId": "c1",
+        "terminal": "1"
+      }
+    },
+    {
+      "a": {
+        "componentId": "c1",
+        "terminal": "2"
+      },
+      "b": {
+        "componentId": "v1",
+        "terminal": "-"
+      }
+    }
+  ],
+  "stash": {},
+  "instruments": null,
+  "records": []
+}

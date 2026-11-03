@@ -20,8 +20,24 @@ import {
   simulateNow,
   isBoardActive,
   stepClockNow,
+  onModelChange,
 } from './board.js';
 import { createWaveView } from './waveview.js';
+import { createInstruments } from './instruments.js';
+import { createDataPanel } from './data-panel.js';
+import { migrateArchive } from './datastore.js';
+import { EXAMPLES, getExample, cloneExample } from './examples-data.js';
+import { measureExample, circuitSummary } from './examples-measure.js';
+import { buildReportHtml } from './report.js';
+import {
+  PRESET_PLANS,
+  applyPlanParams,
+  measurePlan,
+  gradePlan,
+  faultLabel,
+} from './experiment-config.js';
+import { setInstrumentProvider, setInstrumentRestorer } from './model.js';
+import { getPart } from './parts.js';
 
 /** 允许切换的视图 id 白名单 */
 const VIEW_IDS = ['view-list', 'view-workspace', 'view-report'];
@@ -37,6 +53,15 @@ let boardViewMode = 'bench';
 
 /** 波形查看器句柄（指令包 7）：进实验创建、离开实验销毁 */
 let waveView = null;
+
+/** 仪器面板句柄（指令包 10） */
+let instruments = null;
+
+/** 存档里带的仪器段：面板还没创建时先存这儿，创建后补恢复 */
+let pendingInstrumentData = null;
+
+/** 数据面板句柄（指令包 11） */
+let dataPanel = null;
 
 /** 当前平台 id（由 board 回调同步，用于切回实验台时恢复标签） */
 let currentPlatformId = 'exp-box';
@@ -179,6 +204,7 @@ function wireWaveView() {
           if (!waveView) return;
           waveView.render(merged);
           waveView.setRunning(false, cancelled ? '已暂停' : '完成');
+          if (dataPanel && merged) dataPanel.ingestTransient(merged);
         },
         onError: (part) => {
           if (!waveView) return;
@@ -201,6 +227,449 @@ function wireWaveView() {
       // 控件值由 waveView.options() 在运行时读取，这里只留钩子
     },
   });
+}
+
+/**
+ * 创建仪器面板并接上实验台数据（指令包 10）。
+ *
+ * 数据口径：
+ *   万用表   → 每次仿真结束后的直流结果（订阅 onModelChange + 防抖延时）
+ *   示波器/逻辑分析 → __labBoard.simtrans.last()（最近一次暂态）
+ *   函数发生 → 电路里的 fgen 元件（走 model.updateParams，可撤销）
+ */
+function wireInstruments() {
+  const host = document.getElementById('instrument-panel');
+  if (!host) return;
+  if (instruments) { instruments = null; }
+  const B = () => window.__labBoard;
+
+  const netOptions = () => {
+    const board = B();
+    if (!board) return [];
+    const netlist = board.model.getNetlist();
+    const parts = [];
+    (netlist.nets || new Map()).forEach((members, netId) => {
+      const labels = [];
+      (members || []).slice(0, 2).forEach((key) => {
+        const text = String(key);
+        if (text.startsWith('c:')) {
+          const [, compId, pin] = text.split(':');
+          labels.push(`${compId}.${pin}`);
+        }
+      });
+      parts.push({ netId, label: labels.length > 0 ? `${netId}（${labels.join('、')}）` : netId });
+    });
+    return parts;
+  };
+
+  const componentOptions = () => {
+    const board = B();
+    if (!board) return [];
+    return board.model.getState().components.map((comp) => {
+      const def = getPart(comp.type);
+      return { id: comp.id, label: `${comp.id}（${def ? def.label : comp.type}）` };
+    });
+  };
+
+  instruments = createInstruments(host, {
+    model: () => (B() ? B().model : null),
+    netOptions,
+    componentOptions,
+    transient: () => {
+      const board = B();
+      return board && board.simtrans ? board.simtrans.last() : null;
+    },
+    runTransient: (opts) => {
+      const board = B();
+      if (!board) return null;
+      const res = board.simtrans.solve(opts || { duration: 0.01, dt: 0.0001 });
+      if (instruments) instruments.refresh();
+      if (dataPanel && res && res.ok) dataPanel.ingestTransient(res);
+      return res;
+    },
+    fgenComponent: () => {
+      const board = B();
+      if (!board) return null;
+      return board.model.getState().components.find((comp) => comp.type === 'fgen') || null;
+    },
+    placeFgen: () => {
+      const board = B();
+      if (!board) return;
+      const platform = board.platforms.getPlatform(board.platformId);
+      for (let y = 1; y < platform.rows - 1; y += 1) {
+        for (let x = 0; x < platform.cols - 2; x += 1) {
+          const r = board.model.addComponent('fgen', x, y);
+          if (r.ok) {
+            board.requestRender();
+            simulateNow('fgen');
+            return;
+          }
+        }
+      }
+    },
+    updateFgen: (id, patch) => {
+      const board = B();
+      if (!board) return;
+      board.model.updateParams(id, patch);
+      simulateNow('fgen');
+      if (instruments) instruments.refresh();
+    },
+  });
+
+  // 存档里带的仪器段：面板创建后补恢复
+  if (pendingInstrumentData && instruments) {
+    instruments.restore(pendingInstrumentData);
+    pendingInstrumentData = null;
+  }
+
+  // 电路一改就刷新仪器（等防抖仿真跑完再读，避免读上一份结果）
+  onModelChange(() => {
+    window.setTimeout(() => {
+      if (instruments) instruments.refresh();
+      if (dataPanel && instruments) {
+        const read = instruments.read();
+        if (read && read.dmm && read.dmm.ok && Number.isFinite(read.dmm.value)) {
+          dataPanel.ingestReading('__dmm', read.dmm.value, 'analog');
+        }
+      }
+    }, 360);
+  });
+
+  window.__labBoard = window.__labBoard || {};
+  window.__labBoard.instruments = instruments;
+}
+
+/** 离开实验：销毁仪器面板 */
+function destroyInstruments() {
+  const host = document.getElementById('instrument-panel');
+  if (host) host.replaceChildren();
+  instruments = null;
+  if (window.__labBoard) window.__labBoard.instruments = null;
+}
+
+/* ==========================================================================
+   示例实验指导书 + 报告（指令包 12）
+   ========================================================================== */
+
+/** 当前打开的实验对应的示例（非示例为 null） */
+let currentExample = null;
+
+/**
+ * 渲染指导书：步骤（可打勾，仅 UI 状态）+ 预期值表 + 观察输入 + 生成报告。
+ * 没有示例时整块隐藏，不占右栏高度。
+ */
+function renderGuide(example) {
+  currentExample = example || null;
+  const host = document.getElementById('guide-panel');
+  if (!host) return;
+  host.replaceChildren();
+  if (!example) {
+    host.hidden = true;
+    return;
+  }
+  host.hidden = false;
+
+  const head = document.createElement('div');
+  head.className = 'inst-head';
+  const title = document.createElement('span');
+  title.className = 'inst-title';
+  title.textContent = '实验指导';
+  const fold = document.createElement('button');
+  fold.type = 'button';
+  fold.className = 'inst-fold';
+  fold.textContent = '收起';
+  head.append(title, fold);
+  host.append(head);
+
+  const body = document.createElement('div');
+  body.className = 'inst-body';
+  host.append(body);
+  fold.addEventListener('click', () => {
+    const folded = host.classList.toggle('is-folded');
+    fold.textContent = folded ? '展开' : '收起';
+    body.hidden = folded;
+  });
+
+  const steps = document.createElement('ol');
+  steps.className = 'guide-steps';
+  (example.guide.steps || []).forEach((text) => {
+    const li = document.createElement('li');
+    const label = document.createElement('label');
+    label.className = 'inst-check';
+    const cb = document.createElement('input');
+    cb.type = 'checkbox';
+    const span = document.createElement('span');
+    span.textContent = text;
+    label.append(cb, span);
+    li.append(label);
+    steps.append(li);
+  });
+  body.append(steps);
+
+  const table = document.createElement('div');
+  table.className = 'data-table';
+  (example.guide.expected || []).forEach((item) => {
+    const line = document.createElement('p');
+    line.className = 'inst-measure-line';
+    line.textContent = `${item.label}：期望 ${item.target}${item.unit || ''}（±${((item.tolerance || 0) * 100).toFixed(1)}%）`;
+    table.append(line);
+  });
+  body.append(table);
+
+  const obsLabel = document.createElement('span');
+  obsLabel.className = 'inst-hint';
+  obsLabel.textContent = '我的观察（会写进报告）：';
+  const obs = document.createElement('textarea');
+  obs.className = 'inst-input guide-obs';
+  obs.rows = 3;
+  obs.placeholder = '例如：中点电压稳定在 2.50V，与理论一致。';
+  body.append(obsLabel, obs);
+
+  const actions = document.createElement('div');
+  actions.className = 'inst-actions';
+  const reportBtn = document.createElement('button');
+  reportBtn.type = 'button';
+  reportBtn.className = 'btn btn-ghost inst-btn btn-primary';
+  reportBtn.textContent = '生成实验报告';
+  reportBtn.addEventListener('click', () => generateExampleReport(example, obs.value));
+  actions.append(reportBtn);
+  body.append(actions);
+
+  renderConfigBlock(body, example);
+}
+
+/**
+ * 实验配置块（包 13）：方案应用 / 故障注入 / 评分。
+ * 方案与故障都是"电路外元数据"：方案写 params（可撤销），故障是求解前的临时变换。
+ */
+function renderConfigBlock(host, example) {
+  const plans = PRESET_PLANS.filter((plan) => plan.exampleId === example.id);
+  if (plans.length === 0) return;
+
+  const title = document.createElement('p');
+  title.className = 'inst-hint';
+  title.textContent = '实验配置（老师可布置方案/故障）';
+  host.append(title);
+
+  const planRow = document.createElement('div');
+  planRow.className = 'inst-row';
+  const planSel = document.createElement('select');
+  planSel.className = 'inst-input';
+  plans.forEach((plan) => {
+    const opt = document.createElement('option');
+    opt.value = plan.id;
+    opt.textContent = plan.title;
+    planSel.append(opt);
+  });
+  const applyBtn = document.createElement('button');
+  applyBtn.type = 'button';
+  applyBtn.className = 'btn btn-ghost inst-btn';
+  applyBtn.textContent = '应用方案';
+  applyBtn.addEventListener('click', () => {
+    const plan = plans.find((p) => p.id === planSel.value);
+    const board = window.__labBoard;
+    if (!plan || !board) return;
+    const res = applyPlanParams(board.model, plan);
+    if (!res.ok) {
+      showToast(res.error || '应用失败', 'error');
+      return;
+    }
+    simulateNow('apply-plan');
+    showToast(`已应用 ${plan.title}（可撤销）`, 'success');
+  });
+  planRow.append(planSel, applyBtn);
+  host.append(planRow);
+
+  const comps = () => (window.__labBoard ? window.__labBoard.model.getState().components : []);
+  const faultRow = document.createElement('div');
+  faultRow.className = 'inst-row';
+  const compSel = document.createElement('select');
+  compSel.className = 'inst-input';
+  comps().forEach((comp) => {
+    const opt = document.createElement('option');
+    opt.value = comp.id;
+    opt.textContent = comp.id;
+    compSel.append(opt);
+  });
+  faultRow.append(compSel);
+  host.append(faultRow);
+
+  const faultActions = document.createElement('div');
+  faultActions.className = 'inst-actions';
+  const addFault = (fault) => {
+    const board = window.__labBoard;
+    if (!board) return;
+    const list = board.faults().concat([fault]);
+    board.setFaults(list);
+    showToast(`已注入：${faultLabel(fault)}`, 'success');
+  };
+  const mk = (label, make) => {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'btn btn-ghost inst-btn';
+    btn.textContent = label;
+    btn.addEventListener('click', () => addFault(make(compSel.value)));
+    return btn;
+  };
+  faultActions.append(
+    mk('开路', (id) => ({ type: 'open', componentId: id })),
+    mk('短路', (id) => ({ type: 'short', componentId: id })),
+    mk('漂移 ×10', (id) => ({ type: 'drift', componentId: id, param: 'resistance', factor: 10 })),
+  );
+  const clearBtn = document.createElement('button');
+  clearBtn.type = 'button';
+  clearBtn.className = 'btn btn-ghost inst-btn';
+  clearBtn.textContent = '清除故障';
+  clearBtn.addEventListener('click', () => {
+    if (window.__labBoard) window.__labBoard.setFaults([]);
+    scoreBox.textContent = '';
+    showToast('故障已清除', 'info');
+  });
+  faultActions.append(clearBtn);
+  host.append(faultActions);
+
+  const scoreActions = document.createElement('div');
+  scoreActions.className = 'inst-actions';
+  const scoreBtn = document.createElement('button');
+  scoreBtn.type = 'button';
+  scoreBtn.className = 'btn btn-ghost inst-btn';
+  scoreBtn.textContent = '评分';
+  const scoreBox = document.createElement('p');
+  scoreBox.className = 'inst-measure-line';
+  scoreBtn.addEventListener('click', () => {
+    const board = window.__labBoard;
+    if (!board) return;
+    const plan = plans.find((p) => p.id === planSel.value);
+    const measured = measurePlan(board.simModel(), plan);
+    const graded = gradePlan(plan, measured.items, { faults: board.faults().length > 0 });
+    scoreBox.textContent = `得分 ${graded.score}（${graded.done}/${graded.total}）`
+      + (graded.suspects.length > 0 ? ` · 疑似故障：${graded.suspects.join('、')}` : '');
+  });
+  scoreActions.append(scoreBtn);
+  host.append(scoreActions, scoreBox);
+}
+
+/** 生成并下载单文件 HTML 报告（数据冻结在点击这一刻） */
+function generateExampleReport(example, observations) {
+  const board = window.__labBoard;
+  if (!board) return;
+  const measured = measureExample(board.model, example);
+  if (!measured.ok && measured.error) {
+    showToast(`报告生成失败：${measured.error}`, 'error');
+    return;
+  }
+  const canvas = document.getElementById('breadboard-canvas');
+  const html = buildReportHtml({
+    title: example.title,
+    time: new Date().toLocaleString('zh-CN'),
+    screenshot: canvas ? canvas.toDataURL('image/png') : '',
+    circuit: circuitSummary(board.model),
+    items: measured.items,
+    observations,
+  });
+  const blob = new Blob([html], { type: 'text/html;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `${example.id}-report.html`;
+  a.click();
+  window.setTimeout(() => URL.revokeObjectURL(url), 2000);
+  const pass = measured.items.filter((x) => x.pass).length;
+  showToast(`报告已生成：${pass}/${measured.items.length} 项符合预期`, 'success');
+}
+
+/**
+ * 数据面板（指令包 11）：记录 / 对比 / 导出 + 项目存档。
+ * 存档沿用 model.serializeCircuit（version 4），打开时先迁移再 loadCircuit。
+ */
+function wireDataPanel() {
+  const host = document.getElementById('data-panel');
+  if (!host) return;
+  const B = () => window.__labBoard;
+  dataPanel = createDataPanel(host, {
+    circuitName: () => currentExperimentId || 'circuit',
+    screenshot: () => {
+      const canvas = document.getElementById('breadboard-canvas');
+      return canvas ? canvas.toDataURL('image/png') : null;
+    },
+    saveProject: (opts = {}) => {
+      const board = B();
+      if (!board) return;
+      const archive = dataPanel.buildArchive(board.model);
+      archive.records = opts.records || [];
+      const text = JSON.stringify(archive, null, 2);
+      const blob = new Blob([text], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `${currentExperimentId || 'circuit'}.circuit.json`;
+      a.click();
+      window.setTimeout(() => URL.revokeObjectURL(url), 2000);
+    },
+    openProject: () => {
+      const input = document.createElement('input');
+      input.type = 'file';
+      input.accept = '.json,application/json';
+      input.addEventListener('change', async () => {
+        const file = input.files && input.files[0];
+        if (!file) return;
+        const text = await file.text();
+        let raw = null;
+        try { raw = JSON.parse(text); } catch (err) {
+          window.alert('文件损坏：不是合法的 JSON');
+          return;
+        }
+        const migrated = migrateArchive(raw);
+        if (!migrated.ok) {
+          window.alert(`无法打开：${migrated.notes.join('；')}`);
+          return;
+        }
+        const board = B();
+        if (!board) return;
+        board.model.loadCircuit(migrated.data, migrated.data.platform);
+        simulateNow('open-project');
+        if (dataPanel) dataPanel.restore(migrated.data.dataOptions || null);
+      });
+      input.click();
+    },
+    applyArchive: (data) => {
+      const board = B();
+      if (!board) return;
+      board.model.loadCircuit(data, data.platform);
+      simulateNow('open-project');
+    },
+  });
+  window.__labBoard = window.__labBoard || {};
+  window.__labBoard.data = dataPanel;
+  window.__labBoard.config = {
+    plans: PRESET_PLANS,
+    apply: (id) => {
+      const plan = PRESET_PLANS.find((p) => p.id === id);
+      if (!plan || !window.__labBoard) return { ok: false };
+      const res = applyPlanParams(window.__labBoard.model, plan);
+      simulateNow('apply-plan');
+      return res;
+    },
+    measure: (id) => {
+      const plan = PRESET_PLANS.find((p) => p.id === id);
+      return window.__labBoard ? measurePlan(window.__labBoard.simModel(), plan) : { ok: false };
+    },
+    grade: (id) => {
+      const plan = PRESET_PLANS.find((p) => p.id === id);
+      const measured = window.__labBoard ? measurePlan(window.__labBoard.simModel(), plan) : { items: [] };
+      return gradePlan(plan, measured.items, { faults: window.__labBoard.faults().length > 0 });
+    },
+    setFaults: (list) => (window.__labBoard ? window.__labBoard.setFaults(list) : 0),
+    faults: () => (window.__labBoard ? window.__labBoard.faults() : []),
+  };
+}
+
+/** 离开实验：销毁数据面板 */
+function destroyDataPanel() {
+  const host = document.getElementById('data-panel');
+  if (host) host.replaceChildren();
+  dataPanel = null;
+  if (window.__labBoard) window.__labBoard.data = null;
 }
 
 /** 离开实验：销毁波形查看器 */
@@ -403,6 +872,13 @@ function openExperiment(expId) {
   activateTab('info');
   switchView('view-workspace');
 
+  // 仪器段随存档走（包 10）：model 不认识 UI，用注入的 provider/restorer
+  setInstrumentProvider(() => (instruments ? instruments.snapshot() : null));
+  setInstrumentRestorer((data) => {
+    if (instruments) instruments.restore(data);
+    else pendingInstrumentData = data;
+  });
+
   // 每次进入实验都回到实验台视图（原理图是辅助视图，不应成为默认落地页）
   switchBoardView('bench');
   // 连续放置是"一次操作习惯"，换实验时复位为关闭，避免用户莫名连放
@@ -427,15 +903,32 @@ function openExperiment(expId) {
     },
   });
 
+  // 示例实验：每次打开都从只读模板恢复（用户改动不写回模板）
+  const example = getExample(exp.id);
+  if (example && window.__labBoard) {
+    const template = cloneExample(example.circuit);
+    window.__labBoard.model.loadCircuit(template, example.circuit.platform || exp.platform);
+  }
+  renderGuide(example);
+
   // 进入实验就先算一次直流工作点：恢复出来的电路也能立刻看到读数
   simulateNow('init');
 
   // 波形查看器（指令包 7）：进实验时挂上，用户点「运行」才跑暂态
   wireWaveView();
+
+  // 测量仪器（指令包 10）：四件仪器共用一份面板
+  wireInstruments();
+
+  // 数据面板（指令包 11）：记录/对比/导出/项目存档
+  wireDataPanel();
 }
 
 /** 离开工作区：先清理实验台（含落盘与原理图），再切回列表 */
 function leaveWorkspace() {
+  renderGuide(null);
+  destroyDataPanel();
+  destroyInstruments();
   destroyWaveView();
   destroyBoard();
   currentExperimentId = null;
@@ -1031,6 +1524,21 @@ function bindZoomControls() {
 
 /** 启动应用：绑定事件、渲染列表、进入默认视图 */
 function init() {
+  // 示例实验：注册到实验列表（只补缺失，避免每次启动重复写入）
+  EXAMPLES.forEach((ex) => {
+    if (getExperimentById(ex.id)) return;
+    addExperiment({
+      id: ex.id,
+      title: ex.title,
+      desc: ex.desc,
+      durationMin: ex.durationMin,
+      difficulty: ex.difficulty,
+      tags: ex.tags,
+      platform: ex.platform,
+      equipment: ex.equipment,
+    });
+  });
+
   bindEvents();
   activateTab('info');
   renderList();

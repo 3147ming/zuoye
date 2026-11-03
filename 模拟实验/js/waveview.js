@@ -281,17 +281,29 @@ export function createWaveView(host, callbacks = {}) {
       if (hidden.has(wave.netId)) return;
       ctx.strokeStyle = CHANNEL_COLORS[index % CHANNEL_COLORS.length];
       ctx.beginPath();
-      let started = false;
-      wave.samples.forEach((s) => {
-        const x = toX(s.t);
-        const y = toY(s.v);
-        if (!started) {
-          ctx.moveTo(x, y);
-          started = true;
-        } else {
-          ctx.lineTo(x, y);
+      if (wave.type === 'digital' && wave.samples.length > 0) {
+        // 数字线画阶梯：保持到下一采样时刻再垂直跳变（与模拟曲线同一时间轴）
+        let prev = wave.samples[0];
+        ctx.moveTo(toX(prev.t), toY(prev.v));
+        for (let i = 1; i < wave.samples.length; i += 1) {
+          const sample = wave.samples[i];
+          ctx.lineTo(toX(sample.t), toY(prev.v));
+          ctx.lineTo(toX(sample.t), toY(sample.v));
+          prev = sample;
         }
-      });
+      } else {
+        let started = false;
+        wave.samples.forEach((sample) => {
+          const x = toX(sample.t);
+          const y = toY(sample.v);
+          if (!started) {
+            ctx.moveTo(x, y);
+            started = true;
+          } else {
+            ctx.lineTo(x, y);
+          }
+        });
+      }
       ctx.stroke();
     });
   }
@@ -318,7 +330,8 @@ export function createWaveView(host, callbacks = {}) {
       const name = document.createElement('span');
       name.className = 'wave-legend-name';
       const ch = result.channels ? result.channels.find((c) => c.netId === wave.netId) : null;
-      name.textContent = ch ? `${wave.netId}（${ch.driver}）` : wave.netId;
+      const kind = wave.type === 'digital' ? '数字' : '模拟';
+      name.textContent = ch ? `${wave.netId}（${ch.driver}·${kind}）` : `${wave.netId}（${kind}）`;
       item.append(input, swatch, name);
       legend.append(item);
     });

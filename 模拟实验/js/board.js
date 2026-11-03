@@ -50,6 +50,7 @@ import {
   triggerPulse,
   resetDigState,
   levelBadge,
+  collectDigitalUnits,
 } from './simdig.js';
 import { levelText } from './digmodels.js';
 import {
@@ -57,6 +58,16 @@ import {
   runTransient,
   resetTransientState,
 } from './simtrans.js';
+import { createFaultView } from './experiment-config.js';
+import {
+  collectMix,
+  mixStateSnapshot,
+  mixStateOf,
+  analyzeMixLoops,
+  comparatorThreshold,
+  resetMixState,
+  MAX_MIX_ITER,
+} from './simmix.js';
 
 /** 存档键前缀 */
 const STORAGE_PREFIX = 'lab-sim-circuit-';
@@ -313,6 +324,15 @@ function relayout() {
   requestRender();
 }
 
+/**
+ * 求解用的模型门面（包 13）：有故障时套一层只读视图。
+ * 放在模块级是因为 simulateNow / __labBoard.simtrans 都在 initBoard 之外。
+ */
+function simModel() {
+  if (!board || !board.faults || board.faults.length === 0) return model;
+  return createFaultView(model, board.faults);
+}
+
 /* ==========================================================================
    状态栏与属性面板
    ========================================================================== */
@@ -333,8 +353,21 @@ function refreshHealth() {
       `网络 ${report.netCount}`,
     ];
     if (report.danglingWires.length > 0) parts.push(`悬空导线 ${report.danglingWires.length}`);
+    // 混合仿真标识（包 8）：电路里有边界元件时明确显示"混合仿真"；
+    // 环路/不收敛时把可读原因直接写进状态行（面板另有环路详情）
+    const dig = board.sim ? board.sim.dig : null;
+    const mixCount = dig && dig.mix ? (Number(dig.mix.units) || 0) : 0;
+    let mixedError = false;
+    if (mixCount > 0) {
+      if (dig && dig.ok === false) {
+        mixedError = true;
+        parts.push(`混合仿真 · ${dig.error || '求解失败'}`);
+      } else {
+        parts.push(`混合仿真 · 边界 ${mixCount}`);
+      }
+    }
     status.textContent = parts.join(' · ');
-    status.classList.toggle('is-warn', report.danglingWires.length > 0);
+    status.classList.toggle('is-warn', report.danglingWires.length > 0 || mixedError);
   }
 }
 
@@ -450,7 +483,8 @@ function renderProps() {
   }
 
   const actions = [{ label: '删除元件', action: 'delete' }];
-  if (def.size.w !== def.size.h && comp.rotation === 0) {
+  if (comp.rotation === 0) {
+    // 正方占位（比较器）也能转：端子排布不对称
     actions.unshift({ label: '旋转 90°', action: 'rotate' });
   }
   host.append(buildPropsActions(actions));
@@ -535,12 +569,18 @@ function buildParamField(comp, field) {
     input.value = rawValue;
   } else {
     input = document.createElement('input');
-    input.className = 'props-input';
-    input.type = 'number';
+    input.className = field.type === 'range' ? 'props-input props-range' : 'props-input';
+    input.type = field.type === 'range' ? 'range' : 'number';
     if (field.step !== undefined) input.step = String(field.step);
     if (field.min !== undefined) input.min = String(field.min);
     if (field.max !== undefined) input.max = String(field.max);
     input.value = String(displayValue(comp.params[field.key], field));
+    if (field.type === 'range') {
+      // 滑块拖动实时生效：input 事件即改参数（走既有参数防抖）
+      input.addEventListener('input', () => {
+        input.dispatchEvent(new Event('change', { bubbles: true }));
+      });
+    }
   }
 
   input.dataset.paramKey = field.key;
@@ -580,7 +620,7 @@ function handlePropsChange(event) {
   if (!input || !board) return;
   const compId = input.dataset.componentId;
   const key = input.dataset.paramKey;
-  const isNumber = input.dataset.paramType === 'number';
+  const isNumber = input.dataset.paramType === 'number' || input.dataset.paramType === 'range';
 
   if (!isNumber) {
     model.updateParams(compId, { [key]: input.value });
@@ -652,7 +692,7 @@ export function simulateNow(reason = 'manual') {
   const started = performance.now();
   let coupled;
   try {
-    coupled = solveCoupled(model);
+    coupled = solveCoupled(simModel());
   } catch (err) {
     // 引擎自身的意外不能把整个应用带走：降级成一条错误结果，画布仍可编辑
     const message = err && err.message ? err.message : String(err);
@@ -1389,6 +1429,8 @@ export function initBoard(options) {
 
   // 暂态运行态（分帧运行中 / 最近一次结果）
   board.transientRun = { active: false, handle: null, last: null };
+  // 故障注入（包 13）：求解前临时变换，不改 model 本体
+  board.faults = [];
 
   board.interaction = createInteraction({
     canvas,
@@ -1574,17 +1616,62 @@ export function initBoard(options) {
         return comp.params.state;
       },
     },
+    // 同步渲染一帧（性能基准 B4 / 截图用；正常画面仍走 rAF 合并）
+    renderNow: () => {
+      if (!board) return false;
+      renderScene(board.view, board.scene);
+      return true;
+    },
+    // 故障注入（指令包 13）：探针/配置面板设置
+    simModel: () => simModel(),
+    setFaults: (list) => {
+      board.faults = Array.isArray(list) ? list.filter((f) => f && f.componentId) : [];
+      simulateNow('faults');
+      return board.faults.length;
+    },
+    faults: () => board.faults.slice(),
+    // 混合信号边界层（指令包 8）：供探针读取边界状态 / 环路 / 阈值
+    simmix: {
+      state: () => mixStateSnapshot(),
+      stateOf: (id) => mixStateOf(id),
+      units: () => collectMix(model.getState(), model.getNetlist().netOf).units.map((unit) => ({
+        componentId: unit.componentId,
+        kind: unit.kind,
+        vccNet: unit.vccNet,
+        gndNet: unit.gndNet,
+        inputs: unit.inputs,
+        outputs: unit.outputs,
+      })),
+      threshold: (params, supply) => comparatorThreshold(params || {}, supply),
+      loops: () => {
+        const netlist = model.getNetlist();
+        const collected = collectMix(model.getState(), netlist.netOf);
+        return analyzeMixLoops({
+          state: model.getState(),
+          netOf: netlist.netOf,
+          mixUnits: collected.units,
+          digitalUnits: collectDigitalUnits(model),
+        });
+      },
+      maxIter: () => MAX_MIX_ITER,
+      reset: () => { resetMixState(); return true; },
+    },
     // 暂态仿真入口（指令包 7）：与 simdc/simdig 同契约风格
     simtrans: {
       // 同步跑完返回结果（测试/一次性求解用）
-      solve: (opts) => solveTransient(model, opts || {}),
+      // 同步求解并记住结果：示波器/逻辑分析仪读的就是"最近一次"
+      solve: (opts) => {
+        const res = solveTransient(simModel(), opts || {});
+        board.transientRun.last = res;
+        return res;
+      },
       last: () => board.transientRun.last,
       running: () => board.transientRun.active,
       // 分帧异步运行：每帧算一小段，进度回报 hooks，可随时 stop
       start: (opts, hooks) => {
         if (board.transientRun.active) return { ok: false, error: '暂态仿真正在运行中', stop: () => {} };
         board.transientRun.active = true;
-        const handle = runTransient(model, opts || {}, {
+        const handle = runTransient(simModel(), opts || {}, {
           onProgress: (done, total) => {
             if (hooks && typeof hooks.onProgress === 'function') hooks.onProgress(done, total);
           },
@@ -1679,6 +1766,7 @@ export function destroyBoard() {
 
   if (board.transientRun && board.transientRun.handle) board.transientRun.handle.stop();
   resetTransientState();
+  resetMixState();
   if (board.interaction) board.interaction.detach();
   destroySchematic();
   changeListeners = [];

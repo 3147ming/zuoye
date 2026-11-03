@@ -55,6 +55,7 @@ import {
 } from './devmodels.js';
 import {
   collectEntries,
+  entryNets,
   chooseGround,
   checkShorts,
   reachableFromGround,
@@ -69,6 +70,16 @@ import {
   TPD_GATE,
   TPD_FF,
 } from './digmodels.js';
+import { fgenVoltageAt } from './instruments-core.js';
+import {
+  collectMix,
+  evalMixUnit,
+  bitsToLevels,
+  analyzeMixLoops,
+  MAX_MIX_ITER,
+  MIX_DEFAULT_SUPPLY,
+  MIX_FULL_SCALE,
+} from './simmix.js';
 
 /* ==========================================================================
    常量
@@ -108,10 +119,13 @@ const MAX_EVENTS_PER_STEP = 4096;
 
 /** compId → { v: 上一步端电压, i: 上一步电流 } */
 const capState = new Map();
+/** compId → { i: 上一步电流, v: 上一步端电压 }（指令包 9：电感） */
+const indState = new Map();
 
 /** 清空电容状态（进出实验、切换实验时调用，同 resetDigState 语义） */
 export function resetTransientState() {
   capState.clear();
+  indState.clear();
 }
 
 /** 读某个电容的当前状态（调试/测试用） */
@@ -137,7 +151,13 @@ function timeNow() {
 /** 模拟域视图：滤掉数字元件（clock/pulse/logic-switch/ic74xx） */
 function analogStateOf(modelApi) {
   const state = modelApi.getState();
-  return { ...state, components: state.components.filter((comp) => !isDigital(comp.type)) };
+  // 数字源与函数发生器都不进 MNA 元件表：前者由数字域驱动，后者按波形逐时刻驱动
+  return {
+    ...state,
+    components: state.components.filter(
+      (comp) => !isDigital(comp.type) && comp.type !== 'fgen',
+    ),
+  };
 }
 
 /** 网表查找：`c:<compId>:<pin>` → netId */
@@ -324,6 +344,7 @@ export function solveTransient(modelApi, opts = {}) {
       tpEvents: [],
       dt: 0,
       duration: 0,
+      mix: { units: 0, types: [], iterationsMax: 0, dacBits: [] },
     },
     ...patch,
   });
@@ -374,6 +395,10 @@ export function solveTransient(modelApi, opts = {}) {
   /* ---- 数字域 ---- */
   const digital = collectDigital(modelApi, netOf);
 
+  /* ---- 混合信号边界元件（指令包 8） ---- */
+  const mix = collectMix(state, netOf);
+  const mixUnits = mix.units;
+
   /* ---- 时变源（时钟/脉冲/逻辑开关）→ 等效电压源 ---- */
   const sourceDrives = [];
   digital.sources.forEach((src) => {
@@ -390,6 +415,22 @@ export function solveTransient(modelApi, opts = {}) {
           : src.comp.type === 'pulse'
             ? (t) => pulseLevelAt(t, src.comp.params)
             : () => switchLevelAt(src.comp.params),
+    });
+  });
+
+  // 函数发生器：模拟波形源（与时钟/脉冲并列，但输出是连续电压）
+  state.components.forEach((comp) => {
+    if (comp.type !== 'fgen') return;
+    const outNet = netOfPin(netOf, comp.id, 'OUT');
+    const refNet = netOfPin(netOf, comp.id, 'GND');
+    if (!outNet) return;
+    sourceDrives.push({
+      kind: 'fgen',
+      compId: comp.id,
+      comp,
+      refNet: refNet || null,
+      outNet,
+      voltageAt: (t) => fgenVoltageAt(t, comp.params),
     });
   });
 
@@ -456,6 +497,42 @@ export function solveTransient(modelApi, opts = {}) {
       driveEntries.push(entry);
     });
   });
+  // 边界元件（比较器 / DAC / 缓冲）的输出同样是模拟驱动源。
+  // 参考端优先取元件自己的 GND 脚：芯片没接系统地时输出以它的 GND 为准。
+  mixUnits.forEach((unit, index) => {
+    const out = unit.outputs.find((item) => item.pin === 'OUT' && item.net);
+    if (!out) return;
+    const ref = unit.gndNet || ground;
+    if (!ref || out.net === ref) return;
+    const entry = makeDriveEntry(`__mix${index + 1}`, out.net, ref, 0);
+    entry.driveKey = `mix:${unit.componentId}:OUT`;
+    entry.mixUnit = unit;
+    unit.driveEntry = entry;
+    driveEntries.push(entry);
+  });
+
+  /* ---- 跨域组合环路检测（结构性失败，先于求解报出） ---- */
+  if (mixUnits.length > 0) {
+    const loop = analyzeMixLoops({
+      state,
+      netOf,
+      mixUnits,
+      digitalUnits: digital.units,
+    });
+    if (!loop.ok) {
+      const chain = loop.cycle.join(' → ');
+      const via = loop.via.length > 0 ? `（经由 ${loop.via.join('、')}）` : '';
+      return empty({
+        ok: false,
+        error: '混合仿真不收敛：检测到跨域组合环路',
+        detail: `环上元件：${chain}${via}`,
+        cycle: loop.cycle,
+        warnings,
+        ground,
+        groundReason: groundPick.why,
+      });
+    }
+  }
 
   /* ---- 装配索引（含驱动条目的支路未知量） ---- */
   const built = buildIndex(entries, driveEntries, ground, reachable);
@@ -495,6 +572,19 @@ export function solveTransient(modelApi, opts = {}) {
     ui.outputs.forEach((out) => {
       if (!out.net) return;
       netDriverMap.set(out.net, { key: `${ui.compId}:${out.pin}`, kind: 'output', comp: ui.comp });
+    });
+  });
+  // 边界元件的逻辑输出（比较器 OUT / ADC D0..D7 / 缓冲 OUT）。
+  // DAC 的输出是模拟量，不进电平表——它的负载按电压阈值读。
+  mixUnits.forEach((unit) => {
+    if (unit.kind === 'dac') return;
+    unit.outputs.forEach((out) => {
+      if (!out.net) return;
+      netDriverMap.set(out.net, {
+        key: `mix:${unit.componentId}:${out.pin}`,
+        kind: 'output',
+        comp: unit.comp,
+      });
     });
   });
 
@@ -612,6 +702,16 @@ export function solveTransient(modelApi, opts = {}) {
 
   /* ---- 主循环 ---- */
   const caps = entries.filter((entry) => entry.model.id === 'capacitor');
+  const inductors = entries.filter((entry) => entry.model.id === 'inductor');
+  const ctxOfInd = (entry) => {
+    const st = indState.get(entry.comp.id) || { i: 0, v: 0 };
+    return {
+      dt,
+      vPrev: st.v,
+      iPrev: st.i,
+      startup: false,
+    };
+  };
   const hasNonlinear = entries.some((entry) => entry.model.isNonlinear);
   let currentV = new Map(); // netId → 电压（本步解）
 
@@ -624,9 +724,62 @@ export function solveTransient(modelApi, opts = {}) {
   };
   vOfNetRef.v = vOfNet;
 
+  /* ---- 边界元件求值（每轮联合迭代调用） ---- */
+  const mixSupplyOf = (unit) => {
+    const vcc = unit.vccNet ? vOfNet(unit.vccNet) : null;
+    if (vcc === null || vcc === undefined) return MIX_DEFAULT_SUPPLY;
+    const gnd = unit.gndNet ? vOfNet(unit.gndNet) : null;
+    return Math.max(0.1, vcc - (gnd === null || gnd === undefined ? 0 : gnd));
+  };
+
+  const evalMixNow = () => {
+    const ctx = {
+      supplyOf: mixSupplyOf,
+      voltage: (net) => (net ? vOfNet(net) : null),
+      level: (net) => inputLevelOf(net, vOfNet),
+    };
+    let changed = 0;
+    mixUnits.forEach((unit) => {
+      const r = evalMixUnit(unit, ctx);
+      if (unit.kind === 'comparator' || unit.kind === 'buffer') {
+        const key = `mix:${unit.componentId}:OUT`;
+        const cur = driverLevel.get(key);
+        if (!cur || cur.level !== r.level) {
+          driverLevel.set(key, { level: r.level, via: `mix:${unit.componentId}` });
+          changed += 1;
+        }
+        return;
+      }
+      if (unit.kind === 'adc') {
+        const levels = bitsToLevels(r.bits || 0);
+        unit.outputs.forEach((out) => {
+          if (!out.net) return;
+          const key = `mix:${unit.componentId}:${out.pin}`;
+          const level = levels[out.pin] === 1 ? 1 : 0;
+          const cur = driverLevel.get(key);
+          if (!cur || cur.level !== level) {
+            driverLevel.set(key, { level, via: `mix:${unit.componentId}` });
+            changed += 1;
+          }
+        });
+      }
+    });
+    return changed;
+  };
+
+  /** 驱动电压签名：用于联合迭代的收敛判定 */
+  const driveSignature = () => activeDrives
+    .filter((entry) => entry.driveKey)
+    .map((entry) => Number(entry.comp.params.voltage || 0).toFixed(6))
+    .join(',');
+
+  const dacBits = new Map();
+
+  evalMixNow();
   settleDigital();
 
   const steps = [];
+  let mixIterMax = 0;
   const total = Math.floor(duration / dt + 1e-9);
   for (let k = 0; k <= total; k += 1) {
     const t = t0 + k * dt;
@@ -643,19 +796,14 @@ export function solveTransient(modelApi, opts = {}) {
     });
     applyEvents(t);
 
-    // 2) 时变源电压（时钟/脉冲/逻辑开关 + 数字输出驱动）
+    // 2) 时变源电压（时钟/脉冲/逻辑开关）
     sourceDrives.forEach((drv) => {
-      const level = drv.levelAt(t);
-      drv.stampV = voltageOfLevel(level);
+      // 函数发生器直接给电压；时钟/脉冲/逻辑开关走"电平 → 电压"换算
+      drv.stampV = drv.voltageAt ? drv.voltageAt(t) : voltageOfLevel(drv.levelAt(t));
       if (drv.entry) drv.entry.comp.params.voltage = drv.stampV;
     });
-    activeDrives.forEach((entry) => {
-      if (!entry.driveKey) return;
-      const cur = driverLevel.get(entry.driveKey);
-      entry.comp.params.voltage = voltageOfLevel(cur ? cur.level : X);
-    });
 
-    // 3) 装配 + 求解
+    // 3) 联合迭代：模拟 ↔ 边界 ↔ 数字，直到驱动电压稳定（≤ MAX_MIX_ITER 次）
     //    k=0 是「初值解」：电容用很硬的后向欧拉（dt 缩小 IC_STIFFEN 倍）
     //    把端电压钉在 vPrev 上，既给出 t=0 的各点电压，又顺带解出初始电流 i[0]。
     //    之后全程梯形（i[k] = G(v[k]−v[k−1]) − i[k−1]），精度见文件头选型实测。
@@ -668,39 +816,53 @@ export function solveTransient(modelApi, opts = {}) {
         startup: k === 0,
       };
     };
-    const solved = analogEmpty
-      ? { ok: true, x: new Float64Array(0), iter: 0, residual: 0 }
-      : solveInstant(entries, activeDrives, nodeIndex, branchOf, n, ctxOf, hasNonlinear);
-    if (!solved.ok) {
-      return empty({
-        ok: false,
-        error: solved.error === '矩阵奇异（电路可能开路/短路）'
-          ? '电路开路：存在未闭合回路'
-          : (solved.error || '暂态仿真发散（请检查电路）'),
-        warnings,
-        ground,
-        groundReason: groundPick.why,
-        detail: solved.detail,
-      });
-    }
 
-    // 5) 数值健全性（技术约束 3：发散必须 ok:false，不许输出垃圾）
-    if (!allFinite(solved.x)) {
-      return empty({
-        ok: false,
-        error: '暂态仿真发散（请检查电路）',
-        warnings,
-        ground,
-        groundReason: groundPick.why,
+    let solved = null;
+    let mixIterations = 0;
+    let mixConverged = false;
+    let prevSignature = null;
+
+    for (let iter = 0; iter < MAX_MIX_ITER; iter += 1) {
+      mixIterations = iter + 1;
+
+      // 3a) 数字/边界驱动电压（上一轮求值结果）
+      activeDrives.forEach((entry) => {
+        if (!entry.driveKey) return;
+        const cur = driverLevel.get(entry.driveKey);
+        entry.comp.params.voltage = voltageOfLevel(cur ? cur.level : X);
       });
-    }
-    currentV = new Map();
-    orderedNets.forEach((net) => {
-      const idx = nodeIndex.get(net);
-      currentV.set(net, solved.x[idx]);
-    });
-    for (const v of currentV.values()) {
-      if (!(Math.abs(v) <= V_LIMIT)) {
+      // DAC 是纯组合：输出直接由当前输入位算（D/255·Vref），不需要记忆
+      mixUnits.forEach((unit) => {
+        if (unit.kind !== 'dac' || !unit.driveEntry) return;
+        let d = 0;
+        unit.inputs.forEach((input, index) => {
+          if (inputLevelOf(input.net, vOfNet) === 1) d |= 1 << index;
+        });
+        const vrefRaw = Number(unit.comp.params && unit.comp.params.vref);
+        const vref = Number.isFinite(vrefRaw) && vrefRaw > 0 ? vrefRaw : mixSupplyOf(unit);
+        unit.driveEntry.comp.params.voltage = (d / MIX_FULL_SCALE) * vref;
+        dacBits.set(unit.componentId, d);
+      });
+
+      // 3b) 装配 + 求解
+      solved = analogEmpty
+        ? { ok: true, x: new Float64Array(0), iter: 0, residual: 0 }
+        : solveInstant(entries, activeDrives, nodeIndex, branchOf, n, ctxOf, hasNonlinear, ctxOfInd);
+      if (!solved.ok) {
+        return empty({
+          ok: false,
+          error: solved.error === '矩阵奇异（电路可能开路/短路）'
+            ? '电路开路：存在未闭合回路'
+            : (solved.error || '暂态仿真发散（请检查电路）'),
+          warnings,
+          ground,
+          groundReason: groundPick.why,
+          detail: solved.detail,
+        });
+      }
+
+      // 5) 数值健全性（技术约束 3：发散必须 ok:false，不许输出垃圾）
+      if (!allFinite(solved.x)) {
         return empty({
           ok: false,
           error: '暂态仿真发散（请检查电路）',
@@ -709,9 +871,65 @@ export function solveTransient(modelApi, opts = {}) {
           groundReason: groundPick.why,
         });
       }
+      currentV = new Map();
+      orderedNets.forEach((net) => {
+        const idx = nodeIndex.get(net);
+        currentV.set(net, solved.x[idx]);
+      });
+      for (const v of currentV.values()) {
+        if (!(Math.abs(v) <= V_LIMIT)) {
+          return empty({
+            ok: false,
+            error: '暂态仿真发散（请检查电路）',
+            warnings,
+            ground,
+            groundReason: groundPick.why,
+          });
+        }
+      }
+
+      // 3c) 边界元件求值（用刚解出的模拟电压）
+      evalMixNow();
+
+      // 3d) 数字门按当前电压重算输入（跳变按 TPD 排到未来时刻）
+      digital.units.forEach((ui) => scheduleUnit(ui, t));
+      applyEvents(t);
+
+      // 3e) 收敛判定：没有边界元件时一次即可；有则看驱动电压是否稳定
+      if (mixUnits.length === 0) {
+        mixConverged = true;
+        break;
+      }
+      const signature = driveSignature();
+      if (signature === prevSignature) {
+        mixConverged = true;
+        break;
+      }
+      prevSignature = signature;
     }
 
-    // 6) 电容状态更新（梯形/首步 BE）
+    if (!mixConverged) {
+      return empty({
+        ok: false,
+        error: `混合仿真不收敛：跨域迭代超过 ${MAX_MIX_ITER} 次`,
+        detail: '请检查比较器 / ADC / DAC 之间是否构成无延迟反馈（可加电容或串电阻）',
+        warnings,
+        ground,
+        groundReason: groundPick.why,
+      });
+    }
+    if (mixIterations > mixIterMax) mixIterMax = mixIterations;
+
+    // 6) 电感状态更新（梯形/首步 BE）
+    inductors.forEach((entry) => {
+      const br = branchOf.get(entry.comp.id);
+      const i = br === undefined ? 0 : solved.x[br];
+      const vp = entry.netPos === ground ? 0 : (currentV.get(entry.netPos) ?? 0);
+      const vn = entry.netNeg === ground ? 0 : (currentV.get(entry.netNeg) ?? 0);
+      indState.set(entry.comp.id, { i, v: vp - vn });
+    });
+
+    // 6b) 电容状态更新（梯形/首步 BE）
     caps.forEach((entry) => {
       const vp = entry.netPos === ground ? 0 : (currentV.get(entry.netPos) ?? 0);
       const vn = entry.netNeg === ground ? 0 : (currentV.get(entry.netNeg) ?? 0);
@@ -738,6 +956,14 @@ export function solveTransient(modelApi, opts = {}) {
         if (!sampled.has(out.net)) sampled.set(out.net, voltageOfLevel(cur ? cur.level : X));
       });
     });
+    mixUnits.forEach((unit) => {
+      if (unit.kind === 'dac') return; // DAC 输出是模拟量，已在 orderedNets 里
+      unit.outputs.forEach((out) => {
+        if (!out.net) return;
+        const cur = driverLevel.get(`mix:${unit.componentId}:${out.pin}`);
+        if (!sampled.has(out.net)) sampled.set(out.net, voltageOfLevel(cur ? cur.level : X));
+      });
+    });
     sampled.forEach((v, net) => {
       if (v === null || v === undefined) return;
       ensureChannel(net);
@@ -756,6 +982,24 @@ export function solveTransient(modelApi, opts = {}) {
 
   const waveforms = [];
   const channels = [];
+  // 哪些网是"数字线"：门/边界元件的逻辑输出。波形容器据此画阶梯并标注 type
+  const digitalNets = new Set();
+  digital.units.forEach((ui) => ui.outputs.forEach((out) => {
+    if (out.net) digitalNets.add(out.net);
+  }));
+  // 时钟/脉冲/逻辑开关的输出是"逻辑电平",同样按数字线画阶梯（示波器/LA 要挂得上）
+  sourceDrives.forEach((drv) => {
+    if (!drv.outNet) return;
+    if (drv.comp && (drv.comp.type === 'clock' || drv.comp.type === 'pulse' || drv.comp.type === 'logic-switch')) {
+      digitalNets.add(drv.outNet);
+    }
+  });
+  mixUnits.forEach((unit) => {
+    if (unit.kind === 'dac') return;
+    unit.outputs.forEach((out) => {
+      if (out.net) digitalNets.add(out.net);
+    });
+  });
   sampleNets.forEach((net) => {
     const arr = sampleValues.get(net);
     if (!arr) return;
@@ -769,8 +1013,9 @@ export function solveTransient(modelApi, opts = {}) {
       if (v > max) max = v;
     }
     if (samples.length === 0) return;
-    const driver = describeDriver(net, digital, sourceDrives);
-    waveforms.push({ netId: net, label: net, samples });
+    const driver = describeDriver(net, digital, sourceDrives, mixUnits);
+    const type = digitalNets.has(net) ? 'digital' : 'analog';
+    waveforms.push({ netId: net, label: net, samples, type });
     channels.push({
       netId: net,
       label: net,
@@ -778,6 +1023,7 @@ export function solveTransient(modelApi, opts = {}) {
       max: Number.isFinite(max) ? max : 0,
       unit: 'V',
       driver,
+      type,
     });
   });
 
@@ -797,6 +1043,12 @@ export function solveTransient(modelApi, opts = {}) {
       duration,
       t0,
       stride,
+      mix: {
+        units: mixUnits.length,
+        types: mix.types,
+        iterationsMax: mixIterMax,
+        dacBits: [...dacBits.entries()].map(([id, bits]) => ({ componentId: id, bits })),
+      },
     },
   });
   return result;
@@ -882,8 +1134,7 @@ function buildIndex(entries, driveEntries, ground, reachable) {
     orderedNets.push(net);
   };
   entries.forEach((entry) => {
-    addNet(entry.netPos);
-    addNet(entry.netNeg);
+    entryNets(entry).forEach(addNet);
   });
   driveEntries.forEach((entry) => {
     addNet(entry.netPos);
@@ -891,11 +1142,9 @@ function buildIndex(entries, driveEntries, ground, reachable) {
   });
 
   // 两端都能落下方程（节点下标或地）的驱动才真正参与装配
-  const active = entries.concat(driveEntries).filter((entry) => {
-    const okPos = entry.netPos === ground || nodeIndex.has(entry.netPos);
-    const okNeg = entry.netNeg === ground || nodeIndex.has(entry.netNeg);
-    return okPos && okNeg;
-  });
+  const active = entries.concat(driveEntries).filter((entry) => (
+    entryNets(entry).every((net) => net === ground || nodeIndex.has(net))
+  ));
   const activeDrives = active.filter((entry) => entry.isDrive);
 
   const branchOf = new Map();
@@ -912,26 +1161,45 @@ function buildIndex(entries, driveEntries, ground, reachable) {
 }
 
 /** 单步装配 + 求解 */
-function solveInstant(entries, driveEntries, nodeIndex, branchOf, n, ctxOf, hasNonlinear) {
+function solveInstant(entries, driveEntries, nodeIndex, branchOf, n, ctxOf, hasNonlinear, ctxOfInd) {
   const A = makeMatrix(n);
   const b = makeVector(n);
 
-  const refsOf = (entry, limit) => ({
-    pos: nodeIndex.has(entry.netPos) ? nodeIndex.get(entry.netPos) : -1,
-    neg: nodeIndex.has(entry.netNeg) ? nodeIndex.get(entry.netNeg) : -1,
-    br: branchOf.has(entry.comp.id) ? branchOf.get(entry.comp.id) : -1,
-    size: n,
-    limit,
-    comp: entry.comp,
-  });
+  const refsOf = (entry, limit) => {
+    const refs = {
+      pos: nodeIndex.has(entry.netPos) ? nodeIndex.get(entry.netPos) : -1,
+      neg: nodeIndex.has(entry.netNeg) ? nodeIndex.get(entry.netNeg) : -1,
+      br: branchOf.has(entry.comp.id) ? branchOf.get(entry.comp.id) : -1,
+      size: n,
+      limit,
+      comp: entry.comp,
+    };
+    if (entry.multi) {
+      refs.idx = {};
+      refs.connected = {};
+      entry.pins.forEach((pin) => {
+        const net = entry.nets[pin];
+        refs.idx[pin] = net && nodeIndex.has(net) ? nodeIndex.get(net) : -1;
+        refs.connected[pin] = Boolean(net);
+      });
+    }
+    return refs;
+  };
 
   const stamp = (x, limit) => {
     A.fill(0);
     b.fill(0);
     entries.forEach((entry) => {
       const refs = refsOf(entry, limit);
+      if (entry.multi) {
+        const fn = entry.model.stampMulti || entry.model.stampLinear;
+        if (typeof fn === 'function') fn(A, b, refs, entry.comp.params, x);
+        return;
+      }
       if (entry.model.id === 'capacitor') {
         entry.model.stampTransient(A, b, refs, entry.comp.params, ctxOf(entry));
+      } else if (entry.model.id === 'inductor') {
+        entry.model.stampTransient(A, b, refs, entry.comp.params, ctxOfInd(entry));
       } else if (entry.model.isNonlinear && typeof entry.model.stampNR === 'function') {
         entry.model.stampNR(A, b, refs, entry.comp.params, x);
       } else {
@@ -984,11 +1252,19 @@ function solveInstant(entries, driveEntries, nodeIndex, branchOf, n, ctxOf, hasN
 }
 
 /** 通道的驱动来源描述（面板展示用） */
-function describeDriver(net, digital, sourceDrives) {
+function describeDriver(net, digital, sourceDrives, mixUnits = []) {
   const src = sourceDrives.find((d) => d.outNet === net);
   if (src) return src.comp.type === 'clock' ? '时钟' : src.comp.type === 'pulse' ? '脉冲' : '逻辑开关';
   for (const ui of digital.units) {
     if (ui.outputs.some((o) => o.net === net)) return ui.model.label || '数字输出';
+  }
+  for (const unit of mixUnits) {
+    if (unit.kind === 'dac') continue;
+    if (unit.outputs.some((o) => o.net === net)) return unit.spec.label;
+  }
+  // 模拟网：说清是谁驱动的（DAC 输出 / 比较器输出 / 普通节点）
+  for (const unit of mixUnits) {
+    if (unit.kind === 'dac' && unit.outputs.some((o) => o.net === net)) return 'DAC 输出';
   }
   return '模拟网';
 }

@@ -13,6 +13,7 @@
  */
 
 import { getPart, footprintOf, terminalPos } from './parts.js';
+import { resetRelayState } from './devmodels.js';
 import { getPlatform, getNode, isPlatformId } from './platforms.js';
 
 /** 撤销栈上限：超过后丢弃最早快照 */
@@ -119,6 +120,8 @@ export function createCircuit(platformId = 'exp-box') {
   undoStack = [];
   netCache = null;
   counters = { comp: new Map(), wire: 0 };
+  // 机电元件的吸合状态是"上电态"，新电路必须清掉（否则 id 复用会串台）
+  resetRelayState();
   return state;
 }
 
@@ -344,9 +347,10 @@ export function rotateComponent(id) {
   if (!comp) return { ok: false, error: '元件不存在' };
 
   const def = getPart(comp.type);
-  if (!def || def.size.w === def.size.h) {
-    return { ok: false, error: '该元件为正方占位，旋转无变化' };
-  }
+  if (!def) return { ok: false, error: '未知元件类型' };
+  // 正方占位也允许旋转：比较器（3×3）的端子排布不对称，
+  // 学生需要转 90° 把电源脚换到另一侧来走线。
+  // 占位不变时下面的边界/重叠校验依然生效（不会把元件转出平台）。
 
   // 循环四向：0 → 90 → 180 → 270 → 0（每次 90°）
   const next = (comp.rotation + 90) % 360;
@@ -369,6 +373,30 @@ export function rotateComponent(id) {
   comp.rotation = next;
   invalidate();
   return { ok: true, component: comp };
+}
+
+/**
+ * 批量写参数：一次撤销快照（包 13 的"应用方案"用）。
+ * 只写 params 的 patch，不碰端子/占位/模型常数。
+ * @param {Array<{id:string, patch:object}>} updates
+ */
+export function applyParamGroup(updates, label = 'params') {
+  if (!state || !Array.isArray(updates) || updates.length === 0) {
+    return { ok: false, changed: 0, error: '没有可应用的参数' };
+  }
+  const targets = [];
+  updates.forEach(({ id, patch }) => {
+    const comp = findComponent(id);
+    if (!comp || !patch || typeof patch !== 'object') return;
+    targets.push({ comp, patch });
+  });
+  if (targets.length === 0) return { ok: false, changed: 0, error: '元件不存在' };
+  pushUndo(label);
+  targets.forEach(({ comp, patch }) => {
+    Object.assign(comp.params, patch);
+  });
+  invalidate();
+  return { ok: true, changed: targets.length };
 }
 
 /** 修改元件参数（合并式）；无变化时不写撤销栈 */
@@ -659,9 +687,24 @@ export function peekStash(platformId) {
    ========================================================================== */
 
 /** 导出为可存 localStorage 的纯数组对象（端子由 parts.js 重建，不落盘） */
+let instrumentProvider = null;
+let instrumentRestorer = null;
+
+/**
+ * 仪器面板把"挂点/参数/时基"寄生在存档里（包 10）。
+ * 用注入而不是 import：model 层不认识任何 UI 模块，node 单测也不会被 DOM 牵连。
+ */
+export function setInstrumentProvider(fn) {
+  instrumentProvider = typeof fn === 'function' ? fn : null;
+}
+
+export function setInstrumentRestorer(fn) {
+  instrumentRestorer = typeof fn === 'function' ? fn : null;
+}
+
 export function serializeCircuit() {
   if (!state) return null;
-  return {
+  const data = {
     version: 3,
     platform: state.platform,
     components: state.components.map((comp) => ({
@@ -675,6 +718,11 @@ export function serializeCircuit() {
     wires: state.wires.map((wire) => ({ id: wire.id, a: { ...wire.a }, b: { ...wire.b } })),
     stash: JSON.parse(JSON.stringify(state.stash)),
   };
+  if (instrumentProvider) {
+    const instruments = instrumentProvider();
+    if (instruments) data.instruments = instruments;
+  }
+  return data;
 }
 
 /**
@@ -730,6 +778,11 @@ export function loadCircuit(data, platformId) {
       counters.wire += 1;
       report.wires += 1;
     });
+  }
+
+  // 仪器挂点/参数：等元件与网表都就绪后再恢复（面板要按 netId 找通道）
+  if (data.instruments && instrumentRestorer) {
+    try { instrumentRestorer(data.instruments); } catch (err) { /* 仪器段坏了不能拖垮电路 */ }
   }
 
   if (data.stash && typeof data.stash === 'object') {

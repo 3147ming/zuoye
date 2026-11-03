@@ -2038,6 +2038,238 @@ button {
   overflow-wrap: anywhere;
 }
 
+/* ==========================================================================
+   测量仪器面板（指令包 10）
+   ========================================================================== */
+
+.inst-panel {
+  border: 1px solid var(--line, rgba(120, 140, 175, 0.25));
+  border-radius: 8px;
+  background: var(--panel, #1a1f27);
+  overflow: hidden;
+}
+
+.inst-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 8px;
+  background: rgba(120, 140, 175, 0.08);
+}
+
+.inst-title {
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  color: var(--ink, #e2e7f2);
+}
+
+.inst-fold {
+  border: 1px solid rgba(120, 140, 175, 0.3);
+  background: transparent;
+  color: var(--muted, #9aa6bd);
+  font-size: 11px;
+  border-radius: 4px;
+  padding: 2px 6px;
+  cursor: pointer;
+}
+
+.inst-tabs {
+  display: flex;
+  gap: 2px;
+  padding: 4px 6px 0;
+  border-bottom: 1px solid rgba(120, 140, 175, 0.18);
+  flex-wrap: wrap;
+}
+
+.inst-tab {
+  border: none;
+  background: transparent;
+  color: var(--muted, #9aa6bd);
+  font-size: 11px;
+  padding: 4px 7px;
+  border-radius: 4px 4px 0 0;
+  cursor: pointer;
+}
+
+.inst-tab.is-active {
+  background: rgba(127, 214, 194, 0.16);
+  color: var(--ink, #e2e7f2);
+}
+
+.inst-body {
+  padding: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.inst-panel.is-folded .inst-tabs,
+.inst-panel.is-folded .inst-body {
+  display: none;
+}
+
+.inst-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  color: var(--muted, #9aa6bd);
+  flex-wrap: wrap;
+}
+
+.inst-row-label {
+  min-width: 64px;
+}
+
+.inst-input {
+  flex: 1;
+  min-width: 0;
+  background: rgba(10, 14, 20, 0.5);
+  border: 1px solid rgba(120, 140, 175, 0.28);
+  border-radius: 4px;
+  color: var(--ink, #e2e7f2);
+  font-size: 11px;
+  padding: 3px 6px;
+}
+
+.inst-check {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11px;
+  color: var(--muted, #9aa6bd);
+}
+
+.inst-screen {
+  margin-top: 4px;
+  padding: 10px 8px;
+  border-radius: 6px;
+  background: #0c1116;
+  border: 1px solid rgba(127, 214, 194, 0.25);
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.inst-value {
+  font-family: "Cascadia Mono", Consolas, monospace;
+  font-size: 26px;
+  font-weight: 600;
+  color: #7fd6c2;
+  letter-spacing: 0.04em;
+}
+
+.inst-value.is-error {
+  color: #e2685f;
+  font-size: 16px;
+}
+
+.inst-note {
+  font-size: 10px;
+  color: rgba(154, 166, 189, 0.9);
+  min-height: 12px;
+}
+
+.inst-scope-canvas {
+  width: 100%;
+  height: 160px;
+  border-radius: 6px;
+  border: 1px solid rgba(127, 214, 194, 0.22);
+  display: block;
+}
+
+.inst-measure {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.inst-measure-line {
+  margin: 0;
+  font-size: 10px;
+  color: rgba(200, 210, 225, 0.85);
+  font-family: "Cascadia Mono", Consolas, monospace;
+}
+
+.inst-actions {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.inst-btn {
+  font-size: 11px;
+  padding: 3px 8px;
+}
+
+.inst-la-list {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  max-height: 160px;
+  overflow: auto;
+}
+
+.inst-la-result {
+  font-size: 11px;
+  color: #7fd6c2;
+  font-family: "Cascadia Mono", Consolas, monospace;
+  min-height: 14px;
+}
+
+.inst-hint {
+  margin: 0;
+  font-size: 10px;
+  color: rgba(154, 166, 189, 0.8);
+  line-height: 1.5;
+}
+
+.props-range {
+  accent-color: #7fd6c2;
+}
+
+.data-panel {
+  border: 1px solid var(--line, rgba(120, 140, 175, 0.25));
+  border-radius: 8px;
+  background: var(--panel, #1a1f27);
+  overflow: hidden;
+}
+
+.data-panel.is-folded .inst-tabs,
+.data-panel.is-folded .inst-body {
+  display: none;
+}
+
+.data-table {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  max-height: 180px;
+  overflow: auto;
+}
+
+.guide-steps {
+  margin: 0;
+  padding-left: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 11px;
+  color: var(--muted, #9aa6bd);
+}
+
+.guide-steps li label {
+  align-items: flex-start;
+  line-height: 1.5;
+}
+
+.guide-obs {
+  width: 100%;
+  resize: vertical;
+  font-family: inherit;
+}
+
 /* 尊重系统减弱动效偏好 */
 @media (prefers-reduced-motion: reduce) {
   *,

@@ -145,6 +145,13 @@ export function formatResidual(value) {
  * 同时导出给 simtrans.js 复用（暂态每个步进都要走同一套筛选/选地/剪枝逻辑，
  * 抽出公共函数保持单源，避免两处实现漂移）。
  */
+/** 元件接入的全部网（多端器件按 pins 顺序；两端器件就是 netPos/netNeg） */
+export function entryNets(entry) {
+  if (!entry) return [];
+  if (entry.multi) return entry.pins.map((pin) => entry.nets[pin]).filter(Boolean);
+  return [entry.netPos, entry.netNeg].filter(Boolean);
+}
+
 export function collectEntries(state, netOf) {
   const entries = [];
   const warnings = [];
@@ -164,6 +171,37 @@ export function collectEntries(state, netOf) {
     const invalid = validateParams(comp.type, comp.params);
     if (invalid) {
       errors.push(`${comp.id}：${invalid}`);
+      return;
+    }
+
+    // 多端器件（三极管/运放/继电器/拨码/电位器）：按端子名逐个解析网络
+    if (model.pins.length > 2) {
+      const nets = {};
+      model.pins.forEach((pin) => {
+        nets[pin] = netOf.get(`c:${comp.id}:${pin}`) || null;
+      });
+      const required = Array.isArray(model.requiredPins) ? model.requiredPins : model.pins;
+      const missing = required.filter((pin) => !nets[pin]);
+      if (missing.length > 0) {
+        warnings.push(`${comp.id} 的 ${missing.join('、')} 端子未连接，已跳过`);
+        return;
+      }
+      const connected = model.pins.filter((pin) => nets[pin]);
+      if (connected.length < 2) {
+        warnings.push(`${comp.id} 至少需要两个端子接入电路，已跳过`);
+        return;
+      }
+      entries.push({
+        comp,
+        model,
+        multi: true,
+        pins: model.pins,
+        nets,
+        netPos: nets[model.pins[0]],
+        netNeg: nets[model.pins[1]],
+        pinPos: model.pins[0],
+        pinNeg: model.pins[1],
+      });
       return;
     }
 
@@ -209,8 +247,9 @@ export function chooseGround(entries) {
 
   const counts = new Map();
   entries.forEach((entry) => {
-    counts.set(entry.netPos, (counts.get(entry.netPos) || 0) + 1);
-    counts.set(entry.netNeg, (counts.get(entry.netNeg) || 0) + 1);
+    entryNets(entry).forEach((net) => {
+      counts.set(net, (counts.get(net) || 0) + 1);
+    });
   });
   let best = null;
   counts.forEach((count, net) => {
@@ -305,6 +344,19 @@ export function reachableFromGround(entries, ground, conducts = conductsDC) {
 
   entries.forEach((entry) => {
     if (!conducts(entry.comp.type, entry.comp.params)) return;
+    if (entry.multi) {
+      const pairs = typeof entry.model.conductsPairs === 'function'
+        ? entry.model.conductsPairs(entry.comp.params)
+        : [[entry.pins[0], entry.pins[1]]];
+      pairs.forEach(([a, b]) => {
+        const na = entry.nets[a];
+        const nb = entry.nets[b];
+        if (!na || !nb) return;
+        link(na, nb);
+        link(nb, na);
+      });
+      return;
+    }
     link(entry.netPos, entry.netNeg);
     link(entry.netNeg, entry.netPos);
   });
@@ -334,7 +386,7 @@ function buildAndSolve(entries, ground, reachable, options) {
   let index = 0;
   const orderedNets = [];
   entries.forEach((entry) => {
-    [entry.netPos, entry.netNeg].forEach((net) => {
+    entryNets(entry).forEach((net) => {
       if (net === ground || nodeIndex.has(net) || !reachable.has(net)) return;
       nodeIndex.set(net, index);
       index += 1;
@@ -344,7 +396,7 @@ function buildAndSolve(entries, ground, reachable, options) {
 
   const branchOf = new Map();
   let branchCount = 0;
-  const active = entries.filter((entry) => reachable.has(entry.netPos) && reachable.has(entry.netNeg));
+  const active = entries.filter((entry) => entryNets(entry).every((net) => reachable.has(net)));
   active.forEach((entry) => {
     if (!needsBranch(entry.comp.type)) return;
     branchOf.set(entry.comp.id, nodeIndex.size + branchCount);
@@ -374,6 +426,18 @@ function buildAndSolve(entries, ground, reachable, options) {
         limit,
         comp: entry.comp,
       };
+      if (entry.multi) {
+        refs.idx = {};
+        refs.connected = {};
+        entry.pins.forEach((pin) => {
+          const net = entry.nets[pin];
+          refs.idx[pin] = net && nodeIndex.has(net) ? nodeIndex.get(net) : -1;
+          refs.connected[pin] = Boolean(net);
+        });
+        const fn = entry.model.stampMulti || entry.model.stampLinear;
+        if (typeof fn === 'function') fn(A, b, refs, entry.comp.params, x);
+        return;
+      }
       if (entry.model.isNonlinear && typeof entry.model.stampNR === 'function') {
         entry.model.stampNR(A, b, refs, entry.comp.params, x);
       } else {
@@ -423,6 +487,32 @@ function buildAndSolve(entries, ground, reachable, options) {
         reason: polish.reason,
         error: polish.error,
       };
+    }
+  }
+
+  // 继电器这类"状态由解决定"的元件：解完后刷新状态，变了就带新触点重解（≤3 轮）
+  if (solved && solved.ok) {
+    const relays = active.filter((entry) => entry.model.id === 'relay');
+    for (let pass = 0; pass < 3 && relays.length > 0; pass += 1) {
+      const voltageOf = (net) => {
+        if (net === ground) return 0;
+        if (!nodeIndex.has(net)) return null;
+        return solved.x[nodeIndex.get(net)];
+      };
+      let changed = false;
+      relays.forEach((entry) => {
+        if (entry.model.refreshState ? entry.model.refreshState(entry, voltageOf) : false) changed = true;
+      });
+      // 第 0 轮无论如何都带"按最终解刷新过的状态"重解一次：
+      // 牛顿最后一轮 stamp 用的是上一迭代点（首轮还是 x=0），触点状态可能已过期。
+      if (pass > 0 && !changed) break;
+      const next = newtonSolve(solved.x, makeIterate(false), {
+        maxIter: options.maxIterExact,
+        tol: options.tol,
+        relax: 1,
+      });
+      if (!next.ok) break;
+      solved = { ...solved, ...next };
     }
   }
 
@@ -522,7 +612,7 @@ export function solveDC(modelApi, options = {}) {
   const floating = [];
   const seenFloating = new Set();
   entries.forEach((entry) => {
-    [entry.netPos, entry.netNeg].forEach((net) => {
+    entryNets(entry).forEach((net) => {
       if (net === ground || reachable.has(net) || seenFloating.has(net)) return;
       seenFloating.add(net);
       floating.push(net);
@@ -585,6 +675,24 @@ export function solveDC(modelApi, options = {}) {
     const v = known ? vp - vn : null;
     const model = entry.model;
     let current = null;
+
+    // 多端/自定义结果：模型自己给出 v/i/note（三极管报 Vce/Ic，运放报摆幅…）
+    if (typeof model.resultOf === 'function') {
+      const own = model.resultOf(entry, (net) => voltageOf(net), x, built.branchOf) || {};
+      const note = own.note || '';
+      return {
+        componentId: entry.comp.id,
+        type: entry.comp.type,
+        label: model.label,
+        v: own.v === undefined ? v : own.v,
+        i: own.i === undefined ? null : own.i,
+        power: own.v !== undefined && own.i !== undefined && own.v !== null && own.i !== null
+          ? own.v * own.i
+          : null,
+        note,
+        extra: own,
+      };
+    }
 
     if (known) {
       if (model.id === 'resistor') current = v / Number(entry.comp.params.resistance);

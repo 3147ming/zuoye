@@ -24,6 +24,13 @@ import {
   logicNot,
   X,
 } from './digmodels.js';
+import {
+  collectMix,
+  evalMixUnit,
+  bitsToLevels,
+  resetMixState,
+  analyzeMixLoops,
+} from './simmix.js';
 
 /** 数字驱动注入到直流求解时用的假元件前缀（面板上要过滤掉） */
 export const DRIVE_PREFIX = '__drv';
@@ -41,6 +48,8 @@ const ffMemory = new Map(); // `${compId}#${unitId}` → { q, clk }
 export function resetDigState() {
   sourceState.clear();
   ffMemory.clear();
+  // 边界元件的比较器输出/ADC 码值同样是"上电状态"，一起清零
+  resetMixState();
 }
 
 /** 读时钟/脉冲的当前电平 */
@@ -148,6 +157,7 @@ export function solveDig(modelApi, options = {}) {
     netLevels: {},
     hasDigital: false,
     analogInputsUsed: 0,
+    mix: { units: [], analogDrives: [] },
     elapsedMs: 0,
   };
 
@@ -177,6 +187,9 @@ export function solveDig(modelApi, options = {}) {
       if (node && node.v !== null && Number.isFinite(node.v)) analogVoltages.set(node.netId, node.v);
     });
   }
+
+  const netLevel = new Map(); // netId → 0|1|X（已求出的驱动电平）
+  const levelConflicts = new Set();
 
   /* ---- 第一步：收集数字元件 ---- */
   const drivers = new Map(); // netId → [{ unitKey, compId, pin }]
@@ -236,6 +249,123 @@ export function solveDig(modelApi, options = {}) {
     sources.push({ comp, spec, level, net: outNet });
     addDriver(outNet, { unitKey: null, compId: comp.id, pin: spec.out });
   });
+
+  /* ---- 混合信号边界元件（指令包 8） ---- */
+  const mix = collectMix(state, netOf);
+  const mixUnits = mix.units;
+  if (mixUnits.length > 0) result.hasDigital = true;
+  // 先给出边界元件计数：环路早退时状态行也要知道"这是混合仿真"
+  result.mix = { units: mixUnits.length, types: mix.types, analogDrives: [], detail: [] };
+
+  // 供电电压：VCC 脚实测电压 − GND 脚实测电压，缺省 5V
+  const mixSupplyOf = (unit) => {
+    const read = (net) => (net && analogVoltages.has(net) ? analogVoltages.get(net) : null);
+    const vcc = read(unit.vccNet);
+    if (vcc === null) return 5;
+    const gnd = read(unit.gndNet);
+    return Math.max(0.1, vcc - (gnd === null ? 0 : gnd));
+  };
+  // 收集阶段只能读模拟电压（数字电平还没算出来）
+  const mixVoltageCtx = {
+    supplyOf: mixSupplyOf,
+    voltage: (net) => (net && analogVoltages.has(net) ? analogVoltages.get(net) : null),
+    level: (net) => {
+      if (!net) return X;
+      if (netLevel.has(net)) return netLevel.get(net);
+      return analogVoltages.has(net) ? levelFromVoltage(analogVoltages.get(net)) : X;
+    },
+  };
+  // 求值后可以读三值电平
+  const mixLevelCtx = {
+    supplyOf: mixSupplyOf,
+    voltage: mixVoltageCtx.voltage,
+    level: (net) => {
+      if (!net) return X;
+      if (netLevel.has(net)) return netLevel.get(net);
+      return analogVoltages.has(net) ? levelFromVoltage(analogVoltages.get(net)) : X;
+    },
+  };
+
+  const registerMixSource = (unit, pin, level) => {
+    const net = netOfPin(unit.comp, pin);
+    sources.push({ comp: unit.comp, spec: { id: unit.spec.id, label: unit.spec.label, out: pin }, level, net });
+    addDriver(net, { unitKey: null, compId: unit.componentId, pin });
+  };
+
+  mixUnits.forEach((unit) => {
+    if (unit.kind === 'comparator') {
+      const r = evalMixUnit(unit, mixVoltageCtx);
+      const out = unit.outputs.find((item) => item.pin === 'OUT');
+      if (out && out.net) registerMixSource(unit, 'OUT', r.level);
+      return;
+    }
+    if (unit.kind === 'adc') {
+      const r = evalMixUnit(unit, mixVoltageCtx);
+      const levels = bitsToLevels(r.bits || 0);
+      unit.outputs.forEach((out) => {
+        if (out.net) registerMixSource(unit, out.pin, levels[out.pin] === 1 ? 1 : 0);
+      });
+      return;
+    }
+    if (unit.kind === 'buffer') {
+      const input = unit.inputs.find((item) => item.pin === 'IN');
+      const output = unit.outputs.find((item) => item.pin === 'OUT');
+      const key = `mix:${unit.componentId}`;
+      units.push({
+        key,
+        comp: unit.comp,
+        model: { id: 'buffer74', label: '数字缓冲', tpd: 0 },
+        unit: {
+          id: 'BUF',
+          label: '缓冲',
+          kind: 'gate',
+          inputs: ['IN'],
+          outputs: ['OUT'],
+          fn: (values) => ({ OUT: values.IN }),
+        },
+        inputs: [{ pin: 'IN', net: input ? input.net : null }],
+        outputs: [{ pin: 'OUT', net: output ? output.net : null }],
+        levelIn: {},
+        levelOut: {},
+      });
+      addDriver(output ? output.net : null, { unitKey: key, compId: unit.componentId, pin: 'OUT' });
+      return;
+    }
+    if (unit.kind === 'dac') {
+      // DAC 没有数字输出，但它的输入位要进拓扑图（这样"某位悬空/未驱动"能显示出来）
+      units.push({
+        key: `mix:${unit.componentId}`,
+        comp: unit.comp,
+        model: { id: 'dac8', label: '8 位 DAC', tpd: 0 },
+        unit: {
+          id: 'DAC',
+          label: 'DAC',
+          kind: 'gate',
+          inputs: unit.inputs.map((item) => item.pin),
+          outputs: [],
+          fn: () => ({}),
+        },
+        inputs: unit.inputs.map((item) => ({ pin: item.pin, net: item.net })),
+        outputs: [],
+        levelIn: {},
+        levelOut: {},
+      });
+    }
+  });
+
+  // 跨域组合环路：结构性错误，先于拓扑排序报出（包 8.2）
+  if (mixUnits.length > 0) {
+    const loop = analyzeMixLoops({ state, netOf, mixUnits, digitalUnits: units });
+    if (!loop.ok) {
+      result.ok = false;
+      result.error = '检测到跨域组合环路（请检查连线）';
+      result.cycle = loop.cycle;
+      result.detail = `环上元件：${loop.cycle.join(' → ')}`
+        + (loop.via.length > 0 ? `（经由 ${loop.via.join('、')}）` : '');
+      result.elapsedMs = elapsedSince(started);
+      return result;
+    }
+  }
 
   floatingByComp.forEach((pins, compId) => {
     const unique = [...new Set(pins)].sort((a, b) => Number(a) - Number(b));
@@ -323,8 +453,7 @@ export function solveDig(modelApi, options = {}) {
   }
 
   /* ---- 第四步：按拓扑序求值 ---- */
-  const netLevel = new Map(); // netId → 0|1|X（已求出的驱动电平）
-  const levelConflicts = new Set();
+  // netLevel / levelConflicts 提前到收集阶段声明：边界元件求值要读它们
 
   const assignNet = (net, level) => {
     if (!net) return;
@@ -392,6 +521,64 @@ export function solveDig(modelApi, options = {}) {
     item.edge = false;
     item.mode = 'gate';
   });
+
+  /* ---- 边界元件：求值后回填模拟输出（供 solveCoupled 注入） ---- */
+  const mixAnalogDrives = [];
+  const mixReport = [];
+  mixUnits.forEach((unit) => {
+    const r = evalMixUnit(unit, mixLevelCtx);
+    const record = {
+      componentId: unit.componentId,
+      kind: unit.kind,
+      label: unit.spec.label,
+      level: r.level === undefined ? null : r.level,
+      bits: r.bits === null ? null : r.bits,
+      vout: r.vout,
+      supply: r.supply,
+    };
+    if (unit.kind === 'comparator') {
+      record.diff = r.diff;
+      const out = unit.outputs.find((item) => item.pin === 'OUT');
+      if (out && out.net) {
+        mixAnalogDrives.push({
+          componentId: unit.componentId,
+          pin: 'OUT',
+          netId: out.net,
+          voltage: r.vout,
+          level: r.level,
+        });
+      }
+    } else if (unit.kind === 'dac') {
+      const out = unit.outputs.find((item) => item.pin === 'OUT');
+      if (out && out.net) {
+        mixAnalogDrives.push({
+          componentId: unit.componentId,
+          pin: 'OUT',
+          netId: out.net,
+          voltage: r.vout,
+          level: null,
+        });
+      }
+    } else if (unit.kind === 'buffer') {
+      const out = unit.outputs.find((item) => item.pin === 'OUT');
+      if (out && out.net && r.vout !== null) {
+        mixAnalogDrives.push({
+          componentId: unit.componentId,
+          pin: 'OUT',
+          netId: out.net,
+          voltage: r.vout,
+          level: r.level,
+        });
+      }
+    }
+    mixReport.push(record);
+  });
+  result.mix = {
+    units: mixUnits.length,
+    types: mix.types,
+    analogDrives: mixAnalogDrives,
+    detail: mixReport,
+  };
 
   if (levelConflicts.size > 0) {
     levelConflicts.forEach((net) => {
@@ -464,6 +651,14 @@ export function solveDig(modelApi, options = {}) {
   });
 
   sources.forEach((source) => {
+    const existing = byComp.get(source.comp.id);
+    if (existing) {
+      // 多输出源（ADC 的 8 个数据脚）合并进同一条元件记录
+      existing.outputs[source.spec.out] = source.level;
+      existing.wired[source.spec.out] = Boolean(source.net);
+      if (existing.units[0]) existing.units[0].outputs[source.spec.out] = source.level;
+      return;
+    }
     byComp.set(source.comp.id, {
       componentId: source.comp.id,
       type: source.comp.type,
@@ -497,6 +692,37 @@ export function solveDig(modelApi, options = {}) {
 
   result.elapsedMs = elapsedSince(started);
   return result;
+}
+
+/**
+ * 只收集数字求值单元（不求解）。
+ * 跨域环路分析需要"单元 + 输入/输出网"的原始结构；求解结果里的 units 只有
+ * 引脚电平，重建不出网表。这里导出收集逻辑，让 board/simmix 共用同一份。
+ */
+export function collectDigitalUnits(modelApi) {
+  const units = [];
+  if (!modelApi || typeof modelApi.getState !== 'function') return units;
+  const state = modelApi.getState();
+  const netlist = modelApi.getNetlist();
+  const netOf = netlist && netlist.netOf ? netlist.netOf : new Map();
+  if (!state || !Array.isArray(state.components)) return units;
+  state.components.forEach((comp) => {
+    if (!isDigital(comp.type)) return;
+    const model = getDigModel(comp.type, comp.params);
+    if (!model) return;
+    model.units.forEach((unit) => {
+      units.push({
+        key: `${comp.id}#${unit.id}`,
+        compId: comp.id,
+        comp,
+        model,
+        unit,
+        inputs: unit.inputs.map((pin) => ({ pin, net: netOf.get(`c:${comp.id}:${pin}`) || null })),
+        outputs: unit.outputs.map((pin) => ({ pin, net: netOf.get(`c:${comp.id}:${pin}`) || null })),
+      });
+    });
+  });
+  return units;
 }
 
 /* ==========================================================================
@@ -746,7 +972,13 @@ export function solveCoupled(modelApi, options = {}) {
   const coupling = coupleSim(analogBase, dig, options);
 
   const analogNets = analogNetsOf(modelApi);
-  const activeDrives = coupling.drives.filter((drive) => analogNets.has(drive.netId));
+  // 边界元件的模拟输出（比较器 OUT / DAC OUT / 缓冲 OUT）与数字电平同为"驱动源"
+  const mixDrives = (dig.mix && Array.isArray(dig.mix.analogDrives) ? dig.mix.analogDrives : [])
+    .filter((drive) => drive.voltage !== null && drive.voltage !== undefined)
+    .map((drive) => ({ netId: drive.netId, voltage: Number(drive.voltage), level: drive.level }));
+  const activeDrives = coupling.drives
+    .filter((drive) => analogNets.has(drive.netId))
+    .concat(mixDrives.filter((drive) => analogNets.has(drive.netId)));
 
   let analog = analogBase;
   let drove = false;
