@@ -52,6 +52,11 @@ import {
   levelBadge,
 } from './simdig.js';
 import { levelText } from './digmodels.js';
+import {
+  solveTransient,
+  runTransient,
+  resetTransientState,
+} from './simtrans.js';
 
 /** 存档键前缀 */
 const STORAGE_PREFIX = 'lab-sim-circuit-';
@@ -1382,6 +1387,9 @@ export function initBoard(options) {
     interaction: null,
   };
 
+  // 暂态运行态（分帧运行中 / 最近一次结果）
+  board.transientRun = { active: false, handle: null, last: null };
+
   board.interaction = createInteraction({
     canvas,
     paletteHost,
@@ -1566,6 +1574,57 @@ export function initBoard(options) {
         return comp.params.state;
       },
     },
+    // 暂态仿真入口（指令包 7）：与 simdc/simdig 同契约风格
+    simtrans: {
+      // 同步跑完返回结果（测试/一次性求解用）
+      solve: (opts) => solveTransient(model, opts || {}),
+      last: () => board.transientRun.last,
+      running: () => board.transientRun.active,
+      // 分帧异步运行：每帧算一小段，进度回报 hooks，可随时 stop
+      start: (opts, hooks) => {
+        if (board.transientRun.active) return { ok: false, error: '暂态仿真正在运行中', stop: () => {} };
+        board.transientRun.active = true;
+        const handle = runTransient(model, opts || {}, {
+          onProgress: (done, total) => {
+            if (hooks && typeof hooks.onProgress === 'function') hooks.onProgress(done, total);
+          },
+          onChunk: (merged) => {
+            board.transientRun.last = merged;
+            if (hooks && typeof hooks.onChunk === 'function') hooks.onChunk(merged);
+          },
+          onDone: (merged, cancelled) => {
+            board.transientRun.active = false;
+            board.transientRun.handle = null;
+            board.transientRun.last = merged;
+            if (hooks && typeof hooks.onDone === 'function') hooks.onDone(merged, cancelled);
+          },
+          onError: (part) => {
+            board.transientRun.active = false;
+            board.transientRun.handle = null;
+            board.transientRun.last = part;
+            if (hooks && typeof hooks.onError === 'function') hooks.onError(part);
+          },
+        });
+        board.transientRun.handle = handle;
+        return handle;
+      },
+      stop: () => {
+        if (board.transientRun.handle) board.transientRun.handle.stop();
+        return true;
+      },
+      waveforms: () => (board.transientRun.last ? board.transientRun.last.waveforms : []),
+      channels: () => (board.transientRun.last ? board.transientRun.last.channels : []),
+      stats: () => (board.transientRun.last ? board.transientRun.last.stats : null),
+      // 清结果 + 电容状态清零（断电重上语义，同包 6 resetDigState）
+      reset: () => {
+        if (board.transientRun.handle) board.transientRun.handle.stop();
+        board.transientRun.active = false;
+        board.transientRun.handle = null;
+        board.transientRun.last = null;
+        resetTransientState();
+        return true;
+      },
+    },
     save: () => {
       saveNow();
       return true;
@@ -1618,6 +1677,8 @@ export function destroyBoard() {
     rafHandle = 0;
   }
 
+  if (board.transientRun && board.transientRun.handle) board.transientRun.handle.stop();
+  resetTransientState();
   if (board.interaction) board.interaction.detach();
   destroySchematic();
   changeListeners = [];

@@ -141,8 +141,11 @@ export function formatResidual(value) {
  * 把 state.components 翻译成"可参与方程的二端元件"。
  * 返回 { entries, warnings, errors }
  *   entry = { comp, model, netPos, netNeg, terminalPos, terminalNeg }
+ *
+ * 同时导出给 simtrans.js 复用（暂态每个步进都要走同一套筛选/选地/剪枝逻辑，
+ * 抽出公共函数保持单源，避免两处实现漂移）。
  */
-function collectEntries(state, netOf) {
+export function collectEntries(state, netOf) {
   const entries = [];
   const warnings = [];
   const errors = [];
@@ -200,7 +203,7 @@ function collectEntries(state, netOf) {
  *   2. 端子数最多的网——没有电源时至少保证最大的那块网络有定义；
  *   3. 第一个网。
  */
-function chooseGround(entries) {
+export function chooseGround(entries) {
   const source = entries.find((entry) => entry.model.id === 'vsource');
   if (source) return { net: source.netNeg, why: `电压源 ${source.comp.id} 负端` };
 
@@ -241,7 +244,7 @@ function describeNet(net, entries) {
  * 天生同域，检查会对任何带电源的电路误报短路。
  * 两根电池并联属于另一类问题（支路电流不唯一），单独按"跨同一对连通域"判定。
  */
-function checkShorts(entries) {
+export function checkShorts(entries) {
   const dsu = createDsu();
   entries.forEach((entry) => {
     dsu.find(entry.netPos);
@@ -293,7 +296,7 @@ function checkShorts(entries) {
  * 从参考地出发，沿"直流上导通"的元件做连通性扩散。
  * 返回与地连通的网集合。
  */
-function reachableFromGround(entries, ground) {
+export function reachableFromGround(entries, ground, conducts = conductsDC) {
   const adjacency = new Map();
   const link = (a, b) => {
     if (!adjacency.has(a)) adjacency.set(a, []);
@@ -301,7 +304,7 @@ function reachableFromGround(entries, ground) {
   };
 
   entries.forEach((entry) => {
-    if (!conductsDC(entry.comp.type, entry.comp.params)) return;
+    if (!conducts(entry.comp.type, entry.comp.params)) return;
     link(entry.netPos, entry.netNeg);
     link(entry.netNeg, entry.netPos);
   });

@@ -703,7 +703,7 @@ export const PARTS = {
       { name: '+', dx: 0, dy: 0, direction: 'out' },
       { name: '-', dx: 1, dy: 0, direction: 'out' },
     ],
-    defaultParams: { mode: 'momentary' },
+    defaultParams: { mode: 'momentary', width: 0.1 },
     paramFields: [
       {
         key: 'mode',
@@ -713,6 +713,19 @@ export const PARTS = {
           { value: 'momentary', label: '按键脉冲（单次）' },
           { value: 'toggle', label: '翻转保持' },
         ],
+      },
+      {
+        // 暂态波形用：单次触发时正脉冲的宽度（秒）。
+        // 原参数只有 mode、无宽度，指令包 7.6 的「脉冲宽度符合参数」无从校验，
+        // 按「如需加参数字段」补此字段（风格同 clock 的 frequency/duty），端子结构不动。
+        key: 'width',
+        label: '脉宽',
+        type: 'number',
+        unit: 's',
+        factor: 1,
+        step: 0.1,
+        min: 0.01,
+        max: 10,
       },
     ],
     draw: drawPulse,
