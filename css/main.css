@@ -680,6 +680,13 @@ button {
     linear-gradient(to right, rgba(120, 140, 175, 0.26) 1px, transparent 1px),
     linear-gradient(to bottom, rgba(120, 140, 175, 0.26) 1px, transparent 1px);
   background-size: 20px 20px, 20px 20px, 100px 100px, 100px 100px;
+  /* 7B.2.9 视图切换淡入：纯 CSS 过渡，不加 JS 动画循环 */
+  transition: opacity 0.15s var(--ease-out);
+}
+
+/* 切换瞬间由 app.js 加上、下一帧移除，形成 opacity 0→1 的淡入 */
+.canvas-area.is-fading {
+  opacity: 0;
 }
 
 /* 2.5D 画布：铺满中栏，touch-action 禁止拖动时触发页面滚动 */

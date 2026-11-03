@@ -288,8 +288,16 @@ function check(name, ok, detail) {
     pin1 !== null && pin1.x === 5 + 2 && pin1.y === 2,
     JSON.stringify(pin1));
 
-  const again = M.rotateComponent(ic.component.id);
-  check('已旋转再旋转被拒绝', again.ok === false, JSON.stringify(again));
+  // 四向循环：90 → 180 → 270 → 0 都应成功
+  const r2 = M.rotateComponent(ic.component.id);
+  check('四向旋转：90→180 成功', r2.ok === true && M.findComponent(ic.component.id).rotation === 180,
+    JSON.stringify(r2));
+  const r3 = M.rotateComponent(ic.component.id);
+  check('四向旋转：180→270 成功', r3.ok === true && M.findComponent(ic.component.id).rotation === 270,
+    JSON.stringify(r3));
+  const r4 = M.rotateComponent(ic.component.id);
+  check('四向旋转：270→0 回环', r4.ok === true && M.findComponent(ic.component.id).rotation === 0,
+    JSON.stringify(r4));
 
   M.stashComponents('exp-box', [ic.component], []);
   check('暂存区记录 1 个元件', M.peekStash('exp-box').components.length === 1,

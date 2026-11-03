@@ -18,6 +18,7 @@ import {
   invalidatePlatformLayer,
   project,
   pickAt,
+  terminalScreenPos,
   setZoom,
   setPan,
   getZoom,
@@ -691,13 +692,27 @@ export function simulateNow(reason = 'manual') {
   };
   renderSimPanel();
   renderDigPanel();
+  // 计算完成：清除 pending 标志，状态行恢复结果摘要（2.11）
+  board.scene.simPending = false;
+  refreshHealth();
   requestRender();
   return coupled.analog;
+}
+
+/** 状态行显示"计算中…"：防抖等待期即置位，提示用户仿真正在跑（D1） */
+function renderSimPending() {
+  const status = board ? board.statusHost : null;
+  if (!status) return;
+  status.textContent = '计算中…';
+  status.classList.remove('is-warn');
 }
 
 /** 电路变更后的防抖重仿：300ms 内的连续改动只算最后一次 */
 function scheduleSimulation() {
   if (!board) return;
+  // 进入防抖期即标记 pending：状态行立刻显示"计算中…"（2.11）
+  board.scene.simPending = true;
+  renderSimPending();
   if (simTimer) window.clearTimeout(simTimer);
   simTimer = window.setTimeout(() => {
     simTimer = 0;
@@ -1324,7 +1339,9 @@ export function initBoard(options) {
   const view = createView(canvas);
   const scene = {
     platform: platforms.getPlatform(restoredPlatform),
-    circuit: model.getState(),
+    // 始终取活引用：model.loadCircuit / createCircuit 会整体替换 state 对象，
+    // 若这里存死引用，换存档后 pickAt/渲染会看到旧电路（元件点不中、导线看不见）
+    get circuit() { return model.getState(); },
     selection: null,
     hover: null,
     hoverGroup: null,
@@ -1334,6 +1351,10 @@ export function initBoard(options) {
     ghost: null,
     dangling: new Set(),
     lens: { on: false },
+    // 删除预告：临时保存将被删导线的几何，render 层用醒目色闪一下（~150ms）
+    pendingFlash: null,
+    // 仿真计算"进行中"标志（防抖等待期即置位，供状态行显示"计算中…"）
+    simPending: false,
   };
 
   board = {
@@ -1480,10 +1501,43 @@ export function initBoard(options) {
     project: (gx, gy) => project(view, gx, gy),
     pick: (x, y) => pickAt(view, board ? board.scene : scene, x, y),
     nodeAt: (gx, gy) => (board ? platforms.nodesAt(board.platformId, gx, gy) : []),
+    // 7B 探针支持：端子的网格/屏幕坐标（拖拽连线、光标、右键删除探针需要真实坐标）
+    geometry: {
+      terminal: (componentId, terminalName) => {
+        const comp = model.findComponent(componentId);
+        return comp ? terminalPos(comp, terminalName) : null;
+      },
+      terminals: (componentId) => {
+        const comp = model.findComponent(componentId);
+        if (!comp) return [];
+        return comp.terminals.map((terminal) => ({
+          name: terminal.name,
+          ...terminalPos(comp, terminal.name),
+        }));
+      },
+      screenTerminal: (componentId, terminalName) => {
+        const comp = model.findComponent(componentId);
+        return comp ? terminalScreenPos(view, comp, terminalName) : null;
+      },
+    },
     switchPlatform: (id) => applyPlatform(id),
     place: (type, x, y) => board.interaction.placeComponent(type, x, y),
     undo: () => board.interaction.undo(),
     deleteSelection: () => board.interaction.deleteSelection(),
+    // 7B 交互探针入口：重做 / 旋转 / 连续放置 / 右键删除（右键走 canvas 原生事件）
+    interact: {
+      redo: () => board.interaction.redo(),
+      rotate: () => board.interaction.rotateSelection(),
+      continuousPlace: (on) => board.interaction.setContinuousPlace(on),
+      isContinuousPlace: () => board.interaction.isContinuousPlace(),
+      contextmenu: (clientX, clientY) => {
+        if (!board || !board.canvas) return false;
+        board.canvas.dispatchEvent(
+          new MouseEvent('contextmenu', { bubbles: true, cancelable: true, clientX, clientY }),
+        );
+        return true;
+      },
+    },
     setSelection: (selection) => applySelection(selection),
     relayout: () => relayout(),
     // 仿真调试入口：solve 立即重算，last 取上一次结果，report 取格式化文本

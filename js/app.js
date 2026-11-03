@@ -66,6 +66,7 @@ const dom = {
   btnZoomReset: document.getElementById('btn-zoom-reset'),
   btnLens: document.getElementById('btn-lens'),
   zoomLevel: document.getElementById('zoom-level'),
+  btnContPlace: document.getElementById('btn-continuous-place'),
   toastHost: document.getElementById('toast-host'),
   modalHost: document.getElementById('modal-host'),
 };
@@ -119,6 +120,15 @@ function switchBoardView(mode) {
 
   if (dom.benchArea) dom.benchArea.hidden = mode !== 'bench';
   if (dom.schemArea) dom.schemArea.hidden = mode !== 'schematic';
+
+  // 2.9 视图淡入：目标画布 opacity 0→1（150ms）。纯 CSS transition，
+  // 不加 JS 动画循环；先加类置 0，强制回流后再移除，确保过渡真的从 0 起跑。
+  const targetArea = mode === 'bench' ? dom.benchArea : dom.schemArea;
+  if (targetArea) {
+    targetArea.classList.add('is-fading');
+    void targetArea.offsetWidth;
+    requestAnimationFrame(() => targetArea.classList.remove('is-fading'));
+  }
 
   if (dom.btnViewBench) {
     dom.btnViewBench.classList.toggle('is-active', mode === 'bench');
@@ -329,6 +339,8 @@ function openExperiment(expId) {
 
   // 每次进入实验都回到实验台视图（原理图是辅助视图，不应成为默认落地页）
   switchBoardView('bench');
+  // 连续放置是"一次操作习惯"，换实验时复位为关闭，避免用户莫名连放
+  setContPlacePressed(false);
 
   // 画布尺寸依赖布局完成，必须在视图切过去之后再初始化
   initBoard({
@@ -357,6 +369,7 @@ function openExperiment(expId) {
 function leaveWorkspace() {
   destroyBoard();
   currentExperimentId = null;
+  setContPlacePressed(false);
   switchBoardView('bench');
   switchView('view-list');
 }
@@ -382,30 +395,60 @@ function activateTab(name) {
    轻提示与确认对话框
    ========================================================================== */
 
-/** 底部轻提示，kind ∈ info / success / error */
+/** toast 每条驻留时间（毫秒） */
+const TOAST_DWELL = 1600;
+
+/** toast 队列：同时最多 1 条，其余按顺序展示（2.10） */
+const toastQueue = [];
+let toastBusy = false;
+
+/**
+ * 底部轻提示，kind ∈ info / success / error
+ *
+ * 2.10 的取舍：改成「同时最多 1 条 + 顺序展示」，不做消息文本合并。
+ * 合并会丢信息（如连续删除的"已删除导线 w1 / w2"看不出删了哪条），
+ * 而顺序展示既不会堆积遮挡、又能让用户逐条看清；
+ * 真正的高频来源（连续放置）已在交互层合并成"已放置 N 个 xxx"。
+ */
 function showToast(message, kind = 'info') {
+  // 2.10：队列上限 3 条，超出丢最旧、保留最新——极端高频操作下提示不会积压过久
+  if (toastQueue.length >= 3) toastQueue.shift();
+  toastQueue.push({ message, kind });
+  if (!toastBusy) pumpToast();
+}
+
+/** 取队首展示；收尾时自动抽下一条，保证同屏只有 1 条 */
+function pumpToast() {
+  if (toastBusy) return;
+  const item = toastQueue.shift();
+  if (!item) return;
+  toastBusy = true;
+
   const toast = document.createElement('div');
-  toast.className = `toast toast--${kind}`;
+  toast.className = `toast toast--${item.kind}`;
 
   const dot = document.createElement('span');
   dot.className = 'toast-dot';
   const text = document.createElement('span');
   text.className = 'toast-text';
-  text.textContent = message;
+  text.textContent = item.message;
 
   toast.append(dot, text);
   dom.toastHost.append(toast);
-
-  // 同屏最多保留 3 条
-  while (dom.toastHost.children.length > 3) {
+  // 兜底：无论走哪条异常路径，同屏都只保留 1 条
+  while (dom.toastHost.children.length > 1) {
     dom.toastHost.firstElementChild.remove();
   }
 
   requestAnimationFrame(() => toast.classList.add('is-in'));
   window.setTimeout(() => {
     toast.classList.remove('is-in');
-    window.setTimeout(() => toast.remove(), 240);
-  }, 2800);
+    window.setTimeout(() => {
+      toast.remove();
+      toastBusy = false;
+      pumpToast();
+    }, 240);
+  }, TOAST_DWELL);
 }
 
 /** 打开覆盖确认框，返回 Promise<boolean>：确认 true / 取消 false */
@@ -846,6 +889,13 @@ function setLensPressed(on) {
   dom.btnLens.classList.toggle('is-active', on);
 }
 
+/** 更新连续放置按钮的按下态（换实验 / 离开工作区时复位） */
+function setContPlacePressed(on) {
+  if (!dom.btnContPlace) return;
+  dom.btnContPlace.setAttribute('aria-pressed', String(on));
+  dom.btnContPlace.classList.toggle('is-active', on);
+}
+
 /** 绑定视图缩放 / 放大镜工具栏（包 7A） */
 function bindZoomControls() {
   const zoomApi = () => (window.__labBoard && window.__labBoard.zoom) ? window.__labBoard.zoom : null;
@@ -884,12 +934,28 @@ function bindZoomControls() {
     });
   }
 
+  // 连续放置开关（7B.2）：开启后放一个不退出放置模式，Esc 或再次点击退出
+  if (dom.btnContPlace) {
+    dom.btnContPlace.addEventListener('click', () => {
+      const api = window.__labBoard && window.__labBoard.interact;
+      if (!api) return;
+      const on = !api.isContinuousPlace();
+      api.continuousPlace(on);
+      setContPlacePressed(on);
+      showToast(on ? '连续放置：开（Esc 退出）' : '连续放置：关', 'info');
+    });
+  }
+
   // 缩放 / 放大镜状态由交互层（键盘、智能聚焦）驱动，这里只做读数同步
   window.addEventListener('viewzoom', (event) => {
     if (event.detail && typeof event.detail.level === 'number') setZoomReadout(event.detail.level);
   });
   window.addEventListener('lensstate', (event) => {
     if (event.detail && typeof event.detail.on === 'boolean') setLensPressed(event.detail.on);
+  });
+  // 连续放置模式被 Esc / 交互层关闭时，同步工具栏按钮的按下态
+  window.addEventListener('placestate', (event) => {
+    if (event.detail && typeof event.detail.on === 'boolean') setContPlacePressed(event.detail.on);
   });
 }
 

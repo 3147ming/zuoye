@@ -133,7 +133,7 @@ export function symbolScreenPos(view, entry) {
 
 /** 符号外接矩形的屏幕坐标 */
 export function symbolScreenRect(view, comp, entry) {
-  const size = symSize(comp.type, comp.rotation === 90 ? 90 : 0);
+  const size = symSize(comp.type, comp.rotation || 0);
   const at = symProject(view, entry.sx, entry.sy);
   return { x: at.x, y: at.y, w: size.w * view.cell, h: size.h * view.cell };
 }
@@ -144,7 +144,7 @@ export function symbolScreenRect(view, comp, entry) {
 
 /** 元件某端子在该元件原理图占位中的绝对逻辑坐标 */
 function terminalAbsolute(comp, entry, terminalName) {
-  const pin = pinByName(comp.type, terminalName, comp.rotation === 90 ? 90 : 0);
+  const pin = pinByName(comp.type, terminalName, comp.rotation || 0);
   if (!pin) return null;
   return {
     componentId: comp.id,
@@ -409,12 +409,12 @@ function drawSymbols(ctx, view, scene) {
       x: at.x,
       y: at.y,
       cell: view.cell,
-      rotation: comp.rotation === 90 ? 90 : 0,
+      rotation: comp.rotation || 0,
       color,
     });
 
     // 标签：符号下方居中
-    const size = symSize(comp.type, comp.rotation === 90 ? 90 : 0);
+    const size = symSize(comp.type, comp.rotation || 0);
     const text = symbolLabel(comp);
     ctx.font = `${labelSize}px "Cascadia Mono", Consolas, monospace`;
     ctx.textAlign = 'center';
@@ -607,7 +607,7 @@ export function pickSchematic(view, scene, sx, sy) {
     const comp = circuit.components[i];
     const entry = layout.get(comp.id);
     if (!entry) continue;
-    const size = symSize(comp.type, comp.rotation === 90 ? 90 : 0);
+    const size = symSize(comp.type, comp.rotation || 0);
     if (
       point.gx >= entry.sx && point.gx <= entry.sx + size.w
       && point.gy >= entry.sy && point.gy <= entry.sy + size.h

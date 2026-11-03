@@ -269,17 +269,35 @@ export function componentCorners(view, comp) {
   ];
 }
 
-/** 给 parts.js 的 draw() 用的坐标系包装 */
+/** 给 parts.js 的 draw() 用的坐标系包装（局部相对坐标，旋转由外层 canvas 变换完成） */
 function componentFrame(view, comp) {
   const def = getPart(comp.type);
-  const footprint = footprintOf(def, comp.rotation);
+  const footprint = footprintOf(def, 0); // 始终按未旋转尺寸绘制，旋转交给 canvas 变换
   return {
     w: footprint.w,
     h: footprint.h,
     tileW: view.tileW,
     tileH: view.tileH,
-    project: (dx, dy) => project(view, comp.x + dx, comp.y + dy),
+    project: (dx, dy) => ({ x: dx * view.tileW, y: dy * view.tileH }),
   };
+}
+
+/**
+ * 面包板元件旋转：绕整数网格矩形 [0..w-1]×[0..h-1] 的左上角旋转，
+ * 与 parts.js 的 terminalPos 四向公式严格一致（已验证端子屏幕坐标重合）。
+ * 仅当 rotation 非 0 生效；0° 时不做任何变换。
+ */
+function applyComponentRotation(ctx, rotation, w, h, cell) {
+  if (rotation === 90) {
+    ctx.translate((h - 1) * cell, 0);
+    ctx.rotate(Math.PI / 2);
+  } else if (rotation === 180) {
+    ctx.translate((w - 1) * cell, (h - 1) * cell);
+    ctx.rotate(Math.PI);
+  } else if (rotation === 270) {
+    ctx.translate(0, (w - 1) * cell);
+    ctx.rotate(-Math.PI / 2);
+  }
 }
 
 /** 把"整个视图"包装成 prism 需要的 frame 接口 */
@@ -794,7 +812,28 @@ export function renderScene(view, scene) {
   drawPendingWire(ctx, view, scene);
   drawWireHoverEnds(ctx, view, scene);
   drawConnectableHints(ctx, view, scene);
+  drawFlashWires(ctx, view, scene);
   drawMagnifier(ctx, view, scene);
+}
+
+/** 删除预告：把即将被删的导线以醒目色闪一下（约 150ms，由 scene.pendingFlash 控制） */
+function drawFlashWires(ctx, view, scene) {
+  const flash = scene.pendingFlash;
+  if (!flash || !flash.wires || flash.wires.length === 0) return;
+  if (performance.now() > flash.until) return;
+  ctx.save();
+  ctx.lineCap = 'round';
+  ctx.lineJoin = 'round';
+  flash.wires.forEach((wire) => {
+    const ends = wireScreenEnds(view, wire);
+    if (!ends) return;
+    const points = wirePath(view, ends.a, ends.b);
+    strokePath(ctx, points);
+    ctx.strokeStyle = 'rgba(242, 169, 59, 0.95)';
+    ctx.lineWidth = Math.max(3, view.tileW * 0.16);
+    ctx.stroke();
+  });
+  ctx.restore();
 }
 
 /** 悬停孔位 → 高亮整组（让"哪些孔天然连通"一眼可见） */
@@ -888,6 +927,9 @@ function drawComponents(ctx, view, scene, theme) {
     }
 
     ctx.save();
+    const origin = project(view, comp.x, comp.y);
+    ctx.translate(origin.x, origin.y);
+    applyComponentRotation(ctx, comp.rotation, def.size.w, def.size.h, view.tileW);
     def.draw(ctx, comp, {
       frame: componentFrame(view, comp),
       theme,
@@ -953,6 +995,9 @@ function drawGhost(ctx, view, scene, theme) {
   const fakeComp = { type, x, y, rotation: 0, params: { ...def.defaultParams } };
   ctx.save();
   ctx.globalAlpha = 0.72;
+  const ghostOrigin = project(view, x, y);
+  ctx.translate(ghostOrigin.x, ghostOrigin.y);
+  applyComponentRotation(ctx, fakeComp.rotation, def.size.w, def.size.h, view.tileW);
   def.draw(ctx, fakeComp, {
     frame: componentFrame(view, fakeComp),
     theme,
@@ -1110,8 +1155,10 @@ function distanceToSegment(px, py, ax, ay, bx, by) {
 }
 
 /**
- * 屏幕坐标拾取。优先级：元件端子 > 元件本体 > 平台孔位 > 导线。
+ * 屏幕坐标拾取。优先级：元件端子 > 元件本体 > 导线 > 平台孔位。
  * 元件本体优先于孔位：元件压在台面上时，点它应当选中元件而不是选中被遮住的孔。
+ * 导线优先于孔位：导线画在台面孔位之上、孔位命中半径又更大，若孔位先赢，
+ * 实验箱上导线几乎点不中（右键删导线、悬停导线都会失效）。
  */
 export function pickAt(view, scene, sx, sy) {
   const platform = scene.platform;
@@ -1153,7 +1200,29 @@ export function pickAt(view, scene, sx, sy) {
     }
   }
 
-  // 3. 平台孔位（按网格就近查 3×3 邻域，避免遍历近千节点）
+  // 3. 导线（绘制在孔位之上，命中优先于孔位：实验箱孔位密集、命中半径又比导线大，
+  //    若让孔位先赢，导线在实验箱上几乎点不中——右键删导线 / 悬停导线会失效）
+  let wireBest = null;
+  let wireDistance = Math.max(6, view.tileW * 0.2);
+  circuit.wires.forEach((wire) => {
+    const ends = wireScreenEnds(view, wire);
+    if (!ends) return;
+    const points = wirePath(view, ends.a, ends.b);
+    for (let i = 0; i < points.length - 1; i += 1) {
+      const distance = distanceToSegment(
+        sx, sy,
+        points[i].x, points[i].y,
+        points[i + 1].x, points[i + 1].y,
+      );
+      if (distance < wireDistance) {
+        wireDistance = distance;
+        wireBest = { type: 'wire', wireId: wire.id };
+      }
+    }
+  });
+  if (wireBest) return wireBest;
+
+  // 4. 平台孔位（按网格就近查 3×3 邻域，避免遍历近千节点）
   if (platform) {
     const cx = Math.round(point.gx);
     const cy = Math.round(point.gy);
@@ -1178,26 +1247,7 @@ export function pickAt(view, scene, sx, sy) {
     if (nodeBest) return nodeBest;
   }
 
-  // 4. 导线
-  let wireBest = null;
-  let wireDistance = Math.max(6, view.tileW * 0.2);
-  circuit.wires.forEach((wire) => {
-    const ends = wireScreenEnds(view, wire);
-    if (!ends) return;
-    const points = wirePath(view, ends.a, ends.b);
-    for (let i = 0; i < points.length - 1; i += 1) {
-      const distance = distanceToSegment(
-        sx, sy,
-        points[i].x, points[i].y,
-        points[i + 1].x, points[i + 1].y,
-      );
-      if (distance < wireDistance) {
-        wireDistance = distance;
-        wireBest = { type: 'wire', wireId: wire.id };
-      }
-    }
-  });
-  return wireBest;
+  return null;
 }
 
 /** 导出给交互层复用的几何工具 */

@@ -773,24 +773,33 @@ export function getPart(type) {
   return Object.prototype.hasOwnProperty.call(PARTS, type) ? PARTS[type] : null;
 }
 
-/** 旋转后的占位尺寸（90° 交换宽高） */
+/** 旋转后的占位尺寸（90° / 270° 交换宽高；0° / 180° 不变） */
 export function footprintOf(def, rotation) {
   if (!def) return { w: 1, h: 1 };
-  return rotation === 90
-    ? { w: def.size.h, h: def.size.w }
-    : { w: def.size.w, h: def.size.h };
+  const { w, h } = def.size;
+  if (rotation === 90 || rotation === 270) return { w: h, h: w };
+  return { w, h };
 }
 
-/** 元件某端子的网格坐标（考虑旋转） */
+/**
+ * 元件某端子的网格坐标（考虑四向旋转）。
+ * 旋转约定与渲染层 canvas 变换一致：绕整数网格矩形 [0..w-1]×[0..h-1]
+ * 的「左上角」旋转（90° 顺时针 → (dx,dy)=(h-1-dy,dx)）。
+ */
 export function terminalPos(comp, terminalName) {
   const def = getPart(comp.type);
   if (!def) return null;
   const terminal = def.terminals.find((item) => item.name === terminalName);
   if (!terminal) return null;
-  if (comp.rotation === 90) {
-    return { x: comp.x + (def.size.h - 1 - terminal.dy), y: comp.y + terminal.dx };
-  }
-  return { x: comp.x + terminal.dx, y: comp.y + terminal.dy };
+  const { dx, dy } = terminal;
+  const { w, h } = def.size;
+  const r = comp.rotation || 0;
+  let lx = dx;
+  let ly = dy;
+  if (r === 90) { lx = h - 1 - dy; ly = dx; }
+  else if (r === 270) { lx = dy; ly = w - 1 - dx; }
+  else if (r === 180) { lx = w - 1 - dx; ly = h - 1 - dy; }
+  return { x: comp.x + lx, y: comp.y + ly };
 }
 
 /** 元件全部端子的网格坐标 */

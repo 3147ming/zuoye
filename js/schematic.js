@@ -65,7 +65,7 @@ function occupiedBoxes(layout) {
   layout.forEach((entry, id) => {
     const comp = state.components.find((item) => item.id === id);
     if (!comp) return;
-    const size = symSize(comp.type, comp.rotation === 90 ? 90 : 0);
+    const size = symSize(comp.type, comp.rotation || 0);
     boxes.push({ x: entry.sx, y: entry.sy, w: size.w, h: size.h + 1.6 });
   });
   return boxes;
@@ -115,14 +115,14 @@ function syncLayout() {
     if (schematic.layout.has(comp.id)) {
       // 旋转跟随 model：布局表的 rot 是 model.rotation 的镜像
       const entry = schematic.layout.get(comp.id);
-      entry.rot = comp.rotation === 90 ? 90 : 0;
+      entry.rot = comp.rotation || 0;
       return;
     }
     const slot = findSlot(comp.type, schematic.layout);
     schematic.layout.set(comp.id, {
       sx: slot ? slot.sx : 0,
       sy: slot ? slot.sy : 0,
-      rot: comp.rotation === 90 ? 90 : 0,
+      rot: comp.rotation || 0,
     });
   });
 }
@@ -142,7 +142,7 @@ function contentExtent() {
   schematic.layout.forEach((entry, id) => {
     const comp = state.components.find((item) => item.id === id);
     if (!comp) return;
-    const size = symSize(comp.type, comp.rotation === 90 ? 90 : 0);
+    const size = symSize(comp.type, comp.rotation || 0);
     maxX = Math.max(maxX, entry.sx + size.w);
     maxY = Math.max(maxY, entry.sy + size.h + 1.6);
   });

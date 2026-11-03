@@ -475,8 +475,20 @@ export const SYMBOLS = {
   },
 };
 
-/** 90° 旋转后引脚所在的边 */
+/** 90° 旋转后引脚所在的边（保留，便于单步推导） */
 const SIDE_ROTATED = { left: 'top', top: 'right', right: 'bottom', bottom: 'left' };
+
+/** 引脚边的顺时针递进链 */
+const SIDE_NEXT = { left: 'top', top: 'right', right: 'bottom', bottom: 'left' };
+
+/** 把引脚边按旋转档位（0/90/180/270）顺时针递进，得到旋转后的边 */
+function rotateSide(side, rotation) {
+  if (!side) return side;
+  let s = side;
+  const steps = (((rotation / 90) % 4) + 4) % 4;
+  for (let i = 0; i < steps; i += 1) s = SIDE_NEXT[s] || s;
+  return s;
+}
 
 /* ==========================================================================
    工程单位格式化（与 parts.js 的 factor 约定一致：存储用基本单位）
@@ -540,23 +552,30 @@ export function registerSymbol(type, def) {
   return true;
 }
 
-/** 符号占位（旋转 90° 交换宽高） */
+/** 符号占位（90° / 270° 交换宽高；0° / 180° 不变） */
 export function symSize(type, rotation = 0) {
   const sym = getSymbol(type);
   if (!sym) return { w: 3, h: 2 };
-  return rotation === 90
-    ? { w: sym.size.h, h: sym.size.w }
-    : { w: sym.size.w, h: sym.size.h };
+  const { w, h } = sym.size;
+  if (rotation === 90 || rotation === 270) return { w: h, h: w };
+  return { w, h };
 }
 
 /**
- * 引脚在符号局部坐标中的位置（已含旋转）。
- * 顺时针 90°：(dx, dy) → (h - dy, dx)
+ * 引脚在符号局部坐标中的位置（已含四向旋转）。
+ * 统一绕符号中心旋转：
+ *   90° 顺时针 → (h - dy, dx)
+ *   180°      → (w - dx, h - dy)
+ *   270°      → (dy, w - dx)
  */
 export function pinPos(sym, pin, rotation = 0) {
   if (!sym || !pin) return null;
-  if (rotation === 90) return { x: sym.size.h - pin.dy, y: pin.dx };
-  return { x: pin.dx, y: pin.dy };
+  const { dx, dy } = pin;
+  const { w, h } = sym.size;
+  if (rotation === 90) return { x: h - dy, y: dx };
+  if (rotation === 270) return { x: dy, y: w - dx };
+  if (rotation === 180) return { x: w - dx, y: h - dy };
+  return { x: dx, y: dy };
 }
 
 /** 列出某类型在给定旋转下的全部引脚（含边与角色） */
@@ -568,7 +587,7 @@ export function pinList(type, rotation = 0) {
     return {
       name: pin.name,
       role: pin.role || 'io',
-      side: rotation === 90 ? (SIDE_ROTATED[pin.side] || pin.side) : pin.side,
+      side: rotateSide(pin.side, rotation),
       x: pos.x,
       y: pos.y,
     };
@@ -615,7 +634,7 @@ export function symbolLabel(comp) {
 export function drawSymbol(ctx, comp, style) {
   const sym = getSymbol(comp.type);
   if (!sym) return;
-  const rotation = style.rotation === 90 ? 90 : 0;
+  const rotation = style.rotation || 0;
   const cell = style.cell;
 
   // 绘制函数一律按「未旋转」的局部坐标写，旋转交给画布变换。
@@ -633,11 +652,16 @@ export function drawSymbol(ctx, comp, style) {
 
   ctx.save();
   ctx.translate(style.x, style.y);
+  // 四向旋转：绕符号左上角应用与 pinPos 一致的变换（已验证引脚位置重合）
   if (rotation === 90) {
-    // 未旋转的 [0,w]×[0,h] 顺时针 90° 后落到 [0,h]×[0,w]，
-    // 先右移 h 格再旋转，恰好把矩形搬回正区域。
     ctx.translate(sym.size.h * cell, 0);
     ctx.rotate(Math.PI / 2);
+  } else if (rotation === 180) {
+    ctx.translate(sym.size.w * cell, sym.size.h * cell);
+    ctx.rotate(Math.PI);
+  } else if (rotation === 270) {
+    ctx.translate(0, sym.size.w * cell);
+    ctx.rotate(-Math.PI / 2);
   }
   sym.draw(ctx, comp, g);
   ctx.restore();
@@ -645,6 +669,6 @@ export function drawSymbol(ctx, comp, style) {
 
 /** 符号在画布上的外接矩形（用于选中框） */
 export function symbolRect(comp, x, y, cell) {
-  const size = symSize(comp.type, comp.rotation === 90 ? 90 : 0);
+  const size = symSize(comp.type, comp.rotation || 0);
   return { x, y, w: size.w * cell, h: size.h * cell };
 }

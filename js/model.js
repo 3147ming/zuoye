@@ -24,6 +24,9 @@ let state = null;
 /** 撤销快照栈 */
 let undoStack = [];
 
+/** 重做快照栈：撤销后产生新操作即清空 */
+let redoStack = [];
+
 /** 网表缓存：任何结构变更都会置空 */
 let netCache = null;
 
@@ -183,6 +186,8 @@ export function pushUndo(label = '') {
     wires: cloneWires(state.wires),
   });
   if (undoStack.length > UNDO_LIMIT) undoStack.shift();
+  // 任何新结构变更都会使"重做"失效
+  redoStack = [];
 }
 
 /** 撤销一步；无可撤销时返回 false */
@@ -190,6 +195,12 @@ export function undo() {
   if (!state) return false;
   const snapshot = undoStack.pop();
   if (!snapshot) return false;
+  // 被撤销的快照压入重做栈，供重做恢复到"操作后"状态
+  redoStack.push({
+    label: snapshot.label,
+    components: cloneComponents(state.components),
+    wires: cloneWires(state.wires),
+  });
   state.components = snapshot.components;
   state.wires = snapshot.wires;
   invalidate();
@@ -209,6 +220,30 @@ export function undoDepth() {
 /** 清空撤销栈（进入新实验时调用） */
 export function clearUndo() {
   undoStack = [];
+  redoStack = [];
+}
+
+/** 重做一步；无可重做时返回 false */
+export function redo() {
+  if (!state) return false;
+  const snapshot = redoStack.pop();
+  if (!snapshot) return false;
+  // 把"当前（操作前）状态"压回撤销栈，保证 redo 后仍能再次 undo
+  undoStack.push({
+    label: snapshot.label,
+    components: cloneComponents(state.components),
+    wires: cloneWires(state.wires),
+  });
+  if (undoStack.length > UNDO_LIMIT) undoStack.shift();
+  state.components = snapshot.components;
+  state.wires = snapshot.wires;
+  invalidate();
+  return true;
+}
+
+/** 是否还有可重做的操作 */
+export function canRedo() {
+  return redoStack.length > 0;
 }
 
 /* ==========================================================================
@@ -234,7 +269,9 @@ export function addComponent(type, x, y, options = {}) {
   const def = getPart(type);
   if (!def) return { ok: false, error: `未知元件类型：${type}` };
 
-  const rotation = options.rotation === 90 ? 90 : 0;
+  const rotation = options.rotation === 90 || options.rotation === 180 || options.rotation === 270
+    ? options.rotation
+    : 0;
   const footprint = footprintOf(def, rotation);
   const px = Math.round(Number(x));
   const py = Math.round(Number(y));
@@ -300,19 +337,20 @@ export function removeComponent(id) {
   return { ok: true, removedWires: before - state.wires.length };
 }
 
-/** 旋转选中元件 90°；占位/越界冲突时拒绝 */
+/** 旋转选中元件 90°；循环四向 0→90→180→270→0；占位/越界冲突时拒绝 */
 export function rotateComponent(id) {
   if (!state) return { ok: false, error: '电路尚未初始化' };
   const comp = findComponent(id);
   if (!comp) return { ok: false, error: '元件不存在' };
-  if (comp.rotation === 90) return { ok: false, error: '本包只支持 0° / 90° 两档旋转' };
 
   const def = getPart(comp.type);
   if (!def || def.size.w === def.size.h) {
     return { ok: false, error: '该元件为正方占位，旋转无变化' };
   }
 
-  const footprint = footprintOf(def, 90);
+  // 循环四向：0 → 90 → 180 → 270 → 0（每次 90°）
+  const next = (comp.rotation + 90) % 360;
+  const footprint = footprintOf(def, next);
   const platform = getPlatform(state.platform);
   if (
     comp.x + footprint.w > platform.cols
@@ -328,7 +366,7 @@ export function rotateComponent(id) {
   if (clash) return { ok: false, error: `旋转后会与 ${clash.id} 重叠` };
 
   pushUndo(`rotate:${id}`);
-  comp.rotation = 90;
+  comp.rotation = next;
   invalidate();
   return { ok: true, component: comp };
 }
