@@ -1882,6 +1882,162 @@ button {
   color: var(--amber);
 }
 
+/* ==========================================================================
+   波形查看器（指令包 7：示波器风格）
+   ========================================================================== */
+
+.wave-view {
+  display: grid;
+  gap: 8px;
+}
+
+.wave-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.wave-title {
+  font-family: var(--font-display);
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+
+.wave-title::before {
+  content: "";
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  margin-right: 7px;
+  border-radius: 50%;
+  background: var(--amber);
+  vertical-align: middle;
+}
+
+.wave-status {
+  flex: 1;
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  color: var(--text-faint);
+  overflow-wrap: anywhere;
+}
+
+.wave-fold {
+  border: 1px solid var(--line-soft);
+  border-radius: 6px;
+  background: var(--panel-soft);
+  color: var(--text-faint);
+  font-size: 10.5px;
+  padding: 2px 8px;
+  cursor: pointer;
+}
+
+.wave-fold:hover {
+  color: var(--text);
+}
+
+.wave-body {
+  display: grid;
+  gap: 8px;
+}
+
+.wave-canvas {
+  display: block;
+  width: 100%;
+  height: 216px;
+  border: 1px solid var(--line-soft);
+  border-radius: var(--radius-sm);
+  background: #f8f5ec;
+}
+
+.wave-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.wave-run {
+  min-height: 30px;
+  font-size: 12px;
+  padding: 0 14px;
+}
+
+.wave-run.is-running {
+  background: var(--red);
+  border-color: var(--red);
+  color: #fff;
+}
+
+.wave-clear {
+  min-height: 30px;
+  font-size: 12px;
+}
+
+.wave-field {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11px;
+  color: var(--text-faint);
+}
+
+.wave-field-label {
+  white-space: nowrap;
+}
+
+.wave-input {
+  width: 72px;
+  min-height: 28px;
+  padding: 2px 6px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--bg-deep);
+  color: var(--text);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  text-align: right;
+}
+
+.wave-field--check {
+  cursor: pointer;
+}
+
+.wave-field--check input {
+  accent-color: var(--amber);
+}
+
+.wave-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 12px;
+}
+
+.wave-legend-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--text-faint);
+  cursor: pointer;
+}
+
+.wave-legend-item input {
+  accent-color: var(--amber);
+}
+
+.wave-legend-swatch {
+  width: 10px;
+  height: 10px;
+  border-radius: 2px;
+}
+
+.wave-legend-name {
+  overflow-wrap: anywhere;
+}
+
 /* 尊重系统减弱动效偏好 */
 @media (prefers-reduced-motion: reduce) {
   *,

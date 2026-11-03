@@ -9,6 +9,8 @@ import * as P2 from '../js/parts.js';
 import * as S from '../js/solver.js';
 import * as D from '../js/devmodels.js';
 import * as SIM from '../js/simdc.js';
+import * as ST from '../js/simtrans.js';
+import * as D2 from '../js/digmodels.js';
 
 let pass = 0;
 let fail = 0;
@@ -1131,6 +1133,281 @@ function check(name, ok, detail) {
   const ms = (typeof performance !== 'undefined' ? performance.now() : Date.now()) - t0;
   check('96 个门求值成功', big.ok === true && big.units.length === 96, `${big.units.length} units`);
   check('96 个门单次 < 5ms', ms < 5, `${ms.toFixed(2)}ms`);
+}
+
+/* ==========================================================================
+   暂态仿真（指令包 7：simtrans.js）
+   ========================================================================== */
+
+/** RC 充放电用的标准电路：vs → R → C → vs(-) */
+function buildRc(mode, { vs = 5, r = 1000, c = 100e-6 } = {}) {
+  M.createCircuit('breadboard');
+  ST.resetTransientState();
+  const v = M.addComponent('vsource', 2, 2, { params: { voltage: mode === 'discharge' ? 0 : vs } });
+  const rr = M.addComponent('resistor', 6, 2, { params: { resistance: r } });
+  const cc = M.addComponent('capacitor', 10, 2, { params: { capacitance: c } });
+  M.addWire({ componentId: v.component.id, terminal: '+' }, { componentId: rr.component.id, terminal: '1' });
+  M.addWire({ componentId: rr.component.id, terminal: '2' }, { componentId: cc.component.id, terminal: '1' });
+  M.addWire({ componentId: cc.component.id, terminal: '2' }, { componentId: v.component.id, terminal: '-' });
+  return { vs: v.component.id, r: rr.component.id, c: cc.component.id };
+}
+
+/** 线性插值取 t 时刻的电压 */
+function vAt(wave, t) {
+  const s = wave.samples;
+  if (s.length === 0) return NaN;
+  if (t <= s[0].t) return s[0].v;
+  for (let i = 1; i < s.length; i += 1) {
+    if (s[i].t >= t) {
+      const a = s[i - 1];
+      const b = s[i];
+      const span = b.t - a.t;
+      return span > 0 ? a.v + ((b.v - a.v) * (t - a.t)) / span : b.v;
+    }
+  }
+  return s[s.length - 1].v;
+}
+
+/** 相对误差（%） */
+function relErr(actual, expected) {
+  return (100 * (actual - expected)) / expected;
+}
+
+{
+  // ① RC 充电三时刻（验收 2：τ/3τ/6τ 误差 < 2%）
+  const ids = buildRc('charge');
+  const res = ST.solveTransient(M, { duration: 0.6, dt: 0.01 });
+  check('暂态 RC 充电求解成功', res.ok === true && res.waveforms.length >= 2, res.error || '');
+  const capWave = res.waveforms.find((w) => {
+    const ch = res.channels.find((c2) => c2.netId === w.netId);
+    return ch && ch.max > 4.5 && ch.min < 0.5;
+  });
+  check('暂态 RC 充电识别到电容通道', Boolean(capWave), res.channels.map((c2) => c2.netId).join(','));
+  const e1 = relErr(vAt(capWave, 0.1), 5 * (1 - Math.exp(-1)));
+  const e3 = relErr(vAt(capWave, 0.3), 5 * (1 - Math.exp(-3)));
+  const e6 = relErr(vAt(capWave, 0.6), 5 * (1 - Math.exp(-6)));
+  check('RC t=τ vC≈3.16V（误差<2%）', Math.abs(e1) < 2, `v=${vAt(capWave, 0.1).toFixed(4)} err=${e1.toFixed(3)}%`);
+  check('RC t=3τ vC≈4.75V（误差<2%）', Math.abs(e3) < 2, `v=${vAt(capWave, 0.3).toFixed(4)} err=${e3.toFixed(3)}%`);
+  check('RC t=6τ vC≈4.98V（误差<2%）', Math.abs(e6) < 2, `v=${vAt(capWave, 0.6).toFixed(4)} err=${e6.toFixed(3)}%`);
+
+  // ② RC 放电（预充 5V，t=τ ≈ 1.84V）
+  const d = buildRc('discharge');
+  ST.setCapState(d.c, 5, 0);
+  const res2 = ST.solveTransient(M, { duration: 0.3, dt: 0.01, initialVc: { [d.c]: 5 } });
+  const capWave2 = res2.waveforms.find((w) => {
+    const ch = res2.channels.find((c2) => c2.netId === w.netId);
+    return ch && ch.max > 4.5;
+  });
+  const eD = relErr(vAt(capWave2, 0.1), 5 * Math.exp(-1));
+  check('RC 放电 t=τ vC≈1.84V（误差<2%）', Math.abs(eD) < 2, `v=${vAt(capWave2, 0.1).toFixed(4)} err=${eD.toFixed(3)}%`);
+
+  // ③ 纯电阻分压收敛到直流解 3.333V
+  M.createCircuit('breadboard');
+  ST.resetTransientState();
+  const v3 = M.addComponent('vsource', 2, 2, { params: { voltage: 5 } });
+  const ra = M.addComponent('resistor', 6, 2, { params: { resistance: 1000 } });
+  const rb = M.addComponent('resistor', 10, 2, { params: { resistance: 2000 } });
+  M.addWire({ componentId: v3.component.id, terminal: '+' }, { componentId: ra.component.id, terminal: '1' });
+  M.addWire({ componentId: ra.component.id, terminal: '2' }, { componentId: rb.component.id, terminal: '1' });
+  M.addWire({ componentId: rb.component.id, terminal: '2' }, { componentId: v3.component.id, terminal: '-' });
+  const res3 = ST.solveTransient(M, { duration: 0.2, dt: 0.01 });
+  const mid = res3.waveforms.find((w) => {
+    const ch = res3.channels.find((c2) => c2.netId === w.netId);
+    return ch && Math.abs(ch.max - 3.3333) < 0.05;
+  });
+  check('纯电阻暂态收敛到直流解 3.333V', Boolean(mid) && Math.abs(vAt(mid, 0.2) - 10 / 3) < 0.02,
+    mid ? vAt(mid, 0.2).toFixed(4) : '未找到中点通道');
+
+  // ④ 时钟方波 1Hz duty50
+  M.createCircuit('breadboard');
+  ST.resetTransientState();
+  const ck = M.addComponent('clock', 2, 2, { params: { frequency: 1, duty: 50 } });
+  const rl = M.addComponent('resistor', 6, 2, { params: { resistance: 1000 } });
+  M.addWire({ componentId: ck.component.id, terminal: '+' }, { componentId: rl.component.id, terminal: '1' });
+  M.addWire({ componentId: rl.component.id, terminal: '2' }, { componentId: ck.component.id, terminal: 'GND' });
+  const res4 = ST.solveTransient(M, { duration: 1, dt: 0.01 });
+  const clkWave = res4.waveforms.find((w) => {
+    const ch = res4.channels.find((c2) => c2.netId === w.netId);
+    return ch && /时钟/.test(ch.driver);
+  });
+  check('时钟通道标为时钟源', Boolean(clkWave), res4.channels.map((c2) => `${c2.netId}→${c2.driver}`).join('|'));
+  check('时钟 1Hz duty50：t=0 高 5V', Math.abs(vAt(clkWave, 0) - 5) < 1e-6, vAt(clkWave, 0));
+  check('时钟 1Hz duty50：t=0.25 高 5V', Math.abs(vAt(clkWave, 0.25) - 5) < 1e-6, vAt(clkWave, 0.25));
+  check('时钟 1Hz duty50：t=0.5 低 0V', Math.abs(vAt(clkWave, 0.5) - 0) < 1e-6, vAt(clkWave, 0.5));
+  check('时钟 1Hz duty50：t=0.75 低 0V', Math.abs(vAt(clkWave, 0.75) - 0) < 1e-6, vAt(clkWave, 0.75));
+  check('时钟周期 1s（t=1 回到高）', Math.abs(vAt(clkWave, 1) - 5) < 1e-6, vAt(clkWave, 1));
+  check('时钟翻转次数 = duration×2（2 次）', res4.stats.events === 2, String(res4.stats.events));
+
+  // ⑤ 时钟 0.25Hz duty 25 → 高 1s / 低 3s
+  M.createCircuit('breadboard');
+  ST.resetTransientState();
+  const ck2 = M.addComponent('clock', 2, 2, { params: { frequency: 0.25, duty: 25 } });
+  const rl2 = M.addComponent('resistor', 6, 2, { params: { resistance: 1000 } });
+  M.addWire({ componentId: ck2.component.id, terminal: '+' }, { componentId: rl2.component.id, terminal: '1' });
+  M.addWire({ componentId: rl2.component.id, terminal: '2' }, { componentId: ck2.component.id, terminal: 'GND' });
+  const res5 = ST.solveTransient(M, { duration: 4, dt: 0.01 });
+  const w5 = res5.waveforms.find((w) => {
+    const ch = res5.channels.find((c2) => c2.netId === w.netId);
+    return ch && /时钟/.test(ch.driver);
+  });
+  check('时钟 0.25Hz duty25：t=0.5 高', vAt(w5, 0.5) > 2.5, vAt(w5, 0.5));
+  check('时钟 0.25Hz duty25：t=1.5 低（高 1s）', vAt(w5, 1.5) < 2.5, vAt(w5, 1.5));
+  check('时钟 0.25Hz duty25：t=3.5 低（低 3s）', vAt(w5, 3.5) < 2.5, vAt(w5, 3.5));
+  check('时钟 0.25Hz duty25：t=4 回到高（周期 4s）', vAt(w5, 4) > 2.5, vAt(w5, 4));
+
+  // ⑥ 脉冲：单次触发一个正脉冲，宽度符合参数
+  M.createCircuit('breadboard');
+  ST.resetTransientState();
+  const pu = M.addComponent('pulse', 2, 2, { params: { mode: 'momentary', width: 0.1 } });
+  const rl3 = M.addComponent('resistor', 6, 2, { params: { resistance: 1000 } });
+  M.addWire({ componentId: pu.component.id, terminal: '+' }, { componentId: rl3.component.id, terminal: '1' });
+  M.addWire({ componentId: rl3.component.id, terminal: '2' }, { componentId: pu.component.id, terminal: '-' });
+  const res6 = ST.solveTransient(M, { duration: 0.5, dt: 0.005 });
+  const pw = res6.waveforms.find((w) => {
+    const ch = res6.channels.find((c2) => c2.netId === w.netId);
+    return ch && /脉冲/.test(ch.driver);
+  });
+  check('脉冲 t=0 为高', pw && vAt(pw, 0) > 2.5, pw ? vAt(pw, 0) : 'no wave');
+  check('脉冲 t=0.05 仍为高', pw && vAt(pw, 0.05) > 2.5, pw ? vAt(pw, 0.05) : '');
+  check('脉冲 t=0.2 已回低', pw && vAt(pw, 0.2) < 2.5, pw ? vAt(pw, 0.2) : '');
+  // 宽度：找唯一的下降沿时刻，应落在 width 附近（误差 ≤ 一个步长）
+  let fallT = null;
+  for (let i = 1; i < pw.samples.length; i += 1) {
+    if (pw.samples[i - 1].v > 2.5 && pw.samples[i].v <= 2.5) { fallT = pw.samples[i].t; break; }
+  }
+  check('脉冲宽度符合参数 0.1s（±一个步长）', fallT !== null && Math.abs(fallT - 0.1) <= 0.005 + 1e-9,
+    `下降沿 t=${fallT}`);
+  check('脉冲只触发一次（只有一个下降沿）',
+    pw.samples.filter((s, i) => i > 0 && pw.samples[i - 1].v > 2.5 && s.v <= 2.5).length === 1, '');
+
+  // ⑦ 门传播延迟：74LS00 一级 / 串两级
+  for (const stages of [1, 2]) {
+    M.createCircuit('breadboard');
+    ST.resetTransientState();
+    const ck3 = M.addComponent('clock', 2, 2, { params: { frequency: 1, duty: 50 } });
+    const ic = M.addComponent('ic74xx', 6, 2, { params: { type: '74LS00' } });
+    M.addWire({ componentId: ck3.component.id, terminal: '+' }, { componentId: ic.component.id, terminal: '1' });
+    M.addWire({ componentId: ck3.component.id, terminal: '+' }, { componentId: ic.component.id, terminal: '2' });
+    if (stages === 2) {
+      M.addWire({ componentId: ic.component.id, terminal: '3' }, { componentId: ic.component.id, terminal: '4' });
+      M.addWire({ componentId: ic.component.id, terminal: '3' }, { componentId: ic.component.id, terminal: '5' });
+    }
+    M.addWire({ componentId: ck3.component.id, terminal: 'GND' }, { componentId: ic.component.id, terminal: '7' });
+    const outPin = stages === 1 ? '3' : '6';
+    const load = M.addComponent('resistor', 14, 6, { params: { resistance: 1000 } });
+    M.addWire({ componentId: ic.component.id, terminal: outPin }, { componentId: load.component.id, terminal: '1' });
+    M.addWire({ componentId: load.component.id, terminal: '2' }, { componentId: ck3.component.id, terminal: 'GND' });
+    const rg = ST.solveTransient(M, { duration: 1, dt: 0.01 });
+    const unitKey = `${ic.component.id}#${stages === 1 ? 'U1' : 'U2'}`;
+    const want = 0.5 + stages * D2.TPD_GATE;
+    const hit = rg.stats.tpEvents.find((e) => e.via === unitKey && Math.abs(e.at - want) < 1e-12);
+    check(`门延迟 ${stages} 级：输出翻转 = 输入 + ${stages}×TPD`, Boolean(hit),
+      `want=${want} got=${rg.stats.tpEvents.filter((e) => e.via === unitKey).map((e) => e.at).join(',')}`);
+    // 波形层：输出翻转采样点与输入翻转采样点相差 < 2 个采样点
+    const outCh = rg.channels.find((c2) => /与非/.test(c2.driver));
+    const outW = rg.waveforms.find((w) => outCh && w.netId === outCh.netId);
+    let outFlip = null;
+    for (let i = 1; i < outW.samples.length; i += 1) {
+      if ((outW.samples[i - 1].v > 2.5) !== (outW.samples[i].v > 2.5)) { outFlip = outW.samples[i].t; break; }
+    }
+    check(`门延迟 ${stages} 级：波形翻转延迟 < 2 个采样点`, outFlip !== null && Math.abs(outFlip - 0.5) <= 2 * 0.01 + 1e-9,
+      `输出翻转采样点=${outFlip}`);
+  }
+
+  // ⑧ 采样上限抽稀（duration=100s、dt=1ms）
+  M.createCircuit('breadboard');
+  ST.resetTransientState();
+  const v8 = M.addComponent('vsource', 2, 2, { params: { voltage: 5 } });
+  const r8 = M.addComponent('resistor', 6, 2, { params: { resistance: 1000 } });
+  M.addWire({ componentId: v8.component.id, terminal: '+' }, { componentId: r8.component.id, terminal: '1' });
+  M.addWire({ componentId: r8.component.id, terminal: '2' }, { componentId: v8.component.id, terminal: '-' });
+  const res8 = ST.solveTransient(M, { duration: 100, dt: 0.001 });
+  check('抽稀：原始步数 100001', res8.stats.steps === 100001, String(res8.stats.steps));
+  check('抽稀：单通道点数 ≤ 20000', res8.stats.maxMemory <= 20000, String(res8.stats.maxMemory));
+  check('抽稀：波形首点 t=0 保留', res8.waveforms[0].samples[0].t === 0, String(res8.waveforms[0].samples[0].t));
+  check('抽稀：波形末点 t=duration 保留',
+    Math.abs(res8.waveforms[0].samples[res8.waveforms[0].samples.length - 1].t - 100) < 1e-6,
+    String(res8.waveforms[0].samples[res8.waveforms[0].samples.length - 1].t));
+
+  // ⑨ 悬空网不出通道 + 无电源电路给警告
+  M.createCircuit('breadboard');
+  ST.resetTransientState();
+  const v9 = M.addComponent('vsource', 2, 2, { params: { voltage: 5 } });
+  const r9 = M.addComponent('resistor', 6, 2, { params: { resistance: 1000 } });
+  const r9b = M.addComponent('resistor', 10, 2, { params: { resistance: 1000 } }); // 两端都悬空
+  M.addWire({ componentId: v9.component.id, terminal: '+' }, { componentId: r9.component.id, terminal: '1' });
+  M.addWire({ componentId: r9.component.id, terminal: '2' }, { componentId: v9.component.id, terminal: '-' });
+  const res9 = ST.solveTransient(M, { duration: 0.2, dt: 0.01 });
+  check('悬空网不出通道', res9.channels.length === 1, res9.channels.map((c2) => c2.netId).join(','));
+  check('悬空元件给出警告', res9.warnings.some((w2) => /未连接|跳过/.test(w2)), res9.warnings.join('|'));
+
+  M.createCircuit('breadboard');
+  ST.resetTransientState();
+  M.addComponent('resistor', 2, 2, { params: { resistance: 1000 } });
+  const res9b = ST.solveTransient(M, { duration: 0.2, dt: 0.01 });
+  check('无电源电路 ok:true + 明确警告', res9b.ok === true && res9b.warnings.length > 0, res9b.warnings.join('|'));
+
+  // ⑩ 两电容状态独立（τ1=0.1s / τ2=0.4s）
+  M.createCircuit('breadboard');
+  ST.resetTransientState();
+  const v10 = M.addComponent('vsource', 2, 2, { params: { voltage: 5 } });
+  const r10a = M.addComponent('resistor', 6, 2, { params: { resistance: 1000 } });
+  const c10a = M.addComponent('capacitor', 10, 2, { params: { capacitance: 100e-6 } });
+  const r10b = M.addComponent('resistor', 6, 5, { params: { resistance: 2000 } });
+  const c10b = M.addComponent('capacitor', 10, 5, { params: { capacitance: 200e-6 } });
+  M.addWire({ componentId: v10.component.id, terminal: '+' }, { componentId: r10a.component.id, terminal: '1' });
+  M.addWire({ componentId: r10a.component.id, terminal: '2' }, { componentId: c10a.component.id, terminal: '1' });
+  M.addWire({ componentId: v10.component.id, terminal: '+' }, { componentId: r10b.component.id, terminal: '1' });
+  M.addWire({ componentId: r10b.component.id, terminal: '2' }, { componentId: c10b.component.id, terminal: '1' });
+  M.addWire({ componentId: c10a.component.id, terminal: '2' }, { componentId: v10.component.id, terminal: '-' });
+  M.addWire({ componentId: c10b.component.id, terminal: '2' }, { componentId: v10.component.id, terminal: '-' });
+  const res10 = ST.solveTransient(M, { duration: 0.4, dt: 0.01 });
+  const w10a = res10.waveforms.find((w) => {
+    const ch = res10.channels.find((c2) => c2.netId === w.netId);
+    return ch && ch.max > 4.5 && ch.min < 0.5;   // 快支路：0 → 4.91（排除恒 5V 的电源网）
+  });
+  const w10b = res10.waveforms.find((w) => {
+    const ch = res10.channels.find((c2) => c2.netId === w.netId);
+    return ch && ch.max > 2.5 && ch.max < 4.5;   // 慢支路：0 → 3.16
+  });
+  check('两电容：快支路 t=0.1 达 3.16V', w10a && Math.abs(vAt(w10a, 0.1) - 5 * (1 - Math.exp(-1))) < 0.02,
+    w10a ? vAt(w10a, 0.1).toFixed(4) : '缺失');
+  check('两电容：慢支路 t=0.1 仅 1.11V', w10b && Math.abs(vAt(w10b, 0.1) - 5 * (1 - Math.exp(-0.25))) < 0.02,
+    w10b ? vAt(w10b, 0.1).toFixed(4) : '缺失');
+  check('两电容：状态互不串扰', ST.capStateOf(c10a.component.id).v > 4.5 && ST.capStateOf(c10b.component.id).v < 3.5,
+    JSON.stringify([ST.capStateOf(c10a.component.id).v, ST.capStateOf(c10b.component.id).v]));
+
+  // ⑪ 发散/非法电路必须 ok:false + 明确文案，不返回垃圾数值
+  M.createCircuit('breadboard');
+  ST.resetTransientState();
+  const v11 = M.addComponent('vsource', 2, 2, { params: { voltage: 5 } });
+  const c11 = M.addComponent('capacitor', 6, 2, { params: { capacitance: 100e-6 } });
+  M.addWire({ componentId: v11.component.id, terminal: '+' }, { componentId: c11.component.id, terminal: '1' });
+  M.addWire({ componentId: c11.component.id, terminal: '2' }, { componentId: v11.component.id, terminal: '-' });
+  const res11 = ST.solveTransient(M, { duration: 0.2, dt: 0.01 });
+  check('电压源直连电容 → ok:false', res11.ok === false, String(res11.ok));
+  check('发散电路给出明确文案', typeof res11.error === 'string' && res11.error.length > 0, res11.error);
+  check('发散电路不返回垃圾波形', res11.waveforms.length === 0, String(res11.waveforms.length));
+
+  // ⑫ 参数与空电路校验
+  ST.resetTransientState();
+  M.createCircuit('breadboard');
+  const emptyRes = ST.solveTransient(M, { duration: 0.1, dt: 0.01 });
+  check('空电路 → ok:false', emptyRes.ok === false, String(emptyRes.ok));
+  M.addComponent('resistor', 2, 2, { params: { resistance: 1000 } });
+  const badDt = ST.solveTransient(M, { duration: 0.1, dt: -1 });
+  check('非法步长 → ok:false', badDt.ok === false && /步长/.test(badDt.error), badDt.error);
+  const badDur = ST.solveTransient(M, { duration: 0, dt: 0.01 });
+  check('非法时长 → ok:false', badDur.ok === false && /时长/.test(badDur.error), badDur.error);
+
+  // ⑬ 电容状态进出实验清零
+  M.createCircuit('breadboard');
+  ST.resetTransientState();
+  const ids13 = buildRc('charge');
+  ST.solveTransient(M, { duration: 0.2, dt: 0.01 });
+  check('跑完后电容有状态', ST.capStateOf(ids13.c).v > 0.5, JSON.stringify(ST.capStateOf(ids13.c)));
+  ST.resetTransientState();
+  check('resetTransientState 后状态归零', ST.capStateOf(ids13.c).v === 0, JSON.stringify(ST.capStateOf(ids13.c)));
 }
 
 /* ---------------------------------------------------------------- 汇总 */

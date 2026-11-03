@@ -201,14 +201,68 @@ const capacitorModel = {
   pins: ['1', '2'],
   isNonlinear: false,
   conducts: () => false,
+  /**
+   * 暂态下电容是有记忆的导通元件（能传导电流），
+   * 供 simtrans 的接地可达性剪枝用；直流剪枝仍走 conducts()。
+   */
+  conductsTransient: () => true,
   validate() {
     return null;
   },
   stampLinear() {
     // 直流下理想电容 = 开路，不 stamp 任何东西
   },
+  /**
+   * 暂态伴随模型（梯形积分 + 首步后向欧拉启动）。
+   *
+   * 梯形格式：i[k] = (2C/dt)·(v[k] − v[k−1]) − i[k−1] = G·v[k] − I0
+   *   G = 2C/dt，I0 = G·v[k−1] + i[k−1]
+   * 首步没有可信的 i[0]，改用后向欧拉（G = C/dt、I0 = G·v[0]）起步，
+   * 之后全程梯形。选型实测见 simtrans.js 文件头注释。
+   *
+   * ctx = { dt, vPrev, iPrev, startup }
+   */
+  stampTransient(A, b, refs, params, ctx) {
+    const c = capacitanceOf(params);
+    const pair = transientCompanion(c, ctx);
+    stampConductance(A, refs.size, refs.pos, refs.neg, pair.g);
+    // 常数项等效电流源 I0 从 n 端流向 p 端（见文件头 MNA 符号约定）
+    stampRhs(b, refs.size, refs.pos, pair.i0);
+    stampRhs(b, refs.size, refs.neg, -pair.i0);
+  },
   note: () => '直流开路',
 };
+
+/** 读容值（存储单位 F；非法/缺省按 0 处理，调用方负责告警） */
+export function capacitanceOf(params) {
+  const c = Number(params && params.capacitance);
+  return Number.isFinite(c) && c > 0 ? c : 0;
+}
+
+/**
+ * 电容伴随模型系数。
+ * @param {number} c 容值（F）
+ * @param {{dt:number, vPrev:number, iPrev:number, startup?:boolean}} ctx
+ * @returns {{g:number, i0:number}}  i = g·v − i0
+ */
+export function transientCompanion(c, ctx) {
+  const dt = Number(ctx && ctx.dt);
+  const vPrev = Number(ctx && ctx.vPrev) || 0;
+  const iPrev = Number(ctx && ctx.iPrev) || 0;
+  if (!(dt > 0) || !(c > 0)) return { g: 0, i0: 0 };
+  if (ctx && ctx.startup) {
+    // 首步：后向欧拉 G = C/dt，I0 = G·vPrev（不需要 iPrev）
+    const g = c / dt;
+    return { g, i0: g * vPrev };
+  }
+  const g = (2 * c) / dt;
+  return { g, i0: g * vPrev + iPrev };
+}
+
+/** 由解出的 v 反推本步电容电流：i = g·v − i0 */
+export function transientCurrent(pair, v) {
+  return pair.g * v - pair.i0;
+}
 
 /** 理想电压源：MNA 增广一行一列，引入支路电流未知量 */
 const vsourceModel = {
@@ -312,6 +366,21 @@ export function needsBranch(type) {
 export function conductsDC(type, params) {
   const model = getModel(type);
   if (!model || model.skip || typeof model.conducts !== 'function') return false;
+  return Boolean(model.conducts(params || {}));
+}
+
+/**
+ * 暂态上是否导通（接地可达性剪枝用）。
+ * 与直流的唯一差别：电容在暂态下能传导电流（有记忆的导通元件），
+ * 于是「只靠电容接到地」的网在暂态里是可达的、会进方程。
+ */
+export function conductsTransient(type, params) {
+  const model = getModel(type);
+  if (!model || model.skip) return false;
+  if (typeof model.conductsTransient === 'function') {
+    return Boolean(model.conductsTransient(params || {}));
+  }
+  if (typeof model.conducts !== 'function') return false;
   return Boolean(model.conducts(params || {}));
 }
 

@@ -21,6 +21,7 @@ import {
   isBoardActive,
   stepClockNow,
 } from './board.js';
+import { createWaveView } from './waveview.js';
 
 /** 允许切换的视图 id 白名单 */
 const VIEW_IDS = ['view-list', 'view-workspace', 'view-report'];
@@ -33,6 +34,9 @@ let currentExperimentId = null;
 
 /** 当前画布视图（进实验时重置为实验台） */
 let boardViewMode = 'bench';
+
+/** 波形查看器句柄（指令包 7）：进实验创建、离开实验销毁 */
+let waveView = null;
 
 /** 当前平台 id（由 board 回调同步，用于切回实验台时恢复标签） */
 let currentPlatformId = 'exp-box';
@@ -143,6 +147,68 @@ function switchBoardView(mode) {
   if (mode === 'schematic') relayoutSchematicView();
   else relayoutBoard();
   return true;
+}
+
+/* ==========================================================================
+   暂态波形查看器接线（指令包 7.5）
+   ========================================================================== */
+
+/**
+ * 创建波形查看器并接上 __labBoard.simtrans。
+ * 运行/暂停是同一个按钮：在跑就停（波形冻结），没跑就开跑；
+ * 清空同时清结果与电容状态（断电重上，同包 6 resetDigState 语义）。
+ */
+function wireWaveView() {
+  const host = document.getElementById('wave-panel');
+  if (!host) return;
+  if (waveView) waveView.destroy();
+  waveView = createWaveView(host, {
+    onRun: () => {
+      const api = window.__labBoard && window.__labBoard.simtrans;
+      if (!api || !waveView) return;
+      if (api.running()) {
+        api.stop();
+        return;
+      }
+      const opts = waveView.options();
+      waveView.setRunning(true, '计算中…');
+      const handle = api.start(opts, {
+        onProgress: (done, total) => waveView && waveView.setProgress(done, total),
+        onChunk: (merged) => waveView && waveView.render(merged),
+        onDone: (merged, cancelled) => {
+          if (!waveView) return;
+          waveView.render(merged);
+          waveView.setRunning(false, cancelled ? '已暂停' : '完成');
+        },
+        onError: (part) => {
+          if (!waveView) return;
+          waveView.setRunning(false, `失败：${(part && part.error) || '未知错误'}`);
+        },
+      });
+      if (!handle || handle.ok === false) {
+        waveView.setRunning(false, `失败：${(handle && handle.error) || '无法启动'}`);
+      }
+    },
+    onClear: () => {
+      const api = window.__labBoard && window.__labBoard.simtrans;
+      if (api) api.reset();
+      if (waveView) {
+        waveView.clear();
+        waveView.setRunning(false, '未运行');
+      }
+    },
+    onOptions: () => {
+      // 控件值由 waveView.options() 在运行时读取，这里只留钩子
+    },
+  });
+}
+
+/** 离开实验：销毁波形查看器 */
+function destroyWaveView() {
+  if (waveView) {
+    waveView.destroy();
+    waveView = null;
+  }
 }
 
 /* ==========================================================================
@@ -363,10 +429,14 @@ function openExperiment(expId) {
 
   // 进入实验就先算一次直流工作点：恢复出来的电路也能立刻看到读数
   simulateNow('init');
+
+  // 波形查看器（指令包 7）：进实验时挂上，用户点「运行」才跑暂态
+  wireWaveView();
 }
 
 /** 离开工作区：先清理实验台（含落盘与原理图），再切回列表 */
 function leaveWorkspace() {
+  destroyWaveView();
   destroyBoard();
   currentExperimentId = null;
   setContPlacePressed(false);

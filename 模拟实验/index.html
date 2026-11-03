@@ -129,6 +129,8 @@
               <div class="sim-panel" id="sim-panel" aria-live="polite"></div>
               <!-- 数字逻辑状态 + 时钟/脉冲控制条：同样由 board.js 填充 -->
               <div class="sim-panel" id="dig-panel" aria-live="polite"></div>
+              <!-- 暂态波形查看器（指令包 7）：由 waveview.js 渲染，app.js 接线 -->
+              <div class="sim-panel" id="wave-panel" aria-live="polite"></div>
             </div>
             <div class="tab-panel" id="panel-steps" role="tabpanel" aria-labelledby="tab-steps" data-panel="steps">
               <p class="placeholder">实验步骤（待后续指令包）</p>
