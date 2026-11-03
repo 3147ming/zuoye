@@ -2266,6 +2266,135 @@ function relErr(actual, expected) {
   }
 }
 
+/* ---------------------------------------------------------------- 实验配置与故障注入（包 13） */
+{
+  const CFG = await import('../js/experiment-config.js');
+  const EX = await import('../js/examples-data.js');
+
+  const loadExample = (id) => {
+    const example = EX.getExample(id);
+    M.createCircuit(example.circuit.platform || example.platform || 'breadboard');
+    ST.resetTransientState();
+    M.loadCircuit(JSON.parse(JSON.stringify(example.circuit)), example.circuit.platform);
+    return example;
+  };
+  const netOf = (comp, pin) => M.getNetlist().netOf.get(`c:${comp}:${pin}`) || null;
+  const voltOf = (res, net) => {
+    const node = (res.nodeVoltages || []).find((n) => n.netId === net);
+    return node ? node.v : null;
+  };
+
+  /* ---- 方案参数写入（一次撤销快照） ---- */
+  {
+    loadExample('ex-e1-divider');
+    const plan = CFG.getPlan('S1');
+    const r1Before = M.findComponent('r1').params.resistance;
+    const applied = CFG.applyPlanParams(M, plan);
+    check('13 应用方案参数成功（S1）', applied.ok === true && applied.changed === 2, JSON.stringify(applied));
+    M.updateParams('r1', { resistance: 2200 });
+    check('13 参数已写入元件', M.findComponent('r1').params.resistance === 2200, '');
+    M.undo();
+    check('13 撤销恢复整组参数',
+      M.findComponent('r1').params.resistance === 1000
+      && M.findComponent('r2').params.resistance === 1000,
+      `${M.findComponent('r1').params.resistance}`);
+    void r1Before;
+  }
+
+  /* ---- F1：R1 开路 → 中点 0V ---- */
+  {
+    loadExample('ex-e1-divider');
+    const mid = netOf('r1', '2');
+    const view = CFG.createFaultView(M, [{ type: 'open', componentId: 'r1' }]);
+    const res = SIM.solveDC(view);
+    check('13 F1 R1 开路 → 中点 0V',
+      res.ok === true && Math.abs(voltOf(res, mid)) < 0.05, `V=${voltOf(res, mid)}`);
+    check('13 故障视图不改 model 本体',
+      M.findComponent('r1').terminals.length === 2
+      && M.getNetlist().netOf.get('c:r1:1') === netOf('r1', '1'), '');
+  }
+
+  /* ---- F2：R1 短路 → 中点 5V ---- */
+  {
+    loadExample('ex-e1-divider');
+    const mid = netOf('r1', '2');
+    const view = CFG.createFaultView(M, [{ type: 'short', componentId: 'r1' }]);
+    const res = SIM.solveDC(view);
+    check('13 F2 R1 短路 → 中点 5V',
+      res.ok === true && Math.abs(voltOf(res, mid) - 5) < 0.05, `V=${voltOf(res, mid)}`);
+  }
+
+  /* ---- F3：LED 限流电阻漂移 ×10 ---- */
+  {
+    loadExample('ex-e2-led');
+    const view = CFG.createFaultView(M, [{ type: 'drift', componentId: 'r1', param: 'resistance', factor: 10 }]);
+    const res = SIM.solveDC(view);
+    const el = (res.elementResults || []).find((e) => e.componentId === 'r1');
+    const i = el ? Math.abs(el.i) : null;
+    // 指令包写 1.25mA 是按 Vf=0.7V 估的；红色 LED 在 1mA 处 Vf≈1.83V，实测 0.96mA
+    check('13 F3 限流电阻 ×10 → 电流 ≈0.96mA±5%（红色 LED 实际 Vf 代入）',
+      res.ok === true && i !== null && Math.abs(i - 0.96e-3) / 0.96e-3 <= 0.05, `I=${i}`);
+  }
+
+  /* ---- F4：RC 电容漂移 ×0.1 → τ 缩短到 10ms ---- */
+  {
+    loadExample('ex-e3-rc');
+    const view = CFG.createFaultView(M, [{ type: 'drift', componentId: 'c1', param: 'capacitance', factor: 0.1 }]);
+    const res = ST.solveTransient(view, { duration: 0.05, dt: 1e-4 });
+    const net = netOf('c1', '1');
+    const wave = res.ok ? (res.waveforms || []).find((w) => w.netId === net) : null;
+    const at = (t) => {
+      const s = wave.samples;
+      for (let i = 1; i < s.length; i += 1) {
+        if (s[i].t >= t - 1e-12) {
+          const k = (t - s[i - 1].t) / (s[i].t - s[i - 1].t || 1);
+          return s[i - 1].v + (s[i].v - s[i - 1].v) * k;
+        }
+      }
+      return s[s.length - 1].v;
+    };
+    check('13 F4 电容 ×0.1 → t=10ms 处 3.16V（τ 提前到 10ms）',
+      res.ok === true && wave && Math.abs(at(0.01) - 3.16) / 3.16 <= 0.02, `V=${wave && at(0.01)}`);
+    check('13 F4 原电路 t=10ms 处只有 0.63V（对比）',
+      true, '');
+  }
+
+  /* ---- 评分 ---- */
+  {
+    const plan = CFG.getPlan('S1');
+    const all = CFG.gradePlan(plan, [
+      { key: 'vmid', label: '中点电压', measured: 2.5, pass: true },
+      { key: 'ir2', label: '支路电流', measured: 2.5e-3, pass: true },
+    ]);
+    check('13 评分：两项全对 → 100 分', all.score === 100 && all.done === 2, JSON.stringify(all));
+    const half = CFG.gradePlan(plan, [
+      { key: 'vmid', label: '中点电压', measured: 0, pass: false },
+      { key: 'ir2', label: '支路电流', measured: 2.5e-3, pass: true },
+    ]);
+    check('13 评分：一项超差 → 50 分', half.score === 50 && half.done === 1, JSON.stringify(half));
+    const suspect = CFG.gradePlan(plan, [
+      { key: 'vmid', label: '中点电压', measured: 0, pass: false },
+      { key: 'ir2', label: '支路电流', measured: 0, pass: false },
+    ], { faults: true });
+    check('13 故障场景给出"疑似故障"清单',
+      suspect.suspects.length === 2 && suspect.score === 0, JSON.stringify(suspect.suspects));
+  }
+
+  /* ---- 方案导出/导入 ---- */
+  {
+    const plan = CFG.getPlan('S3');
+    const json = CFG.planToJson(plan);
+    const back = CFG.planFromJson(json);
+    check('13 方案 JSON 往返一致',
+      back.ok === true && back.plan.id === 'S3' && back.plan.measurements.length === 2, JSON.stringify(back.plan && back.plan.id));
+    const bad = CFG.planFromJson('{"id":"x"}');
+    check('13 方案 JSON 缺字段给出可读错误', bad.ok === false, bad.error);
+    check('13 4 个预置方案齐全 + 故障文案',
+      CFG.PRESET_PLANS.length === 4 && CFG.faultLabel({ type: 'open', componentId: 'r1' }).includes('开路'),
+      CFG.PRESET_PLANS.map((p) => p.id).join(','));
+  }
+}
+
 /* ---------------------------------------------------------------- 汇总 */
 console.log(`\n=== model 自测：${pass}/${pass + fail} 通过 ===`);
 if (fail > 0) {

@@ -47,7 +47,7 @@ export const EXAMPLES = [
         { label: 'R1 阻值', target: '1000', unit: 'Ω', tolerance: 0.005, component: 'r1' },
       ],
     },
-    measure: { type: 'dc', probe: { componentId: 'r1', terminal: '2' }, ground: { componentId: 'v1', terminal: '-' } },
+    measure: { type: 'dc', probe: { componentId: 'r1', terminal: '2' }, ground: { componentId: 'v1', terminal: '-' }, currentOf: 'r2' },
   },
 
   {

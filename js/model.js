@@ -375,6 +375,30 @@ export function rotateComponent(id) {
   return { ok: true, component: comp };
 }
 
+/**
+ * 批量写参数：一次撤销快照（包 13 的"应用方案"用）。
+ * 只写 params 的 patch，不碰端子/占位/模型常数。
+ * @param {Array<{id:string, patch:object}>} updates
+ */
+export function applyParamGroup(updates, label = 'params') {
+  if (!state || !Array.isArray(updates) || updates.length === 0) {
+    return { ok: false, changed: 0, error: '没有可应用的参数' };
+  }
+  const targets = [];
+  updates.forEach(({ id, patch }) => {
+    const comp = findComponent(id);
+    if (!comp || !patch || typeof patch !== 'object') return;
+    targets.push({ comp, patch });
+  });
+  if (targets.length === 0) return { ok: false, changed: 0, error: '元件不存在' };
+  pushUndo(label);
+  targets.forEach(({ comp, patch }) => {
+    Object.assign(comp.params, patch);
+  });
+  invalidate();
+  return { ok: true, changed: targets.length };
+}
+
 /** 修改元件参数（合并式）；无变化时不写撤销栈 */
 export function updateParams(id, patch) {
   if (!state) return { ok: false, error: '电路尚未初始化' };

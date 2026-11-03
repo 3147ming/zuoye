@@ -29,6 +29,13 @@ import { migrateArchive } from './datastore.js';
 import { EXAMPLES, getExample, cloneExample } from './examples-data.js';
 import { measureExample, circuitSummary } from './examples-measure.js';
 import { buildReportHtml } from './report.js';
+import {
+  PRESET_PLANS,
+  applyPlanParams,
+  measurePlan,
+  gradePlan,
+  faultLabel,
+} from './experiment-config.js';
 import { setInstrumentProvider, setInstrumentRestorer } from './model.js';
 import { getPart } from './parts.js';
 
@@ -427,6 +434,119 @@ function renderGuide(example) {
   reportBtn.addEventListener('click', () => generateExampleReport(example, obs.value));
   actions.append(reportBtn);
   body.append(actions);
+
+  renderConfigBlock(body, example);
+}
+
+/**
+ * 实验配置块（包 13）：方案应用 / 故障注入 / 评分。
+ * 方案与故障都是"电路外元数据"：方案写 params（可撤销），故障是求解前的临时变换。
+ */
+function renderConfigBlock(host, example) {
+  const plans = PRESET_PLANS.filter((plan) => plan.exampleId === example.id);
+  if (plans.length === 0) return;
+
+  const title = document.createElement('p');
+  title.className = 'inst-hint';
+  title.textContent = '实验配置（老师可布置方案/故障）';
+  host.append(title);
+
+  const planRow = document.createElement('div');
+  planRow.className = 'inst-row';
+  const planSel = document.createElement('select');
+  planSel.className = 'inst-input';
+  plans.forEach((plan) => {
+    const opt = document.createElement('option');
+    opt.value = plan.id;
+    opt.textContent = plan.title;
+    planSel.append(opt);
+  });
+  const applyBtn = document.createElement('button');
+  applyBtn.type = 'button';
+  applyBtn.className = 'btn btn-ghost inst-btn';
+  applyBtn.textContent = '应用方案';
+  applyBtn.addEventListener('click', () => {
+    const plan = plans.find((p) => p.id === planSel.value);
+    const board = window.__labBoard;
+    if (!plan || !board) return;
+    const res = applyPlanParams(board.model, plan);
+    if (!res.ok) {
+      showToast(res.error || '应用失败', 'error');
+      return;
+    }
+    simulateNow('apply-plan');
+    showToast(`已应用 ${plan.title}（可撤销）`, 'success');
+  });
+  planRow.append(planSel, applyBtn);
+  host.append(planRow);
+
+  const comps = () => (window.__labBoard ? window.__labBoard.model.getState().components : []);
+  const faultRow = document.createElement('div');
+  faultRow.className = 'inst-row';
+  const compSel = document.createElement('select');
+  compSel.className = 'inst-input';
+  comps().forEach((comp) => {
+    const opt = document.createElement('option');
+    opt.value = comp.id;
+    opt.textContent = comp.id;
+    compSel.append(opt);
+  });
+  faultRow.append(compSel);
+  host.append(faultRow);
+
+  const faultActions = document.createElement('div');
+  faultActions.className = 'inst-actions';
+  const addFault = (fault) => {
+    const board = window.__labBoard;
+    if (!board) return;
+    const list = board.faults().concat([fault]);
+    board.setFaults(list);
+    showToast(`已注入：${faultLabel(fault)}`, 'success');
+  };
+  const mk = (label, make) => {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'btn btn-ghost inst-btn';
+    btn.textContent = label;
+    btn.addEventListener('click', () => addFault(make(compSel.value)));
+    return btn;
+  };
+  faultActions.append(
+    mk('开路', (id) => ({ type: 'open', componentId: id })),
+    mk('短路', (id) => ({ type: 'short', componentId: id })),
+    mk('漂移 ×10', (id) => ({ type: 'drift', componentId: id, param: 'resistance', factor: 10 })),
+  );
+  const clearBtn = document.createElement('button');
+  clearBtn.type = 'button';
+  clearBtn.className = 'btn btn-ghost inst-btn';
+  clearBtn.textContent = '清除故障';
+  clearBtn.addEventListener('click', () => {
+    if (window.__labBoard) window.__labBoard.setFaults([]);
+    scoreBox.textContent = '';
+    showToast('故障已清除', 'info');
+  });
+  faultActions.append(clearBtn);
+  host.append(faultActions);
+
+  const scoreActions = document.createElement('div');
+  scoreActions.className = 'inst-actions';
+  const scoreBtn = document.createElement('button');
+  scoreBtn.type = 'button';
+  scoreBtn.className = 'btn btn-ghost inst-btn';
+  scoreBtn.textContent = '评分';
+  const scoreBox = document.createElement('p');
+  scoreBox.className = 'inst-measure-line';
+  scoreBtn.addEventListener('click', () => {
+    const board = window.__labBoard;
+    if (!board) return;
+    const plan = plans.find((p) => p.id === planSel.value);
+    const measured = measurePlan(board.simModel(), plan);
+    const graded = gradePlan(plan, measured.items, { faults: board.faults().length > 0 });
+    scoreBox.textContent = `得分 ${graded.score}（${graded.done}/${graded.total}）`
+      + (graded.suspects.length > 0 ? ` · 疑似故障：${graded.suspects.join('、')}` : '');
+  });
+  scoreActions.append(scoreBtn);
+  host.append(scoreActions, scoreBox);
 }
 
 /** 生成并下载单文件 HTML 报告（数据冻结在点击这一刻） */
@@ -521,6 +641,27 @@ function wireDataPanel() {
   });
   window.__labBoard = window.__labBoard || {};
   window.__labBoard.data = dataPanel;
+  window.__labBoard.config = {
+    plans: PRESET_PLANS,
+    apply: (id) => {
+      const plan = PRESET_PLANS.find((p) => p.id === id);
+      if (!plan || !window.__labBoard) return { ok: false };
+      const res = applyPlanParams(window.__labBoard.model, plan);
+      simulateNow('apply-plan');
+      return res;
+    },
+    measure: (id) => {
+      const plan = PRESET_PLANS.find((p) => p.id === id);
+      return window.__labBoard ? measurePlan(window.__labBoard.simModel(), plan) : { ok: false };
+    },
+    grade: (id) => {
+      const plan = PRESET_PLANS.find((p) => p.id === id);
+      const measured = window.__labBoard ? measurePlan(window.__labBoard.simModel(), plan) : { items: [] };
+      return gradePlan(plan, measured.items, { faults: window.__labBoard.faults().length > 0 });
+    },
+    setFaults: (list) => (window.__labBoard ? window.__labBoard.setFaults(list) : 0),
+    faults: () => (window.__labBoard ? window.__labBoard.faults() : []),
+  };
 }
 
 /** 离开实验：销毁数据面板 */

@@ -58,6 +58,7 @@ import {
   runTransient,
   resetTransientState,
 } from './simtrans.js';
+import { createFaultView } from './experiment-config.js';
 import {
   collectMix,
   mixStateSnapshot,
@@ -321,6 +322,15 @@ function relayout() {
   const changed = layoutView(board.view, board.scene.platform, cssWidth, cssHeight, { pad: 26 });
   if (changed) invalidatePlatformLayer();
   requestRender();
+}
+
+/**
+ * 求解用的模型门面（包 13）：有故障时套一层只读视图。
+ * 放在模块级是因为 simulateNow / __labBoard.simtrans 都在 initBoard 之外。
+ */
+function simModel() {
+  if (!board || !board.faults || board.faults.length === 0) return model;
+  return createFaultView(model, board.faults);
 }
 
 /* ==========================================================================
@@ -682,7 +692,7 @@ export function simulateNow(reason = 'manual') {
   const started = performance.now();
   let coupled;
   try {
-    coupled = solveCoupled(model);
+    coupled = solveCoupled(simModel());
   } catch (err) {
     // 引擎自身的意外不能把整个应用带走：降级成一条错误结果，画布仍可编辑
     const message = err && err.message ? err.message : String(err);
@@ -1419,6 +1429,8 @@ export function initBoard(options) {
 
   // 暂态运行态（分帧运行中 / 最近一次结果）
   board.transientRun = { active: false, handle: null, last: null };
+  // 故障注入（包 13）：求解前临时变换，不改 model 本体
+  board.faults = [];
 
   board.interaction = createInteraction({
     canvas,
@@ -1604,6 +1616,14 @@ export function initBoard(options) {
         return comp.params.state;
       },
     },
+    // 故障注入（指令包 13）：探针/配置面板设置
+    simModel: () => simModel(),
+    setFaults: (list) => {
+      board.faults = Array.isArray(list) ? list.filter((f) => f && f.componentId) : [];
+      simulateNow('faults');
+      return board.faults.length;
+    },
+    faults: () => board.faults.slice(),
     // 混合信号边界层（指令包 8）：供探针读取边界状态 / 环路 / 阈值
     simmix: {
       state: () => mixStateSnapshot(),
@@ -1635,7 +1655,7 @@ export function initBoard(options) {
       // 同步跑完返回结果（测试/一次性求解用）
       // 同步求解并记住结果：示波器/逻辑分析仪读的就是"最近一次"
       solve: (opts) => {
-        const res = solveTransient(model, opts || {});
+        const res = solveTransient(simModel(), opts || {});
         board.transientRun.last = res;
         return res;
       },
@@ -1645,7 +1665,7 @@ export function initBoard(options) {
       start: (opts, hooks) => {
         if (board.transientRun.active) return { ok: false, error: '暂态仿真正在运行中', stop: () => {} };
         board.transientRun.active = true;
-        const handle = runTransient(model, opts || {}, {
+        const handle = runTransient(simModel(), opts || {}, {
           onProgress: (done, total) => {
             if (hooks && typeof hooks.onProgress === 'function') hooks.onProgress(done, total);
           },
