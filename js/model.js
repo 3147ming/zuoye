@@ -13,6 +13,7 @@
  */
 
 import { getPart, footprintOf, terminalPos } from './parts.js';
+import { resetRelayState } from './devmodels.js';
 import { getPlatform, getNode, isPlatformId } from './platforms.js';
 
 /** 撤销栈上限：超过后丢弃最早快照 */
@@ -119,6 +120,8 @@ export function createCircuit(platformId = 'exp-box') {
   undoStack = [];
   netCache = null;
   counters = { comp: new Map(), wire: 0 };
+  // 机电元件的吸合状态是"上电态"，新电路必须清掉（否则 id 复用会串台）
+  resetRelayState();
   return state;
 }
 

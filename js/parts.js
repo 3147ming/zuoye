@@ -139,7 +139,9 @@ function drawResistor(ctx, comp, style) {
 /** LED：半透明灯珠 + 底座 */
 function drawLed(ctx, comp, style) {
   const { frame, pinLabels } = style;
-  const palette = { red: '#e2685f', green: '#5fd39a', yellow: '#f2c94c' };
+  const palette = {
+    red: '#e2685f', green: '#5fd39a', yellow: '#f2c94c', blue: '#6fa8f2',
+  };
   const color = palette[comp.params.color] || palette.red;
 
   drawContactShadow(ctx, frame, 0.15, 0.12, frame.w - 0.15, frame.h - 0.12);
@@ -594,6 +596,258 @@ function drawAdc8(ctx, comp, style) {
   drawWideChip(ctx, style, 'ADC8', 'rgba(127, 214, 194, 0.9)', 'IN');
 }
 
+/* ==========================================================================
+   指令包 9：分立元件外观
+   ========================================================================== */
+
+/** 二极管/稳压管：小圆柱 + 色环（稳压管多一道折线标记） */
+function drawDiodeBody(ctx, comp, style, zener) {
+  const { frame, pinLabels } = style;
+  drawContactShadow(ctx, frame, 0.18, 0.14, frame.w - 0.18, frame.h - 0.14);
+  prism(ctx, frame, 0.42, 0.16, frame.w - 0.42, frame.h - 0.16, 6, '#2f3542', '#1c212b', '#151a22', 'rgba(0,0,0,0.5)');
+
+  const mid = frame.w / 2;
+  const band0 = lift(frame.project(mid - 0.12, 0.16), 6);
+  const band1 = lift(frame.project(mid - 0.12, frame.h - 0.16), 6);
+  ctx.beginPath();
+  ctx.moveTo(band0.x, band0.y);
+  ctx.lineTo(band1.x, band1.y);
+  ctx.strokeStyle = zener ? '#f2a93b' : '#cfd6e6';
+  ctx.lineWidth = 2.2;
+  ctx.stroke();
+
+  if (zener) {
+    // 稳压管：色环上加两道小折线（Z 形）
+    const z0 = lift(frame.project(mid + 0.16, 0.2), 6);
+    const z1 = lift(frame.project(mid + 0.16, frame.h - 0.2), 6);
+    ctx.beginPath();
+    ctx.moveTo(z0.x - 2, z0.y);
+    ctx.lineTo(z0.x + 2, z0.y + 2);
+    ctx.lineTo(z1.x - 2, z1.y - 2);
+    ctx.lineTo(z1.x + 2, z1.y);
+    ctx.strokeStyle = '#f2a93b';
+    ctx.lineWidth = 1.6;
+    ctx.stroke();
+  }
+
+  drawLead(ctx, frame.project(0, 0), frame.project(0.42, frame.h / 2 - 0.5), '#9aa0ae', 1.6);
+  drawLead(ctx, frame.project(frame.w - 1, 0), frame.project(frame.w - 0.42, frame.h / 2 - 0.5), '#9aa0ae', 1.6);
+
+  if (pinLabels) {
+    drawPinLabel(ctx, frame.project(0, 0), 'A');
+    drawPinLabel(ctx, frame.project(frame.w - 1, 0), 'K');
+  }
+}
+
+function drawDiode(ctx, comp, style) {
+  drawDiodeBody(ctx, comp, style, false);
+}
+
+function drawZener(ctx, comp, style) {
+  drawDiodeBody(ctx, comp, style, true);
+}
+
+/** 三极管：TO-92 半圆壳 + B/C/E 三根引线 */
+function drawTransistor(ctx, comp, style) {
+  const { frame, pinLabels } = style;
+  void comp;
+  drawContactShadow(ctx, frame, 0.7, 0.5, frame.w - 0.7, frame.h - 0.5);
+  const center = lift(frame.project(frame.w / 2 - 0.5, frame.h / 2 - 0.5), 4);
+  const radius = Math.max(7, Math.min(frame.tileW * 0.62, 15));
+  ctx.beginPath();
+  ctx.arc(center.x, center.y, radius, Math.PI * 0.95, Math.PI * 2.05);
+  ctx.closePath();
+  ctx.fillStyle = '#333a4a';
+  ctx.fill();
+  ctx.strokeStyle = 'rgba(0,0,0,0.5)';
+  ctx.lineWidth = 1;
+  ctx.stroke();
+
+  ['B', 'C', 'E'].forEach((name) => {
+    const pin = PARTS.transistor.terminals.find((t) => t.name === name);
+    drawLead(ctx, frame.project(pin.dx, pin.dy), center, '#c2c7d4', 1.4);
+  });
+
+  if (pinLabels) {
+    PARTS.transistor.terminals.forEach((t) => {
+      drawPinLabel(ctx, frame.project(t.dx, t.dy), t.name);
+    });
+  }
+}
+
+/** 运放：DIP-8 黑色本体 + 缺口 + 5 个引脚 */
+function drawOpamp(ctx, comp, style) {
+  const { frame, pinLabels } = style;
+  void comp;
+  drawContactShadow(ctx, frame, 0.05, 0.5, frame.w - 0.05, frame.h - 0.5);
+  prism(ctx, frame, 0.12, 0.5, frame.w - 0.12, frame.h - 0.5, 8, '#32323e', '#1e1e26', '#191920', 'rgba(0,0,0,0.55)');
+
+  const def = PARTS.opamp;
+  def.terminals.forEach((t) => {
+    const to = frame.project(t.dx, t.dy);
+    const from = frame.project(
+      t.dx === 0 ? 0.12 : (t.dx === frame.w - 1 ? frame.w - 0.12 : t.dx),
+      t.dy === 0 ? 0.5 : (t.dy === frame.h - 1 ? frame.h - 0.5 : t.dy),
+    );
+    drawLead(ctx, to, from, '#c2c7d4', 1.4);
+  });
+
+  const notch = lift(frame.project(0.5, 0.5), 8);
+  ctx.beginPath();
+  ctx.arc(notch.x, notch.y, Math.max(2.5, frame.tileW * 0.13), 0, Math.PI * 2);
+  ctx.fillStyle = '#12121a';
+  ctx.fill();
+
+  const label = lift(frame.project(frame.w / 2 - 0.5, frame.h / 2 - 0.5), 8);
+  const size = Math.max(7, Math.min(11, frame.tileW * 0.32));
+  ctx.font = `600 ${size}px "Cascadia Mono", Consolas, monospace`;
+  ctx.fillStyle = 'rgba(226, 231, 242, 0.8)';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText(String(comp.params.model || '741'), label.x, label.y);
+
+  if (pinLabels) {
+    def.terminals.forEach((t) => {
+      drawPinLabel(ctx, frame.project(t.dx, t.dy), t.name, t.name === 'V+' || t.name === 'V-');
+    });
+  }
+}
+
+/** 电感：底座 + 三个线圈弧 */
+function drawInductor(ctx, comp, style) {
+  const { frame, pinLabels } = style;
+  void comp;
+  drawContactShadow(ctx, frame, 0.2, 0.14, frame.w - 0.2, frame.h - 0.14);
+  prism(ctx, frame, 0.45, 0.16, frame.w - 0.45, frame.h - 0.16, 5, '#3a2f28', '#241d18', '#1b1612', 'rgba(0,0,0,0.5)');
+
+  const base = lift(frame.project(0.55, frame.h - 0.28), 5);
+  const radius = Math.max(3, frame.tileW * 0.2);
+  for (let i = 0; i < 3; i += 1) {
+    const p = lift(frame.project(0.85 + i * 0.48, frame.h - 0.28), 5);
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, radius, Math.PI, 0);
+    ctx.strokeStyle = '#c98b52';
+    ctx.lineWidth = 1.8;
+    ctx.stroke();
+  }
+  void base;
+
+  drawLead(ctx, frame.project(0, 0), frame.project(0.45, frame.h / 2 - 0.5), '#9aa0ae', 1.6);
+  drawLead(ctx, frame.project(frame.w - 1, 0), frame.project(frame.w - 0.45, frame.h / 2 - 0.5), '#9aa0ae', 1.6);
+
+  if (pinLabels) {
+    drawPinLabel(ctx, frame.project(0, 0), '1');
+    drawPinLabel(ctx, frame.project(frame.w - 1, 0), '2');
+  }
+}
+
+/** 蜂鸣器：圆柱壳 + 出声孔 */
+function drawBuzzer(ctx, comp, style) {
+  const { frame, pinLabels } = style;
+  void comp;
+  drawContactShadow(ctx, frame, 0.2, 0.16, frame.w - 0.2, frame.h - 0.16);
+  prism(ctx, frame, 0.3, 0.2, frame.w - 0.3, frame.h - 0.2, 9, '#2a2a34', '#1a1a22', '#141419', 'rgba(0,0,0,0.55)');
+
+  const center = lift(frame.project(frame.w / 2 - 0.5, frame.h / 2 - 0.5), 9);
+  const radius = Math.max(4, Math.min(frame.tileW * 0.34, 9));
+  ctx.beginPath();
+  ctx.arc(center.x, center.y, radius, 0, Math.PI * 2);
+  ctx.fillStyle = '#0f0f14';
+  ctx.fill();
+  for (let i = -1; i <= 1; i += 1) {
+    ctx.beginPath();
+    ctx.arc(center.x, center.y, radius * (0.35 + 0.22 * (i + 1)), 0, Math.PI * 2);
+    ctx.strokeStyle = 'rgba(180, 190, 210, 0.35)';
+    ctx.lineWidth = 0.8;
+    ctx.stroke();
+  }
+
+  if (pinLabels) {
+    drawPinLabel(ctx, frame.project(0, 0), '+');
+    drawPinLabel(ctx, frame.project(frame.w - 1, 0), '−');
+  }
+}
+
+/** 继电器：蓝色外壳 + 线圈/触点丝印 */
+function drawRelay(ctx, comp, style) {
+  const { frame, pinLabels } = style;
+  drawContactShadow(ctx, frame, 0.08, 0.14, frame.w - 0.08, frame.h - 0.14);
+  prism(ctx, frame, 0.16, 0.18, frame.w - 0.16, frame.h - 0.18, 8, '#3a5a8a', '#22385a', '#19293f', 'rgba(0,0,0,0.55)');
+
+  const def = PARTS.relay;
+  def.terminals.forEach((t) => {
+    const to = frame.project(t.dx, t.dy);
+    const from = frame.project(
+      t.dx === 0 ? 0.16 : (t.dx === frame.w - 1 ? frame.w - 0.16 : t.dx),
+      t.dy === 0 ? 0.18 : (t.dy === frame.h - 1 ? frame.h - 0.18 : t.dy),
+    );
+    drawLead(ctx, to, from, '#c2c7d4', 1.4);
+  });
+
+  const label = lift(frame.project(frame.w / 2 - 0.5, frame.h / 2 - 0.5), 8);
+  const size = Math.max(6, Math.min(9, frame.tileW * 0.26));
+  ctx.font = `600 ${size}px "Cascadia Mono", Consolas, monospace`;
+  ctx.fillStyle = 'rgba(226, 231, 242, 0.78)';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText('RELAY', label.x, label.y);
+
+  if (pinLabels) {
+    def.terminals.forEach((t) => {
+      drawPinLabel(ctx, frame.project(t.dx, t.dy), t.name);
+    });
+  }
+}
+
+/** 四位拨码：红色本体 + 4 个白色拨杆 */
+function drawDip4(ctx, comp, style) {
+  const { frame, pinLabels } = style;
+  drawContactShadow(ctx, frame, 0.1, 0.14, frame.w - 0.1, frame.h - 0.14);
+  prism(ctx, frame, 0.18, 0.2, frame.w - 0.18, frame.h - 0.2, 5, '#b8452f', '#7d2c1e', '#5d2016', 'rgba(0,0,0,0.5)');
+
+  for (let i = 0; i < 4; i += 1) {
+    const on = !comp.params || comp.params[`s${i + 1}`] !== 'off';
+    const p = lift(frame.project(0.5 + i * 2, frame.h / 2 - 0.5), 6);
+    ctx.beginPath();
+    ctx.ellipse(p.x, p.y, Math.max(2, frame.tileW * 0.12), Math.max(4, frame.tileH * 0.35), on ? -0.3 : 0.3, 0, Math.PI * 2);
+    ctx.fillStyle = '#f0ece0';
+    ctx.fill();
+  }
+
+  if (pinLabels) {
+    PARTS.dip4.terminals.forEach((t) => {
+      drawPinLabel(ctx, frame.project(t.dx, t.dy), t.name);
+    });
+  }
+}
+
+/** 电位器：方形本体 + 一字螺丝槽 */
+function drawPot(ctx, comp, style) {
+  const { frame, pinLabels } = style;
+  void comp;
+  drawContactShadow(ctx, frame, 0.14, 0.14, frame.w - 0.14, frame.h - 0.14);
+  prism(ctx, frame, 0.28, 0.22, frame.w - 0.28, frame.h - 0.22, 6, '#3d445c', '#262c3c', '#1e2331', 'rgba(0,0,0,0.5)');
+
+  const center = lift(frame.project(frame.w / 2 - 0.5, frame.h / 2 - 0.5), 6);
+  const radius = Math.max(4, Math.min(frame.tileW * 0.3, 8));
+  ctx.beginPath();
+  ctx.arc(center.x, center.y, radius, 0, Math.PI * 2);
+  ctx.fillStyle = '#b9c0ce';
+  ctx.fill();
+  ctx.beginPath();
+  ctx.moveTo(center.x - radius * 0.6, center.y);
+  ctx.lineTo(center.x + radius * 0.6, center.y);
+  ctx.strokeStyle = '#2b2f3a';
+  ctx.lineWidth = 2;
+  ctx.stroke();
+
+  if (pinLabels) {
+    PARTS.pot.terminals.forEach((t) => {
+      drawPinLabel(ctx, frame.project(t.dx, t.dy), t.name);
+    });
+  }
+}
+
 /** 电源类共用的底座：深色矮模块 + 两侧引线 */
 function drawSourceBase(ctx, style, accent) {
   const { frame } = style;
@@ -655,7 +909,7 @@ export const PARTS = {
       { name: 'A', dx: 0, dy: 0, direction: 'in' },
       { name: 'K', dx: 1, dy: 0, direction: 'out' },
     ],
-    defaultParams: { color: 'red' },
+    defaultParams: { color: 'red', model: 'ideal' },
     paramFields: [
       {
         key: 'color',
@@ -665,6 +919,21 @@ export const PARTS = {
           { value: 'red', label: '红色' },
           { value: 'green', label: '绿色' },
           { value: 'yellow', label: '黄色' },
+          { value: 'blue', label: '蓝色' },
+        ],
+      },
+      {
+        // 电学型号：默认 ideal 保持 0.7V（包 5/6 的既有断言依赖它），
+        // 选 red/green/yellow/blue 才切到真实压降（2.0/2.2/2.0/3.0V @10mA）
+        key: 'model',
+        label: '压降',
+        type: 'select',
+        options: [
+          { value: 'ideal', label: '理想 0.7V' },
+          { value: 'red', label: '红 2.0V' },
+          { value: 'green', label: '绿 2.2V' },
+          { value: 'yellow', label: '黄 2.0V' },
+          { value: 'blue', label: '蓝 3.0V' },
         ],
       },
     ],
@@ -742,7 +1011,7 @@ export const PARTS = {
       { name: '1', dx: 0, dy: 0, direction: 'bidir' },
       { name: '2', dx: 1, dy: 0, direction: 'bidir' },
     ],
-    defaultParams: { capacitance: 0.00001 },
+    defaultParams: { capacitance: 0.00001, dielectric: 'ceramic' },
     paramFields: [
       {
         key: 'capacitance',
@@ -753,6 +1022,15 @@ export const PARTS = {
         step: 0.1,
         min: 0.001,
         max: 10000,
+      },
+      {
+        key: 'dielectric',
+        label: '介质',
+        type: 'select',
+        options: [
+          { value: 'ceramic', label: '瓷片 / 薄膜' },
+          { value: 'electrolytic', label: '电解（有极性）' },
+        ],
       },
     ],
     draw: drawCapacitor,
@@ -1020,6 +1298,251 @@ export const PARTS = {
     ],
     draw: drawAdc8,
   },
+
+  /* ---- 指令包 9：分立 / 动态 / 机电元件 ---- */
+
+  diode: {
+    id: 'diode',
+    label: '二极管',
+    group: '半导体',
+    size: { w: 2, h: 1 },
+    terminals: [
+      { name: 'A', dx: 0, dy: 0, direction: 'in', role: 'anode' },
+      { name: 'K', dx: 1, dy: 0, direction: 'out', role: 'cathode' },
+    ],
+    defaultParams: { model: '1N4148' },
+    paramFields: [
+      {
+        key: 'model',
+        label: '型号',
+        type: 'select',
+        options: [
+          { value: '1N4148', label: '1N4148（0.7V / 100V）' },
+          { value: '1N4007', label: '1N4007（0.7V / 1000V）' },
+        ],
+      },
+    ],
+    draw: drawDiode,
+  },
+
+  zener: {
+    id: 'zener',
+    label: '稳压管',
+    group: '半导体',
+    size: { w: 2, h: 1 },
+    terminals: [
+      { name: 'A', dx: 0, dy: 0, direction: 'in', role: 'anode' },
+      { name: 'K', dx: 1, dy: 0, direction: 'out', role: 'cathode' },
+    ],
+    defaultParams: { vz: 5.1 },
+    paramFields: [
+      {
+        key: 'vz',
+        label: '稳压值',
+        type: 'select',
+        options: [
+          { value: 3.3, label: '3.3V' },
+          { value: 5.1, label: '5.1V' },
+          { value: 6.2, label: '6.2V' },
+          { value: 9.1, label: '9.1V' },
+        ],
+        // 存档里可能是字符串，统一成数字再比对
+        normalize: (value) => String(Number(value)),
+      },
+    ],
+    draw: drawZener,
+  },
+
+  transistor: {
+    id: 'transistor',
+    label: '三极管',
+    group: '半导体',
+    size: { w: 3, h: 3 },
+    terminals: [
+      { name: 'B', dx: 0, dy: 1, direction: 'in', role: 'base' },
+      { name: 'C', dx: 2, dy: 0, direction: 'out', role: 'collector' },
+      { name: 'E', dx: 2, dy: 2, direction: 'out', role: 'emitter' },
+    ],
+    defaultParams: { model: '2N2222', beta: 100 },
+    paramFields: [
+      {
+        key: 'model',
+        label: '型号',
+        type: 'select',
+        options: [
+          { value: '2N2222', label: '2N2222（NPN）' },
+          { value: '2N3906', label: '2N3906（PNP）' },
+        ],
+      },
+      {
+        key: 'beta',
+        label: 'β',
+        type: 'number',
+        unit: '',
+        factor: 1,
+        step: 10,
+        min: 2,
+        max: 1000,
+      },
+    ],
+    draw: drawTransistor,
+  },
+
+  opamp: {
+    id: 'opamp',
+    label: '运算放大器',
+    group: '有源器件',
+    size: { w: 7, h: 5 },
+    terminals: [
+      { name: '+', dx: 0, dy: 1, direction: 'in', role: 'in+' },
+      { name: '-', dx: 0, dy: 3, direction: 'in', role: 'in-' },
+      { name: 'OUT', dx: 6, dy: 2, direction: 'out', role: 'out' },
+      { name: 'V+', dx: 3, dy: 0, direction: 'power', role: 'VCC' },
+      { name: 'V-', dx: 3, dy: 4, direction: 'power', role: 'GND' },
+    ],
+    defaultParams: { model: 'LM741' },
+    paramFields: [
+      {
+        key: 'model',
+        label: '型号',
+        type: 'select',
+        options: [
+          { value: 'LM741', label: 'LM741（摆幅 VCC−2V）' },
+          { value: 'OP07', label: 'OP07（低失调）' },
+        ],
+      },
+    ],
+    draw: drawOpamp,
+  },
+
+  inductor: {
+    id: 'inductor',
+    label: '电感',
+    group: '无源元件',
+    size: { w: 3, h: 1 },
+    terminals: [
+      { name: '1', dx: 0, dy: 0, direction: 'bidir' },
+      { name: '2', dx: 2, dy: 0, direction: 'bidir' },
+    ],
+    defaultParams: { inductance: 0.01 },
+    paramFields: [
+      {
+        key: 'inductance',
+        label: '电感量',
+        type: 'number',
+        unit: 'mH',
+        factor: 0.001, // 存储单位 H，界面单位 mH
+        step: 1,
+        min: 0.1,
+        max: 1000,
+      },
+    ],
+    draw: drawInductor,
+  },
+
+  buzzer: {
+    id: 'buzzer',
+    label: '蜂鸣器',
+    group: '有源器件',
+    size: { w: 2, h: 2 },
+    terminals: [
+      { name: '+', dx: 0, dy: 0, direction: 'in', role: 'anode' },
+      { name: '-', dx: 1, dy: 0, direction: 'in', role: 'cathode' },
+    ],
+    defaultParams: { mode: 'active' },
+    paramFields: [
+      {
+        key: 'mode',
+        label: '类型',
+        type: 'select',
+        options: [
+          { value: 'active', label: '有源（通电即响，100Ω）' },
+          { value: 'passive', label: '无源（需方波，1kΩ）' },
+        ],
+      },
+    ],
+    draw: drawBuzzer,
+  },
+
+  relay: {
+    id: 'relay',
+    label: '继电器',
+    group: '有源器件',
+    size: { w: 5, h: 3 },
+    terminals: [
+      { name: 'COIL1', dx: 0, dy: 0, direction: 'in', role: 'coil' },
+      { name: 'COIL2', dx: 2, dy: 0, direction: 'in', role: 'coil' },
+      { name: 'COM', dx: 0, dy: 2, direction: 'bidir', role: 'com' },
+      { name: 'NO', dx: 2, dy: 2, direction: 'bidir', role: 'no' },
+      { name: 'NC', dx: 4, dy: 2, direction: 'bidir', role: 'nc' },
+    ],
+    defaultParams: {},
+    paramFields: [],
+    draw: drawRelay,
+  },
+
+  dip4: {
+    id: 'dip4',
+    label: '4 位拨码',
+    group: '数字实验箱',
+    size: { w: 8, h: 2 },
+    terminals: [
+      { name: '1A', dx: 0, dy: 0, direction: 'bidir' },
+      { name: '1B', dx: 0, dy: 1, direction: 'bidir' },
+      { name: '2A', dx: 2, dy: 0, direction: 'bidir' },
+      { name: '2B', dx: 2, dy: 1, direction: 'bidir' },
+      { name: '3A', dx: 4, dy: 0, direction: 'bidir' },
+      { name: '3B', dx: 4, dy: 1, direction: 'bidir' },
+      { name: '4A', dx: 6, dy: 0, direction: 'bidir' },
+      { name: '4B', dx: 6, dy: 1, direction: 'bidir' },
+    ],
+    defaultParams: { s1: 'on', s2: 'on', s3: 'on', s4: 'on' },
+    paramFields: [1, 2, 3, 4].map((i) => ({
+      key: `s${i}`,
+      label: `第 ${i} 位`,
+      type: 'select',
+      options: [
+        { value: 'on', label: '闭合' },
+        { value: 'off', label: '断开' },
+      ],
+    })),
+    draw: drawDip4,
+  },
+
+  pot: {
+    id: 'pot',
+    label: '电位器',
+    group: '无源元件',
+    size: { w: 4, h: 3 },
+    terminals: [
+      { name: '1', dx: 0, dy: 0, direction: 'bidir' },
+      { name: '2', dx: 3, dy: 1, direction: 'bidir', role: 'wiper' },
+      { name: '3', dx: 0, dy: 2, direction: 'bidir' },
+    ],
+    defaultParams: { resistance: 10000, wiper: 50 },
+    paramFields: [
+      {
+        key: 'resistance',
+        label: '总阻值',
+        type: 'number',
+        unit: 'kΩ',
+        factor: 1000,
+        step: 1,
+        min: 0.1,
+        max: 1000,
+      },
+      {
+        key: 'wiper',
+        label: '滑臂',
+        type: 'range',
+        unit: '%',
+        min: 0,
+        max: 100,
+        step: 1,
+      },
+    ],
+    draw: drawPot,
+  },
 };
 
 /** 元件库展示顺序 */
@@ -1038,6 +1561,15 @@ export const PART_ORDER = [
   'buffer74',
   'dac8',
   'adc8',
+  'inductor',
+  'pot',
+  'diode',
+  'zener',
+  'transistor',
+  'opamp',
+  'buzzer',
+  'relay',
+  'dip4',
 ];
 
 /** 取元件定义，未知类型返回 null */

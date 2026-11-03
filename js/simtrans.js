@@ -55,6 +55,7 @@ import {
 } from './devmodels.js';
 import {
   collectEntries,
+  entryNets,
   chooseGround,
   checkShorts,
   reachableFromGround,
@@ -117,10 +118,13 @@ const MAX_EVENTS_PER_STEP = 4096;
 
 /** compId → { v: 上一步端电压, i: 上一步电流 } */
 const capState = new Map();
+/** compId → { i: 上一步电流, v: 上一步端电压 }（指令包 9：电感） */
+const indState = new Map();
 
 /** 清空电容状态（进出实验、切换实验时调用，同 resetDigState 语义） */
 export function resetTransientState() {
   capState.clear();
+  indState.clear();
 }
 
 /** 读某个电容的当前状态（调试/测试用） */
@@ -675,6 +679,16 @@ export function solveTransient(modelApi, opts = {}) {
 
   /* ---- 主循环 ---- */
   const caps = entries.filter((entry) => entry.model.id === 'capacitor');
+  const inductors = entries.filter((entry) => entry.model.id === 'inductor');
+  const ctxOfInd = (entry) => {
+    const st = indState.get(entry.comp.id) || { i: 0, v: 0 };
+    return {
+      dt,
+      vPrev: st.v,
+      iPrev: st.i,
+      startup: false,
+    };
+  };
   const hasNonlinear = entries.some((entry) => entry.model.isNonlinear);
   let currentV = new Map(); // netId → 电压（本步解）
 
@@ -810,7 +824,7 @@ export function solveTransient(modelApi, opts = {}) {
       // 3b) 装配 + 求解
       solved = analogEmpty
         ? { ok: true, x: new Float64Array(0), iter: 0, residual: 0 }
-        : solveInstant(entries, activeDrives, nodeIndex, branchOf, n, ctxOf, hasNonlinear);
+        : solveInstant(entries, activeDrives, nodeIndex, branchOf, n, ctxOf, hasNonlinear, ctxOfInd);
       if (!solved.ok) {
         return empty({
           ok: false,
@@ -883,7 +897,16 @@ export function solveTransient(modelApi, opts = {}) {
     }
     if (mixIterations > mixIterMax) mixIterMax = mixIterations;
 
-    // 6) 电容状态更新（梯形/首步 BE）
+    // 6) 电感状态更新（梯形/首步 BE）
+    inductors.forEach((entry) => {
+      const br = branchOf.get(entry.comp.id);
+      const i = br === undefined ? 0 : solved.x[br];
+      const vp = entry.netPos === ground ? 0 : (currentV.get(entry.netPos) ?? 0);
+      const vn = entry.netNeg === ground ? 0 : (currentV.get(entry.netNeg) ?? 0);
+      indState.set(entry.comp.id, { i, v: vp - vn });
+    });
+
+    // 6b) 电容状态更新（梯形/首步 BE）
     caps.forEach((entry) => {
       const vp = entry.netPos === ground ? 0 : (currentV.get(entry.netPos) ?? 0);
       const vn = entry.netNeg === ground ? 0 : (currentV.get(entry.netNeg) ?? 0);
@@ -1081,8 +1104,7 @@ function buildIndex(entries, driveEntries, ground, reachable) {
     orderedNets.push(net);
   };
   entries.forEach((entry) => {
-    addNet(entry.netPos);
-    addNet(entry.netNeg);
+    entryNets(entry).forEach(addNet);
   });
   driveEntries.forEach((entry) => {
     addNet(entry.netPos);
@@ -1090,11 +1112,9 @@ function buildIndex(entries, driveEntries, ground, reachable) {
   });
 
   // 两端都能落下方程（节点下标或地）的驱动才真正参与装配
-  const active = entries.concat(driveEntries).filter((entry) => {
-    const okPos = entry.netPos === ground || nodeIndex.has(entry.netPos);
-    const okNeg = entry.netNeg === ground || nodeIndex.has(entry.netNeg);
-    return okPos && okNeg;
-  });
+  const active = entries.concat(driveEntries).filter((entry) => (
+    entryNets(entry).every((net) => net === ground || nodeIndex.has(net))
+  ));
   const activeDrives = active.filter((entry) => entry.isDrive);
 
   const branchOf = new Map();
@@ -1111,26 +1131,45 @@ function buildIndex(entries, driveEntries, ground, reachable) {
 }
 
 /** 单步装配 + 求解 */
-function solveInstant(entries, driveEntries, nodeIndex, branchOf, n, ctxOf, hasNonlinear) {
+function solveInstant(entries, driveEntries, nodeIndex, branchOf, n, ctxOf, hasNonlinear, ctxOfInd) {
   const A = makeMatrix(n);
   const b = makeVector(n);
 
-  const refsOf = (entry, limit) => ({
-    pos: nodeIndex.has(entry.netPos) ? nodeIndex.get(entry.netPos) : -1,
-    neg: nodeIndex.has(entry.netNeg) ? nodeIndex.get(entry.netNeg) : -1,
-    br: branchOf.has(entry.comp.id) ? branchOf.get(entry.comp.id) : -1,
-    size: n,
-    limit,
-    comp: entry.comp,
-  });
+  const refsOf = (entry, limit) => {
+    const refs = {
+      pos: nodeIndex.has(entry.netPos) ? nodeIndex.get(entry.netPos) : -1,
+      neg: nodeIndex.has(entry.netNeg) ? nodeIndex.get(entry.netNeg) : -1,
+      br: branchOf.has(entry.comp.id) ? branchOf.get(entry.comp.id) : -1,
+      size: n,
+      limit,
+      comp: entry.comp,
+    };
+    if (entry.multi) {
+      refs.idx = {};
+      refs.connected = {};
+      entry.pins.forEach((pin) => {
+        const net = entry.nets[pin];
+        refs.idx[pin] = net && nodeIndex.has(net) ? nodeIndex.get(net) : -1;
+        refs.connected[pin] = Boolean(net);
+      });
+    }
+    return refs;
+  };
 
   const stamp = (x, limit) => {
     A.fill(0);
     b.fill(0);
     entries.forEach((entry) => {
       const refs = refsOf(entry, limit);
+      if (entry.multi) {
+        const fn = entry.model.stampMulti || entry.model.stampLinear;
+        if (typeof fn === 'function') fn(A, b, refs, entry.comp.params, x);
+        return;
+      }
       if (entry.model.id === 'capacitor') {
         entry.model.stampTransient(A, b, refs, entry.comp.params, ctxOf(entry));
+      } else if (entry.model.id === 'inductor') {
+        entry.model.stampTransient(A, b, refs, entry.comp.params, ctxOfInd(entry));
       } else if (entry.model.isNonlinear && typeof entry.model.stampNR === 'function') {
         entry.model.stampNR(A, b, refs, entry.comp.params, x);
       } else {

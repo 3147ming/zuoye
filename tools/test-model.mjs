@@ -1610,6 +1610,315 @@ function relErr(actual, expected) {
   }
 }
 
+/* ---------------------------------------------------------------- 元件库完整版（包 9） */
+{
+  const reset = () => {
+    M.createCircuit('breadboard');
+    ST.resetTransientState();
+  };
+  const wire = (a, ta, b, tb) => M.addWire(
+    { componentId: a, terminal: ta },
+    { componentId: b, terminal: tb },
+  );
+  const place = (type, x, y, params) => {
+    const r = M.addComponent(type, x, y, { params });
+    if (!r.ok) throw new Error(`${type} 放置失败：${r.error}`);
+    return r.component.id;
+  };
+  const elem = (res, id) => (res.elementResults || []).find((e) => e.componentId === id) || null;
+
+  /* ---- P1 5V-1k-1N4148-GND ---- */
+  {
+    reset();
+    const vs = place('vsource', 2, 2, { voltage: 5 });
+    const r = place('resistor', 6, 2, { resistance: 1000 });
+    const d = place('diode', 10, 2, { model: '1N4148' });
+    wire(vs, '+', r, '1');
+    wire(r, '2', d, 'A');
+    wire(d, 'K', vs, '-');
+    const res = SIM.solveDC(M);
+    const e = elem(res, d);
+    check('P1 1N4148 正向 Vf=0.68~0.72V',
+      res.ok === true && e && e.v >= 0.68 && e.v <= 0.72, `Vf=${e && e.v}`);
+    check('P1 1N4148 电流 4.28~4.32mA',
+      e && Math.abs(e.i) >= 4.28e-3 && Math.abs(e.i) <= 4.32e-3, `I=${e && e.i}`);
+  }
+
+  /* ---- P2 稳压管：9V 钳位 / 5V 不击穿 ---- */
+  {
+    reset();
+    const vs = place('vsource', 2, 2, { voltage: 9 });
+    const r = place('resistor', 6, 2, { resistance: 1000 });
+    const z = place('zener', 10, 2, { vz: 5.1 });
+    wire(vs, '+', r, '1');
+    wire(r, '2', z, 'K');
+    wire(z, 'A', vs, '-');
+    const res = SIM.solveDC(M);
+    const e = elem(res, z);
+    check('P2 9V 经 1k 驱动 5.1V 稳压管 → 击穿钳位 5.1V±5%',
+      res.ok === true && e && Math.abs(e.v) >= 5.1 * 0.95 && Math.abs(e.v) <= 5.1 * 1.05,
+      `V=${e && e.v}（${e && e.note}）`);
+
+    reset();
+    const vs2 = place('vsource', 2, 2, { voltage: 5 });
+    const r2 = place('resistor', 6, 2, { resistance: 1000 });
+    const z2 = place('zener', 10, 2, { vz: 5.1 });
+    wire(vs2, '+', r2, '1');
+    wire(r2, '2', z2, 'K');
+    wire(z2, 'A', vs2, '-');
+    const res2 = SIM.solveDC(M);
+    const e2 = elem(res2, z2);
+    check('P2 5V 供电低于 5.1V → 不击穿（≈5V 且标注反向截止）',
+      res2.ok === true && e2 && Math.abs(e2.v) > 4.9 && /未击穿/.test(e2.note || ''),
+      `V=${e2 && e2.v} note=${e2 && e2.note}`);
+  }
+
+  /* ---- P3 NPN 共射（活性区 Rb=470k；饱和区 Rb=47k） ---- */
+  const buildNpn = (rb, rc, beta) => {
+    reset();
+    const vs = place('vsource', 2, 2, { voltage: 5 });
+    const rbv = place('resistor', 6, 2, { resistance: rb });
+    const rcv = place('resistor', 10, 2, { resistance: rc });
+    const q = place('transistor', 16, 2, { model: '2N2222', beta });
+    wire(vs, '+', rbv, '1');
+    wire(rbv, '2', q, 'B');
+    wire(vs, '+', rcv, '1');
+    wire(rcv, '2', q, 'C');
+    wire(q, 'E', vs, '-');
+    const res = SIM.solveDC(M);
+    return { res, e: elem(res, q) };
+  };
+  {
+    const active = buildNpn(470000, 1000, 100);
+    check('P3 NPN 活性区 Ic=0.92mA±2%',
+      active.res.ok === true && active.e && Math.abs(active.e.i - 0.92e-3) / 0.92e-3 <= 0.02,
+      `Ic=${active.e && active.e.i}（${active.e && active.e.note}）`);
+    check('P3 NPN 活性区 Vce=4.08V±2%',
+      active.e && Math.abs(active.e.v - 4.08) / 4.08 <= 0.02, `Vce=${active.e && active.e.v}`);
+
+    const sat = buildNpn(47000, 1000, 100);
+    check('P3 NPN 饱和区（Rb=47k）标注饱和且 Ic≈4.8mA±5%',
+      sat.res.ok === true && sat.e && sat.e.note === '饱和'
+      && Math.abs(sat.e.i - 4.8e-3) / 4.8e-3 <= 0.05,
+      `Ic=${sat.e && sat.e.i} Vce=${sat.e && sat.e.v} note=${sat.e && sat.e.note}`);
+    check('P3 NPN 饱和压降 < 0.3V（模型自然给出，非硬钳位）',
+      sat.e && sat.e.v > 0 && sat.e.v < 0.3, `Vce=${sat.e && sat.e.v}`);
+  }
+
+  /* ---- P4 运放：跟随 + 开环钳位 ---- */
+  {
+    reset();
+    const vs = place('vsource', 2, 2, { voltage: 5 });
+    const vin = place('vsource', 2, 8, { voltage: 2 });
+    const u = place('opamp', 12, 2, { model: 'LM741' });
+    wire(vin, '+', u, '+');
+    wire(vin, '-', vs, '-');
+    wire(u, 'V+', vs, '+');
+    wire(u, 'V-', vs, '-');
+    wire(u, 'OUT', u, '-');
+    const res = SIM.solveDC(M);
+    const outNet = M.getNetlist().netOf.get(`c:${u}:OUT`);
+    const vout = (res.nodeVoltages || []).find((n) => n.netId === outNet);
+    check('P4 LM741 跟随器 Vin=2V → Vout=2.00V±0.5%',
+      res.ok === true && vout && Math.abs(vout.v - 2) / 2 <= 0.005, `Vout=${vout && vout.v}`);
+
+    reset();
+    const vs2 = place('vsource', 2, 2, { voltage: 5 });
+    const sp = place('vsource', 2, 8, { voltage: 2 });
+    const sm = place('vsource', 6, 8, { voltage: 1 });
+    const u2 = place('opamp', 12, 2, { model: 'LM741' });
+    wire(sp, '+', u2, '+');
+    wire(sp, '-', vs2, '-');
+    wire(sm, '+', u2, '-');
+    wire(sm, '-', vs2, '-');
+    wire(u2, 'V+', vs2, '+');
+    wire(u2, 'V-', vs2, '-');
+    const load = place('resistor', 22, 2, { resistance: 10000 });
+    wire(u2, 'OUT', load, '1');
+    wire(load, '2', vs2, '-');
+    const res2 = SIM.solveDC(M);
+    const outNet2 = M.getNetlist().netOf.get(`c:${u2}:OUT`);
+    const vout2 = (res2.nodeVoltages || []).find((n) => n.netId === outNet2);
+    check('P4 LM741 开环 V+ > V− → 输出钳到 VCC−2V=3V',
+      res2.ok === true && vout2 && Math.abs(vout2.v - 3) < 0.01, `Vout=${vout2 && vout2.v}`);
+  }
+
+  /* ---- P5 RC 10k/10µF ---- */
+  {
+    reset();
+    const vs = place('vsource', 2, 2, { voltage: 5 });
+    const r = place('resistor', 6, 2, { resistance: 10000 });
+    const c = place('capacitor', 10, 2, { capacitance: 10e-6 });
+    wire(vs, '+', r, '1');
+    wire(r, '2', c, '1');
+    wire(c, '2', vs, '-');
+    const res = ST.solveTransient(M, { duration: 0.3, dt: 1e-4 });
+    const wave = res.ok ? res.waveforms.find((w) => {
+      const ch = res.channels.find((x) => x.netId === w.netId);
+      return ch && ch.max > 4.5 && ch.min < 0.5;
+    }) : null;
+    const at = (t) => {
+      const s = wave.samples;
+      for (let i = 1; i < s.length; i += 1) {
+        if (s[i].t >= t - 1e-12) {
+          const k = (t - s[i - 1].t) / (s[i].t - s[i - 1].t || 1);
+          return s[i - 1].v + (s[i].v - s[i - 1].v) * k;
+        }
+      }
+      return s[s.length - 1].v;
+    };
+    const tau = 0.1;
+    const vTau = wave ? at(tau) : 0;
+    const v069 = wave ? at(0.693 * tau) : 0;
+    check('P5 RC 10k/10µF 在 t=τ 处 V=3.16V±2%',
+      res.ok === true && wave && Math.abs(vTau - 3.16) / 3.16 <= 0.02,
+      `V(τ)=${vTau.toFixed(4)}`);
+    check('P5 RC 在 t=0.693τ 处 V≈2.50V（指令包的 3.16V 对应 t=τ，已按物理更正）',
+      wave && Math.abs(v069 - 2.5) / 2.5 <= 0.02, `V(0.693τ)=${v069.toFixed(4)}`);
+  }
+
+  /* ---- P6 电感阶跃 5V-10Ω-1mH ---- */
+  {
+    reset();
+    const vs = place('vsource', 2, 2, { voltage: 5 });
+    const r = place('resistor', 6, 2, { resistance: 10 });
+    const l = place('inductor', 10, 2, { inductance: 0.001 });
+    wire(vs, '+', r, '1');
+    wire(r, '2', l, '1');
+    wire(l, '2', vs, '-');
+    const res = ST.solveTransient(M, { duration: 0.001, dt: 1e-6 });
+    const wave = res.ok ? res.waveforms.find((w) => {
+      const ch = res.channels.find((x) => x.netId === w.netId);
+      return ch && ch.max > 4.5 && ch.min < 0.5;
+    }) : null;
+    const at = (t) => {
+      const s = wave.samples;
+      for (let i = 1; i < s.length; i += 1) {
+        if (s[i].t >= t - 1e-15) {
+          const k = (t - s[i - 1].t) / (s[i].t - s[i - 1].t || 1);
+          return s[i - 1].v + (s[i].v - s[i - 1].v) * k;
+        }
+      }
+      return s[s.length - 1].v;
+    };
+    const iEnd = wave ? (5 - at(0.001)) / 10 : 0;
+    const iTau = wave ? (5 - at(1e-4)) / 10 : 0;
+    check('P6 电感稳态电流 = 0.5A±2%',
+      res.ok === true && wave && Math.abs(iEnd - 0.5) / 0.5 <= 0.02, `I=${iEnd.toFixed(4)}A`);
+    check('P6 电感在 t=τ=L/R=0.1ms 处电流 = 0.316A±5%',
+      wave && Math.abs(iTau - 0.316) / 0.316 <= 0.05, `I(τ)=${iTau.toFixed(4)}A`);
+  }
+
+  /* ---- LED 四色压降（参数化） ---- */
+  {
+    reset();
+    const vs = place('vsource', 2, 2, { voltage: 5 });
+    const r = place('resistor', 6, 2, { resistance: 300 });
+    const led = place('led', 10, 2, { color: 'red', model: 'red' });
+    wire(vs, '+', r, '1');
+    wire(r, '2', led, 'A');
+    wire(led, 'K', vs, '-');
+    const res = SIM.solveDC(M);
+    const e = elem(res, led);
+    check('9 LED 红色型号 10mA 级 Vf≈2.0V±8%',
+      res.ok === true && e && Math.abs(e.v - 2.0) / 2.0 <= 0.08, `Vf=${e && e.v}`);
+  }
+
+  /* ---- PNP 基本工作 ---- */
+  {
+    reset();
+    const vs = place('vsource', 2, 2, { voltage: 5 });
+    const rb = place('resistor', 6, 2, { resistance: 470000 });
+    const rc = place('resistor', 10, 2, { resistance: 1000 });
+    const q = place('transistor', 16, 2, { model: '2N3906', beta: 100 });
+    wire(q, 'E', vs, '+');
+    wire(rb, '1', q, 'B');
+    wire(rb, '2', vs, '-');
+    wire(q, 'C', rc, '1');
+    wire(rc, '2', vs, '-');
+    const res = SIM.solveDC(M);
+    const e = elem(res, q);
+    check('9 PNP（2N3906）共射 Ic≈β·Ib（0.8~1.1mA）',
+      res.ok === true && e && Math.abs(e.i) > 0.8e-3 && Math.abs(e.i) < 1.1e-3,
+      `Ic=${e && e.i} Vce=${e && e.v}`);
+  }
+
+  /* ---- 继电器：线圈吸合 → COM-NO 导通 ---- */
+  {
+    reset();
+    const vs = place('vsource', 2, 2, { voltage: 5 });
+    const k = place('relay', 10, 2, {});
+    const load = place('resistor', 10, 10, { resistance: 1000 });
+    // 线圈接 5V（100Ω → 50mA > 30mA 吸合）
+    wire(vs, '+', k, 'COIL1');
+    wire(k, 'COIL2', vs, '-');
+    // COM 接 5V，NO 经 1k 到地
+    wire(vs, '+', k, 'COM');
+    wire(k, 'NO', load, '1');
+    wire(load, '2', vs, '-');
+    const res = SIM.solveDC(M);
+    const noNet = M.getNetlist().netOf.get(`c:${k}:NO`);
+    const vNo = (res.nodeVoltages || []).find((n) => n.netId === noNet);
+    const e = elem(res, k);
+    check('9 继电器线圈通电吸合（COM-NO 导通）',
+      res.ok === true && e && /吸合/.test(e.note || '') && vNo && vNo.v > 4.5,
+      `note=${e && e.note} V(NO)=${vNo && vNo.v}`);
+  }
+
+  /* ---- 4 位拨码：闭合/断开 ---- */
+  {
+    reset();
+    const vs = place('vsource', 2, 2, { voltage: 5 });
+    const sw = place('dip4', 8, 2, { s1: 'on', s2: 'off', s3: 'on', s4: 'on' });
+    const r1 = place('resistor', 2, 10, { resistance: 1000 });
+    wire(vs, '+', sw, '1A');
+    wire(sw, '1B', r1, '1');
+    wire(r1, '2', vs, '-');
+    const res = SIM.solveDC(M);
+    const n1 = M.getNetlist().netOf.get(`c:${sw}:1B`);
+    const v1 = (res.nodeVoltages || []).find((n) => n.netId === n1);
+    check('9 拨码第 1 位闭合 → 1B 接近 5V',
+      res.ok === true && v1 && v1.v > 4.5, `V=${v1 && v1.v}`);
+
+    reset();
+    const vs2 = place('vsource', 2, 2, { voltage: 5 });
+    const sw2 = place('dip4', 8, 2, { s1: 'off', s2: 'on', s3: 'on', s4: 'on' });
+    const r2 = place('resistor', 2, 10, { resistance: 1000 });
+    wire(vs2, '+', sw2, '1A');
+    wire(sw2, '1B', r2, '1');
+    wire(r2, '2', vs2, '-');
+    const res2 = SIM.solveDC(M);
+    const n2 = M.getNetlist().netOf.get(`c:${sw2}:1B`);
+    const v2 = (res2.nodeVoltages || []).find((n) => n.netId === n2);
+    check('9 拨码第 1 位断开 → 1B 为 0V',
+      res2.ok === true && v2 && Math.abs(v2.v) < 0.1, `V=${v2 && v2.v}`);
+  }
+
+  /* ---- 电位器：滑臂分压 ---- */
+  {
+    reset();
+    const vs = place('vsource', 2, 2, { voltage: 5 });
+    const p = place('pot', 10, 2, { resistance: 10000, wiper: 50 });
+    // 滑臂经 1MΩ 接地：既让滑臂节点进方程，负载效应又只有 0.25%
+    const load = place('resistor', 20, 2, { resistance: 1e6 });
+    wire(vs, '+', p, '1');
+    wire(p, '3', vs, '-');
+    wire(p, '2', load, '1');
+    wire(load, '2', vs, '-');
+    const res = SIM.solveDC(M);
+    const wNet = M.getNetlist().netOf.get(`c:${p}:2`);
+    const vw = (res.nodeVoltages || []).find((n) => n.netId === wNet);
+    check('9 电位器滑臂 50% → 中点 2.5V±0.5%（1M 负载）',
+      res.ok === true && vw && Math.abs(vw.v - 2.5) / 2.5 <= 0.005, `V=${vw && vw.v}`);
+
+    M.updateParams(p, { wiper: 25 });
+    const res2 = SIM.solveDC(M);
+    const vw2 = (res2.nodeVoltages || []).find((n) => n.netId === wNet);
+    check('9 电位器滑臂 25% → 3.75V±0.5%',
+      res2.ok === true && vw2 && Math.abs(vw2.v - 3.749) / 3.75 <= 0.005, `V=${vw2 && vw2.v}`);
+  }
+}
+
 /* ---------------------------------------------------------------- 汇总 */
 console.log(`\n=== model 自测：${pass}/${pass + fail} 通过 ===`);
 if (fail > 0) {

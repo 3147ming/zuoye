@@ -422,6 +422,166 @@ function drawAdcSym(ctx, comp, g) {
 }
 
 /* ==========================================================================
+   指令包 9：分立 / 动态 / 机电元件符号
+   ========================================================================== */
+
+/** 二极管/稳压管：三角 + 阴极条（稳压管阴极条带折角） */
+function drawDiodeSym(ctx, comp, g, zener) {
+  const ink = g.color.ink;
+  polyline(ctx, [g.p(0, 1.3), g.p(1.2, 1.3)], ink, 1.8);
+  // 三角（指向 K）
+  polyline(ctx, [g.p(1.2, 0.5), g.p(1.2, 2.1), g.p(2.5, 1.3), g.p(1.2, 0.5)], ink, 1.8);
+  // 阴极条
+  polyline(ctx, [g.p(2.5, 0.5), g.p(2.5, 2.1)], ink, 2);
+  if (zener) {
+    polyline(ctx, [g.p(2.2, 0.5), g.p(2.8, 0.9)], ink, 1.6);
+    polyline(ctx, [g.p(2.2, 2.1), g.p(2.8, 1.7)], ink, 1.6);
+  }
+  polyline(ctx, [g.p(2.5, 1.3), g.p(4, 1.3)], ink, 1.8);
+  void comp;
+}
+
+function drawDiodeSymbol(ctx, comp, g) {
+  drawDiodeSym(ctx, comp, g, false);
+}
+
+function drawZenerSymbol(ctx, comp, g) {
+  drawDiodeSym(ctx, comp, g, true);
+}
+
+/** 三极管：圆圈 + 基极条 + 发射极箭头 */
+function drawTransistorSym(ctx, comp, g) {
+  const ink = g.color.ink;
+  const cx = g.p(2.4, 2.5);
+  ctx.beginPath();
+  ctx.arc(cx.x, cx.y, Math.max(10, g.cell * 0.85), 0, Math.PI * 2);
+  ctx.strokeStyle = ink;
+  ctx.lineWidth = 1.6;
+  ctx.stroke();
+
+  polyline(ctx, [g.p(0, 2.5), g.p(1.9, 2.5)], ink, 1.8);
+  polyline(ctx, [g.p(1.9, 1.3), g.p(1.9, 3.7)], ink, 2.4);
+  polyline(ctx, [g.p(1.9, 1.9), g.p(5, 0.8)], ink, 1.8);
+  polyline(ctx, [g.p(1.9, 3.1), g.p(5, 4.2)], ink, 1.8);
+  // 发射极箭头（NPN 朝外）
+  const ex = g.p(3.9, 3.55);
+  const angle = Math.atan2(g.p(5, 4.2).y - g.p(1.9, 3.1).y, g.p(5, 4.2).x - g.p(1.9, 3.1).x);
+  ctx.beginPath();
+  ctx.moveTo(ex.x, ex.y);
+  ctx.lineTo(ex.x - 6 * Math.cos(angle - 0.4), ex.y - 6 * Math.sin(angle - 0.4));
+  ctx.lineTo(ex.x - 6 * Math.cos(angle + 0.4), ex.y - 6 * Math.sin(angle + 0.4));
+  ctx.closePath();
+  ctx.fillStyle = ink;
+  ctx.fill();
+  void comp;
+}
+
+/** 运放：三角 + 电源脚 */
+function drawOpampSym(ctx, comp, g) {
+  const ink = g.color.ink;
+  const muted = g.color.muted;
+  polyline(ctx, [g.p(0.5, 0.5), g.p(0.5, 5.5), g.p(5.5, 3), g.p(0.5, 0.5)], ink, 1.8);
+  polyline(ctx, [g.p(0, 1.6), g.p(0.5, 1.6)], ink, 1.8);
+  polyline(ctx, [g.p(0, 4.4), g.p(0.5, 4.4)], ink, 1.8);
+  polyline(ctx, [g.p(5.5, 3), g.p(6, 3)], ink, 1.8);
+  const fontSize = Math.max(8, Math.min(12, g.cell * 0.55));
+  ctx.font = `600 ${fontSize}px "Cascadia Mono", Consolas, monospace`;
+  ctx.fillStyle = ink;
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText('+', g.p(1.1, 1.6).x, g.p(1.1, 1.6).y);
+  ctx.fillText('−', g.p(1.1, 4.4).x, g.p(1.1, 4.4).y);
+  polyline(ctx, [g.p(3, 0), g.p(3, 1.5)], ink, 1.4);
+  polyline(ctx, [g.p(3, 6), g.p(3, 4.5)], ink, 1.4);
+  ctx.font = `${Math.max(6, fontSize * 0.7)}px "Cascadia Mono", Consolas, monospace`;
+  ctx.fillStyle = muted;
+  ctx.textAlign = 'left';
+  ctx.fillText('V+', g.p(3.15, 0.5).x, g.p(3.15, 0.5).y);
+  ctx.fillText('V−', g.p(3.15, 5.5).x, g.p(3.15, 5.5).y);
+  void comp;
+}
+
+/** 电感：四段半圆 */
+function drawInductorSym(ctx, comp, g) {
+  const ink = g.color.ink;
+  polyline(ctx, [g.p(0, 1.3), g.p(0.6, 1.3)], ink, 1.8);
+  for (let i = 0; i < 4; i += 1) {
+    const a = g.p(0.6 + i * 0.7, 1.3);
+    const b = g.p(1.3 + i * 0.7, 1.3);
+    ctx.beginPath();
+    ctx.arc(a.x + (b.x - a.x) / 2, a.y, Math.abs(b.x - a.x) / 2, Math.PI, 0);
+    ctx.strokeStyle = ink;
+    ctx.lineWidth = 1.8;
+    ctx.stroke();
+  }
+  polyline(ctx, [g.p(3.4, 1.3), g.p(4, 1.3)], ink, 1.8);
+  void comp;
+}
+
+/** 蜂鸣器：圆 + 声波弧 */
+function drawBuzzerSym(ctx, comp, g) {
+  const ink = g.color.ink;
+  const c = g.p(1.4, 1.5);
+  ctx.beginPath();
+  ctx.arc(c.x, c.y, Math.max(6, g.cell * 0.5), 0, Math.PI * 2);
+  ctx.strokeStyle = ink;
+  ctx.lineWidth = 1.6;
+  ctx.stroke();
+  for (let i = 1; i <= 2; i += 1) {
+    ctx.beginPath();
+    ctx.arc(c.x, c.y, Math.max(6, g.cell * 0.5) + i * 4, -0.7, 0.7);
+    ctx.stroke();
+  }
+  polyline(ctx, [g.p(0, 1.5), g.p(0.6, 1.5)], ink, 1.6);
+  polyline(ctx, [g.p(2.2, 1.5), g.p(3, 1.5)], ink, 1.6);
+  void comp;
+}
+
+/** 继电器：线圈框 + 触点 */
+function drawRelaySym(ctx, comp, g) {
+  const ink = g.color.ink;
+  box(ctx, g, 0.6, 0.4, 3.4, 2.2);
+  polyline(ctx, [g.p(0, 1.3), g.p(0.6, 1.3)], ink, 1.6);
+  polyline(ctx, [g.p(3.4, 1.3), g.p(4, 1.3)], ink, 1.6);
+  // 线圈折线
+  polyline(ctx, [g.p(1.2, 1.8), g.p(1.6, 0.8), g.p(2.0, 1.8), g.p(2.4, 0.8), g.p(2.8, 1.8)], ink, 1.4);
+  // 触点
+  polyline(ctx, [g.p(0, 4), g.p(1.4, 4)], ink, 1.6);
+  polyline(ctx, [g.p(1.4, 4), g.p(2.6, 3.2)], ink, 1.6);
+  polyline(ctx, [g.p(4, 3), g.p(2.6, 3)], ink, 1.6);
+  polyline(ctx, [g.p(4, 5), g.p(2.6, 5)], ink, 1.6);
+  void comp;
+}
+
+/** 四位拨码：4 个小开关 */
+function drawDip4Sym(ctx, comp, g) {
+  const ink = g.color.ink;
+  for (let i = 0; i < 4; i += 1) {
+    const y = 0.8 + i * 1.2;
+    const on = !comp.params || comp.params[`s${i + 1}`] !== false;
+    polyline(ctx, [g.p(0, y), g.p(1, y)], ink, 1.4);
+    polyline(ctx, [g.p(3, y), g.p(4, y)], ink, 1.4);
+    polyline(ctx, [g.p(1, y), g.p(2.6, on ? y - 0.6 : y - 1.0)], ink, 1.4);
+  }
+}
+
+/** 电位器：电阻 + 滑臂箭头 */
+function drawPotSym(ctx, comp, g) {
+  const ink = g.color.ink;
+  // 竖向电阻
+  polyline(ctx, [g.p(0, 0.4), g.p(0, 3.6)], ink, 1.8);
+  const x = 0;
+  polyline(ctx, [
+    g.p(x, 1.0), g.p(x + 0.7, 1.2), g.p(x - 0.7, 1.8), g.p(x + 0.7, 2.4), g.p(x - 0.7, 3.0), g.p(x, 3.2),
+  ], ink, 1.6);
+  polyline(ctx, [g.p(0, 2), g.p(2.6, 2)], ink, 1.6);
+  // 箭头
+  polyline(ctx, [g.p(2.6, 2), g.p(2.1, 1.7)], ink, 1.4);
+  polyline(ctx, [g.p(2.6, 2), g.p(2.1, 2.3)], ink, 1.4);
+  void comp;
+}
+
+/* ==========================================================================
    符号注册表
    ========================================================================== */
 
@@ -644,6 +804,130 @@ export const SYMBOLS = {
     })(),
     draw: drawAdcSym,
     labelText: () => 'ADC8',
+  },
+
+  /* ---- 指令包 9 ---- */
+
+  diode: {
+    id: 'diode',
+    label: '二极管',
+    size: { w: 4, h: 2.6 },
+    pins: [
+      { name: 'A', dx: 0, dy: 1.3, side: 'left', role: 'io' },
+      { name: 'K', dx: 4, dy: 1.3, side: 'right', role: 'io' },
+    ],
+    draw: drawDiodeSymbol,
+    labelText: (comp) => `D ${comp.params.model || '1N4148'}`,
+  },
+
+  zener: {
+    id: 'zener',
+    label: '稳压管',
+    size: { w: 4, h: 2.6 },
+    pins: [
+      { name: 'A', dx: 0, dy: 1.3, side: 'left', role: 'io' },
+      { name: 'K', dx: 4, dy: 1.3, side: 'right', role: 'io' },
+    ],
+    draw: drawZenerSymbol,
+    labelText: (comp) => `DZ ${comp.params.vz}V`,
+  },
+
+  transistor: {
+    id: 'transistor',
+    label: '三极管',
+    size: { w: 5, h: 5 },
+    pins: [
+      { name: 'B', dx: 0, dy: 2.5, side: 'left', role: 'in' },
+      { name: 'C', dx: 5, dy: 0.8, side: 'right', role: 'out' },
+      { name: 'E', dx: 5, dy: 4.2, side: 'right', role: 'out' },
+    ],
+    draw: drawTransistorSym,
+    labelText: (comp) => `Q ${comp.params.model || '2N2222'}`,
+  },
+
+  opamp: {
+    id: 'opamp',
+    label: '运算放大器',
+    size: { w: 6, h: 6 },
+    pins: [
+      { name: '+', dx: 0, dy: 1.6, side: 'left', role: 'in' },
+      { name: '-', dx: 0, dy: 4.4, side: 'left', role: 'in' },
+      { name: 'OUT', dx: 6, dy: 3, side: 'right', role: 'out' },
+      { name: 'V+', dx: 3, dy: 0, side: 'top', role: 'VCC' },
+      { name: 'V-', dx: 3, dy: 6, side: 'bottom', role: 'GND' },
+    ],
+    draw: drawOpampSym,
+    labelText: (comp) => String(comp.params.model || 'LM741'),
+  },
+
+  inductor: {
+    id: 'inductor',
+    label: '电感',
+    size: { w: 4, h: 2.6 },
+    pins: [
+      { name: '1', dx: 0, dy: 1.3, side: 'left', role: 'io' },
+      { name: '2', dx: 4, dy: 1.3, side: 'right', role: 'io' },
+    ],
+    draw: drawInductorSym,
+    labelText: (comp) => `L ${(Number(comp.params.inductance) * 1000).toFixed(1)}mH`,
+  },
+
+  buzzer: {
+    id: 'buzzer',
+    label: '蜂鸣器',
+    size: { w: 3, h: 3 },
+    pins: [
+      { name: '+', dx: 0, dy: 1.5, side: 'left', role: 'in' },
+      { name: '-', dx: 3, dy: 1.5, side: 'right', role: 'in' },
+    ],
+    draw: drawBuzzerSym,
+    labelText: () => 'BZ',
+  },
+
+  relay: {
+    id: 'relay',
+    label: '继电器',
+    size: { w: 6, h: 6 },
+    pins: [
+      { name: 'COIL1', dx: 0, dy: 1.3, side: 'left', role: 'in' },
+      { name: 'COIL2', dx: 0, dy: 3.7, side: 'left', role: 'in' },
+      { name: 'COM', dx: 6, dy: 1.5, side: 'right', role: 'io' },
+      { name: 'NO', dx: 6, dy: 3.5, side: 'right', role: 'io' },
+      { name: 'NC', dx: 6, dy: 5.2, side: 'right', role: 'io' },
+    ],
+    draw: drawRelaySym,
+    labelText: () => 'K',
+  },
+
+  dip4: {
+    id: 'dip4',
+    label: '4 位拨码',
+    size: { w: 4, h: 5 },
+    pins: [
+      { name: '1A', dx: 0, dy: 0.8, side: 'left', role: 'io' },
+      { name: '1B', dx: 4, dy: 0.8, side: 'right', role: 'io' },
+      { name: '2A', dx: 0, dy: 2.0, side: 'left', role: 'io' },
+      { name: '2B', dx: 4, dy: 2.0, side: 'right', role: 'io' },
+      { name: '3A', dx: 0, dy: 3.2, side: 'left', role: 'io' },
+      { name: '3B', dx: 4, dy: 3.2, side: 'right', role: 'io' },
+      { name: '4A', dx: 0, dy: 4.4, side: 'left', role: 'io' },
+      { name: '4B', dx: 4, dy: 4.4, side: 'right', role: 'io' },
+    ],
+    draw: drawDip4Sym,
+    labelText: () => 'SW4',
+  },
+
+  pot: {
+    id: 'pot',
+    label: '电位器',
+    size: { w: 4, h: 4 },
+    pins: [
+      { name: '1', dx: 0, dy: 0.4, side: 'left', role: 'io' },
+      { name: '3', dx: 0, dy: 3.6, side: 'left', role: 'io' },
+      { name: '2', dx: 4, dy: 2, side: 'right', role: 'io' },
+    ],
+    draw: drawPotSym,
+    labelText: (comp) => `RP ${(Number(comp.params.resistance) / 1000).toFixed(0)}k`,
   },
 };
 

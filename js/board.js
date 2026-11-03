@@ -473,7 +473,8 @@ function renderProps() {
   }
 
   const actions = [{ label: '删除元件', action: 'delete' }];
-  if (def.size.w !== def.size.h && comp.rotation === 0) {
+  if (comp.rotation === 0) {
+    // 正方占位（比较器）也能转：端子排布不对称
     actions.unshift({ label: '旋转 90°', action: 'rotate' });
   }
   host.append(buildPropsActions(actions));
@@ -558,12 +559,18 @@ function buildParamField(comp, field) {
     input.value = rawValue;
   } else {
     input = document.createElement('input');
-    input.className = 'props-input';
-    input.type = 'number';
+    input.className = field.type === 'range' ? 'props-input props-range' : 'props-input';
+    input.type = field.type === 'range' ? 'range' : 'number';
     if (field.step !== undefined) input.step = String(field.step);
     if (field.min !== undefined) input.min = String(field.min);
     if (field.max !== undefined) input.max = String(field.max);
     input.value = String(displayValue(comp.params[field.key], field));
+    if (field.type === 'range') {
+      // 滑块拖动实时生效：input 事件即改参数（走既有参数防抖）
+      input.addEventListener('input', () => {
+        input.dispatchEvent(new Event('change', { bubbles: true }));
+      });
+    }
   }
 
   input.dataset.paramKey = field.key;
@@ -603,7 +610,7 @@ function handlePropsChange(event) {
   if (!input || !board) return;
   const compId = input.dataset.componentId;
   const key = input.dataset.paramKey;
-  const isNumber = input.dataset.paramType === 'number';
+  const isNumber = input.dataset.paramType === 'number' || input.dataset.paramType === 'range';
 
   if (!isNumber) {
     model.updateParams(compId, { [key]: input.value });
