@@ -2063,6 +2063,127 @@ function relErr(actual, expected) {
   }
 }
 
+/* ---------------------------------------------------------------- 数据系统（包 11） */
+{
+  const DS = await import('../js/datastore.js');
+
+  /* ---- 环形记录器 ---- */
+  {
+    const rec = DS.createRecorder({ capacity: 10000 });
+    for (let i = 0; i < 200; i += 1) rec.push('ch1', i * 0.01, Math.sin(i / 10));
+    check('11 记录器：200 条采样按 10ms 写入', rec.countOf('ch1') === 200, String(rec.countOf('ch1')));
+    rec.pause();
+    rec.push('ch1', 3, 1);
+    check('11 记录器：暂停后不再增长', rec.countOf('ch1') === 200, String(rec.countOf('ch1')));
+    rec.resume();
+    rec.push('ch1', 3, 1);
+    check('11 记录器：恢复后继续写入', rec.countOf('ch1') === 201, String(rec.countOf('ch1')));
+    rec.clear();
+    check('11 记录器：清空归零', rec.countOf('ch1') === 0 && rec.total() === 0, '');
+
+    const small = DS.createRecorder({ capacity: 100 });
+    for (let i = 0; i < 150; i += 1) small.push('c', i, i);
+    const kept = small.samples('c');
+    check('11 环形缓冲：写满丢最旧（保留最后 100 条）',
+      kept.length === 100 && kept[0].v === 50 && kept[99].v === 149,
+      `${kept.length}/${kept[0] && kept[0].v}`);
+  }
+
+  /* ---- CSV 逐行对拍 ---- */
+  {
+    const rec = DS.createRecorder();
+    for (let i = 0; i < 20; i += 1) rec.push('net1', i * 0.001, 5 * (1 - Math.exp(-i / 5)));
+    rec.push('net2', 0.005, 1, 'digital');
+    const records = rec.records();
+    const csv = DS.recordsToCsv(records);
+    const back = DS.csvToRecords(csv);
+    check('11 CSV 表头 = time,channel,value,type',
+      csv.replace(/^\uFEFF/, '').split('\n')[0] === DS.CSV_HEADER, csv.slice(0, 40));
+    check('11 CSV 行数 = 记录数', back.length === records.length, `${back.length}/${records.length}`);
+    const first = records[0];
+    const backFirst = back[0];
+    check('11 CSV 数值逐行对拍（4 位有效数字）',
+      Math.abs(backFirst.time - first.time) < 1e-9
+      && backFirst.channel === first.channel
+      && Math.abs(backFirst.value - first.value) <= Math.abs(first.value) * 1e-3 + 1e-12,
+      `${backFirst.value} vs ${first.value}`);
+    check('11 CSV 保留 digital 类型标注',
+      back.some((r) => r.channel === 'net2' && r.type === 'digital'), '');
+  }
+
+  /* ---- JSON 往返 ---- */
+  {
+    const rec = DS.createRecorder();
+    for (let i = 0; i < 10; i += 1) rec.push('a', i * 0.01, i * 0.5);
+    const json = DS.recordsToJson(rec.records(), { circuit: 'demo', dt: 0.01 });
+    const parsed = DS.jsonToRecords(json);
+    check('11 JSON 导出含 meta 与 channels',
+      parsed.channels.length === 1 && parsed.meta.circuit === 'demo',
+      JSON.stringify(parsed.meta));
+    check('11 JSON 往返样本数一致',
+      parsed.channels[0].samples.length === 10 && Math.abs(parsed.channels[0].samples[9].v - 4.5) < 1e-9,
+      JSON.stringify(parsed.channels[0].samples[9]));
+  }
+
+  /* ---- 多通道对齐 ---- */
+  {
+    const a = { id: 'a', samples: [{ t: 0, v: 0 }, { t: 0.01, v: 1 }, { t: 0.02, v: 2 }] };
+    const b = { id: 'b', samples: [{ t: 0.005, v: 10 }, { t: 0.015, v: 20 }] };
+    const aligned = DS.alignSeries([a, b]);
+    check('11 对齐：时间网格 = 两通道并集',
+      aligned.times.length === 5 && aligned.times[1] === 0.005, JSON.stringify(aligned.times));
+    const sa = aligned.series.find((s) => s.id === 'a');
+    const sb = aligned.series.find((s) => s.id === 'b');
+    check('11 对齐：线性插值正确（a 在 0.005 处 = 0.5）',
+      Math.abs(sa.values[1] - 0.5) < 1e-12, String(sa.values[1]));
+    check('11 对齐：超范围不外推（b 在 0 与 0.02 处为 null）',
+      sb.values[0] === null && sb.values[4] === null, JSON.stringify(sb.values));
+  }
+
+  /* ---- 存档版本迁移 ---- */
+  {
+    const v1 = { version: 1, platform: 'breadboard', components: [], wires: [[{ componentId: 'r1', terminal: '1' }, { componentId: 'r2', terminal: '2' }]] };
+    const m1 = DS.migrateArchive(v1);
+    check('11 v1 存档迁移到 v4（导线数组转对象 + 补默认段）',
+      m1.ok && m1.data.version === DS.ARCHIVE_VERSION
+      && m1.data.wires[0].a.componentId === 'r1'
+      && m1.data.instruments === null && Array.isArray(m1.data.records),
+      JSON.stringify(m1.notes));
+
+    const v3 = { version: 3, platform: 'exp-box', components: [{ id: 'r1', type: 'resistor', x: 1, y: 1, params: {} }], wires: [], stash: {} };
+    const m3 = DS.migrateArchive(v3);
+    check('11 v3 存档迁移：补 instruments=null / records=[]',
+      m3.ok && m3.data.version === 4 && m3.data.instruments === null && m3.data.records.length === 0,
+      JSON.stringify(m3.notes));
+
+    const future = DS.migrateArchive({ version: 99, components: [] });
+    check('11 未来版本存档不迁移、可读报错', future.ok === false && future.tooNew === true, JSON.stringify(future.notes));
+
+    const bad = DS.migrateArchive(null);
+    check('11 坏存档给出可读错误（不抛异常）', bad.ok === false && bad.notes.length > 0, JSON.stringify(bad.notes));
+  }
+
+  /* ---- 存档往返一致 ---- */
+  {
+    const archive = M.serializeCircuit();
+    const again = JSON.parse(JSON.stringify(archive));
+    check('11 serialize→parse→serialize 逐字节一致（排除时间戳）',
+      DS.archivesEquivalent(archive, again).same === true, JSON.stringify(DS.archivesEquivalent(archive, again)));
+    const changed = JSON.parse(JSON.stringify(archive));
+    changed.components.push({ id: 'x', type: 'resistor', x: 0, y: 0, params: {} });
+    check('11 内容变化会被 equivalent 检出', DS.archivesEquivalent(archive, changed).same === false, '');
+  }
+
+  /* ---- 理论曲线表达式 ---- */
+  {
+    const ok = DS.compileFormula('v=5*(1-exp(-t/0.1))');
+    check('11 理论公式在 t=0.1 处 = 3.1606V',
+      ok.ok && Math.abs(ok.fn(0.1) - 5 * (1 - Math.exp(-1))) < 1e-9, String(ok.ok && ok.fn(0.1)));
+    const bad = DS.compileFormula('v=window.alert(1)');
+    check('11 理论公式拒绝危险表达式', bad.ok === false, bad.error);
+  }
+}
+
 /* ---------------------------------------------------------------- 汇总 */
 console.log(`\n=== model 自测：${pass}/${pass + fail} 通过 ===`);
 if (fail > 0) {

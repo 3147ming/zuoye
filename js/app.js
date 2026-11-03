@@ -24,6 +24,8 @@ import {
 } from './board.js';
 import { createWaveView } from './waveview.js';
 import { createInstruments } from './instruments.js';
+import { createDataPanel } from './data-panel.js';
+import { migrateArchive } from './datastore.js';
 import { setInstrumentProvider, setInstrumentRestorer } from './model.js';
 import { getPart } from './parts.js';
 
@@ -47,6 +49,9 @@ let instruments = null;
 
 /** 存档里带的仪器段：面板还没创建时先存这儿，创建后补恢复 */
 let pendingInstrumentData = null;
+
+/** 数据面板句柄（指令包 11） */
+let dataPanel = null;
 
 /** 当前平台 id（由 board 回调同步，用于切回实验台时恢复标签） */
 let currentPlatformId = 'exp-box';
@@ -189,6 +194,7 @@ function wireWaveView() {
           if (!waveView) return;
           waveView.render(merged);
           waveView.setRunning(false, cancelled ? '已暂停' : '完成');
+          if (dataPanel && merged) dataPanel.ingestTransient(merged);
         },
         onError: (part) => {
           if (!waveView) return;
@@ -268,6 +274,7 @@ function wireInstruments() {
       if (!board) return null;
       const res = board.simtrans.solve(opts || { duration: 0.01, dt: 0.0001 });
       if (instruments) instruments.refresh();
+      if (dataPanel && res && res.ok) dataPanel.ingestTransient(res);
       return res;
     },
     fgenComponent: () => {
@@ -309,6 +316,12 @@ function wireInstruments() {
   onModelChange(() => {
     window.setTimeout(() => {
       if (instruments) instruments.refresh();
+      if (dataPanel && instruments) {
+        const read = instruments.read();
+        if (read && read.dmm && read.dmm.ok && Number.isFinite(read.dmm.value)) {
+          dataPanel.ingestReading('__dmm', read.dmm.value, 'analog');
+        }
+      }
     }, 360);
   });
 
@@ -322,6 +335,79 @@ function destroyInstruments() {
   if (host) host.replaceChildren();
   instruments = null;
   if (window.__labBoard) window.__labBoard.instruments = null;
+}
+
+/**
+ * 数据面板（指令包 11）：记录 / 对比 / 导出 + 项目存档。
+ * 存档沿用 model.serializeCircuit（version 4），打开时先迁移再 loadCircuit。
+ */
+function wireDataPanel() {
+  const host = document.getElementById('data-panel');
+  if (!host) return;
+  const B = () => window.__labBoard;
+  dataPanel = createDataPanel(host, {
+    circuitName: () => currentExperimentId || 'circuit',
+    screenshot: () => {
+      const canvas = document.getElementById('breadboard-canvas');
+      return canvas ? canvas.toDataURL('image/png') : null;
+    },
+    saveProject: (opts = {}) => {
+      const board = B();
+      if (!board) return;
+      const archive = dataPanel.buildArchive(board.model);
+      archive.records = opts.records || [];
+      const text = JSON.stringify(archive, null, 2);
+      const blob = new Blob([text], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `${currentExperimentId || 'circuit'}.circuit.json`;
+      a.click();
+      window.setTimeout(() => URL.revokeObjectURL(url), 2000);
+    },
+    openProject: () => {
+      const input = document.createElement('input');
+      input.type = 'file';
+      input.accept = '.json,application/json';
+      input.addEventListener('change', async () => {
+        const file = input.files && input.files[0];
+        if (!file) return;
+        const text = await file.text();
+        let raw = null;
+        try { raw = JSON.parse(text); } catch (err) {
+          window.alert('文件损坏：不是合法的 JSON');
+          return;
+        }
+        const migrated = migrateArchive(raw);
+        if (!migrated.ok) {
+          window.alert(`无法打开：${migrated.notes.join('；')}`);
+          return;
+        }
+        const board = B();
+        if (!board) return;
+        board.model.loadCircuit(migrated.data, migrated.data.platform);
+        simulateNow('open-project');
+        if (dataPanel) dataPanel.restore(migrated.data.dataOptions || null);
+      });
+      input.click();
+    },
+    applyArchive: (data) => {
+      const board = B();
+      if (!board) return;
+      board.model.loadCircuit(data, data.platform);
+      simulateNow('open-project');
+    },
+  });
+  window.__labBoard = window.__labBoard || {};
+  window.__labBoard.data = dataPanel;
+}
+
+/** 离开实验：销毁数据面板 */
+function destroyDataPanel() {
+  const host = document.getElementById('data-panel');
+  if (host) host.replaceChildren();
+  dataPanel = null;
+  if (window.__labBoard) window.__labBoard.data = null;
 }
 
 /** 离开实验：销毁波形查看器 */
@@ -563,10 +649,14 @@ function openExperiment(expId) {
 
   // 测量仪器（指令包 10）：四件仪器共用一份面板
   wireInstruments();
+
+  // 数据面板（指令包 11）：记录/对比/导出/项目存档
+  wireDataPanel();
 }
 
 /** 离开工作区：先清理实验台（含落盘与原理图），再切回列表 */
 function leaveWorkspace() {
+  destroyDataPanel();
   destroyInstruments();
   destroyWaveView();
   destroyBoard();

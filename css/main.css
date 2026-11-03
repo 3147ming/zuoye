@@ -2229,6 +2229,26 @@ button {
   accent-color: #7fd6c2;
 }
 
+.data-panel {
+  border: 1px solid var(--line, rgba(120, 140, 175, 0.25));
+  border-radius: 8px;
+  background: var(--panel, #1a1f27);
+  overflow: hidden;
+}
+
+.data-panel.is-folded .inst-tabs,
+.data-panel.is-folded .inst-body {
+  display: none;
+}
+
+.data-table {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  max-height: 180px;
+  overflow: auto;
+}
+
 /* 尊重系统减弱动效偏好 */
 @media (prefers-reduced-motion: reduce) {
   *,
