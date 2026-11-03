@@ -26,6 +26,9 @@ import { createWaveView } from './waveview.js';
 import { createInstruments } from './instruments.js';
 import { createDataPanel } from './data-panel.js';
 import { migrateArchive } from './datastore.js';
+import { EXAMPLES, getExample, cloneExample } from './examples-data.js';
+import { measureExample, circuitSummary } from './examples-measure.js';
+import { buildReportHtml } from './report.js';
 import { setInstrumentProvider, setInstrumentRestorer } from './model.js';
 import { getPart } from './parts.js';
 
@@ -337,6 +340,124 @@ function destroyInstruments() {
   if (window.__labBoard) window.__labBoard.instruments = null;
 }
 
+/* ==========================================================================
+   示例实验指导书 + 报告（指令包 12）
+   ========================================================================== */
+
+/** 当前打开的实验对应的示例（非示例为 null） */
+let currentExample = null;
+
+/**
+ * 渲染指导书：步骤（可打勾，仅 UI 状态）+ 预期值表 + 观察输入 + 生成报告。
+ * 没有示例时整块隐藏，不占右栏高度。
+ */
+function renderGuide(example) {
+  currentExample = example || null;
+  const host = document.getElementById('guide-panel');
+  if (!host) return;
+  host.replaceChildren();
+  if (!example) {
+    host.hidden = true;
+    return;
+  }
+  host.hidden = false;
+
+  const head = document.createElement('div');
+  head.className = 'inst-head';
+  const title = document.createElement('span');
+  title.className = 'inst-title';
+  title.textContent = '实验指导';
+  const fold = document.createElement('button');
+  fold.type = 'button';
+  fold.className = 'inst-fold';
+  fold.textContent = '收起';
+  head.append(title, fold);
+  host.append(head);
+
+  const body = document.createElement('div');
+  body.className = 'inst-body';
+  host.append(body);
+  fold.addEventListener('click', () => {
+    const folded = host.classList.toggle('is-folded');
+    fold.textContent = folded ? '展开' : '收起';
+    body.hidden = folded;
+  });
+
+  const steps = document.createElement('ol');
+  steps.className = 'guide-steps';
+  (example.guide.steps || []).forEach((text) => {
+    const li = document.createElement('li');
+    const label = document.createElement('label');
+    label.className = 'inst-check';
+    const cb = document.createElement('input');
+    cb.type = 'checkbox';
+    const span = document.createElement('span');
+    span.textContent = text;
+    label.append(cb, span);
+    li.append(label);
+    steps.append(li);
+  });
+  body.append(steps);
+
+  const table = document.createElement('div');
+  table.className = 'data-table';
+  (example.guide.expected || []).forEach((item) => {
+    const line = document.createElement('p');
+    line.className = 'inst-measure-line';
+    line.textContent = `${item.label}：期望 ${item.target}${item.unit || ''}（±${((item.tolerance || 0) * 100).toFixed(1)}%）`;
+    table.append(line);
+  });
+  body.append(table);
+
+  const obsLabel = document.createElement('span');
+  obsLabel.className = 'inst-hint';
+  obsLabel.textContent = '我的观察（会写进报告）：';
+  const obs = document.createElement('textarea');
+  obs.className = 'inst-input guide-obs';
+  obs.rows = 3;
+  obs.placeholder = '例如：中点电压稳定在 2.50V，与理论一致。';
+  body.append(obsLabel, obs);
+
+  const actions = document.createElement('div');
+  actions.className = 'inst-actions';
+  const reportBtn = document.createElement('button');
+  reportBtn.type = 'button';
+  reportBtn.className = 'btn btn-ghost inst-btn btn-primary';
+  reportBtn.textContent = '生成实验报告';
+  reportBtn.addEventListener('click', () => generateExampleReport(example, obs.value));
+  actions.append(reportBtn);
+  body.append(actions);
+}
+
+/** 生成并下载单文件 HTML 报告（数据冻结在点击这一刻） */
+function generateExampleReport(example, observations) {
+  const board = window.__labBoard;
+  if (!board) return;
+  const measured = measureExample(board.model, example);
+  if (!measured.ok && measured.error) {
+    showToast(`报告生成失败：${measured.error}`, 'error');
+    return;
+  }
+  const canvas = document.getElementById('breadboard-canvas');
+  const html = buildReportHtml({
+    title: example.title,
+    time: new Date().toLocaleString('zh-CN'),
+    screenshot: canvas ? canvas.toDataURL('image/png') : '',
+    circuit: circuitSummary(board.model),
+    items: measured.items,
+    observations,
+  });
+  const blob = new Blob([html], { type: 'text/html;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `${example.id}-report.html`;
+  a.click();
+  window.setTimeout(() => URL.revokeObjectURL(url), 2000);
+  const pass = measured.items.filter((x) => x.pass).length;
+  showToast(`报告已生成：${pass}/${measured.items.length} 项符合预期`, 'success');
+}
+
 /**
  * 数据面板（指令包 11）：记录 / 对比 / 导出 + 项目存档。
  * 存档沿用 model.serializeCircuit（version 4），打开时先迁移再 loadCircuit。
@@ -641,6 +762,14 @@ function openExperiment(expId) {
     },
   });
 
+  // 示例实验：每次打开都从只读模板恢复（用户改动不写回模板）
+  const example = getExample(exp.id);
+  if (example && window.__labBoard) {
+    const template = cloneExample(example.circuit);
+    window.__labBoard.model.loadCircuit(template, example.circuit.platform || exp.platform);
+  }
+  renderGuide(example);
+
   // 进入实验就先算一次直流工作点：恢复出来的电路也能立刻看到读数
   simulateNow('init');
 
@@ -656,6 +785,7 @@ function openExperiment(expId) {
 
 /** 离开工作区：先清理实验台（含落盘与原理图），再切回列表 */
 function leaveWorkspace() {
+  renderGuide(null);
   destroyDataPanel();
   destroyInstruments();
   destroyWaveView();
@@ -1253,6 +1383,21 @@ function bindZoomControls() {
 
 /** 启动应用：绑定事件、渲染列表、进入默认视图 */
 function init() {
+  // 示例实验：注册到实验列表（只补缺失，避免每次启动重复写入）
+  EXAMPLES.forEach((ex) => {
+    if (getExperimentById(ex.id)) return;
+    addExperiment({
+      id: ex.id,
+      title: ex.title,
+      desc: ex.desc,
+      durationMin: ex.durationMin,
+      difficulty: ex.difficulty,
+      tags: ex.tags,
+      platform: ex.platform,
+      equipment: ex.equipment,
+    });
+  });
+
   bindEvents();
   activateTab('info');
   renderList();
