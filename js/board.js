@@ -50,6 +50,7 @@ import {
   triggerPulse,
   resetDigState,
   levelBadge,
+  collectDigitalUnits,
 } from './simdig.js';
 import { levelText } from './digmodels.js';
 import {
@@ -57,6 +58,15 @@ import {
   runTransient,
   resetTransientState,
 } from './simtrans.js';
+import {
+  collectMix,
+  mixStateSnapshot,
+  mixStateOf,
+  analyzeMixLoops,
+  comparatorThreshold,
+  resetMixState,
+  MAX_MIX_ITER,
+} from './simmix.js';
 
 /** 存档键前缀 */
 const STORAGE_PREFIX = 'lab-sim-circuit-';
@@ -333,8 +343,21 @@ function refreshHealth() {
       `网络 ${report.netCount}`,
     ];
     if (report.danglingWires.length > 0) parts.push(`悬空导线 ${report.danglingWires.length}`);
+    // 混合仿真标识（包 8）：电路里有边界元件时明确显示"混合仿真"；
+    // 环路/不收敛时把可读原因直接写进状态行（面板另有环路详情）
+    const dig = board.sim ? board.sim.dig : null;
+    const mixCount = dig && dig.mix ? (Number(dig.mix.units) || 0) : 0;
+    let mixedError = false;
+    if (mixCount > 0) {
+      if (dig && dig.ok === false) {
+        mixedError = true;
+        parts.push(`混合仿真 · ${dig.error || '求解失败'}`);
+      } else {
+        parts.push(`混合仿真 · 边界 ${mixCount}`);
+      }
+    }
     status.textContent = parts.join(' · ');
-    status.classList.toggle('is-warn', report.danglingWires.length > 0);
+    status.classList.toggle('is-warn', report.danglingWires.length > 0 || mixedError);
   }
 }
 
@@ -1574,6 +1597,32 @@ export function initBoard(options) {
         return comp.params.state;
       },
     },
+    // 混合信号边界层（指令包 8）：供探针读取边界状态 / 环路 / 阈值
+    simmix: {
+      state: () => mixStateSnapshot(),
+      stateOf: (id) => mixStateOf(id),
+      units: () => collectMix(model.getState(), model.getNetlist().netOf).units.map((unit) => ({
+        componentId: unit.componentId,
+        kind: unit.kind,
+        vccNet: unit.vccNet,
+        gndNet: unit.gndNet,
+        inputs: unit.inputs,
+        outputs: unit.outputs,
+      })),
+      threshold: (params, supply) => comparatorThreshold(params || {}, supply),
+      loops: () => {
+        const netlist = model.getNetlist();
+        const collected = collectMix(model.getState(), netlist.netOf);
+        return analyzeMixLoops({
+          state: model.getState(),
+          netOf: netlist.netOf,
+          mixUnits: collected.units,
+          digitalUnits: collectDigitalUnits(model),
+        });
+      },
+      maxIter: () => MAX_MIX_ITER,
+      reset: () => { resetMixState(); return true; },
+    },
     // 暂态仿真入口（指令包 7）：与 simdc/simdig 同契约风格
     simtrans: {
       // 同步跑完返回结果（测试/一次性求解用）
@@ -1679,6 +1728,7 @@ export function destroyBoard() {
 
   if (board.transientRun && board.transientRun.handle) board.transientRun.handle.stop();
   resetTransientState();
+  resetMixState();
   if (board.interaction) board.interaction.detach();
   destroySchematic();
   changeListeners = [];

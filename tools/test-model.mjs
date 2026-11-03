@@ -624,9 +624,17 @@ function check(name, ok, detail) {
     `${DIG.DIG_MODEL_ORDER.length}+${Object.keys(DIG.DIG_SOURCES).length}`);
   check('数字元件 74 系列是「有意跳过」而非「缺模型」',
     D.hasModel('ic74xx') === false && D.isSkipped('ic74xx') === true, D.modelNote('ic74xx'));
+  const MIX = await import('../js/simmix.js');
+  // 混合信号边界元件（包 8）与 IC 一样是"有意跳过"：它们不在 MNA 方程里，
+  // 而是由 simmix 的边界换算 + 驱动源注入参与求解。
   check('模拟元件都有模型且未被跳过',
-    types.filter((t) => !DIG.isDigital(t)).every((t) => D.hasModel(t) && !D.isSkipped(t)),
-    types.filter((t) => !DIG.isDigital(t)).join(','));
+    types.filter((t) => !DIG.isDigital(t) && !MIX.isMixType(t)).every((t) => D.hasModel(t) && !D.isSkipped(t)),
+    types.filter((t) => !DIG.isDigital(t) && !MIX.isMixType(t)).join(','));
+  check('边界元件是「有意跳过」而非缺模型',
+    MIX.MIX_TYPES_EVERY === undefined
+      ? ['comparator', 'buffer74', 'dac8', 'adc8'].every((t) => MIX.isMixType(t) && D.isSkipped(t) && !D.hasModel(t))
+      : false,
+    ['comparator', 'buffer74', 'dac8', 'adc8'].map((t) => `${t}:${D.isSkipped(t)}`).join(','));
 
   // 电阻 / 电容 / 开关的线性属性
   check('电阻不占额外支路未知量', D.needsBranch('resistor') === false, '');
@@ -1408,6 +1416,198 @@ function relErr(actual, expected) {
   check('跑完后电容有状态', ST.capStateOf(ids13.c).v > 0.5, JSON.stringify(ST.capStateOf(ids13.c)));
   ST.resetTransientState();
   check('resetTransientState 后状态归零', ST.capStateOf(ids13.c).v === 0, JSON.stringify(ST.capStateOf(ids13.c)));
+}
+
+/* ---------------------------------------------------------------- 混合信号内核（包 8） */
+{
+  const MIX = await import('../js/simmix.js');
+
+  const resetMix = () => {
+    M.createCircuit('breadboard');
+    ST.resetTransientState();
+    MIX.resetMixState();
+  };
+  const wire = (a, ta, b, tb) => M.addWire(
+    { componentId: a, terminal: ta },
+    { componentId: b, terminal: tb },
+  );
+  const place = (type, x, y, params) => {
+    const r = M.addComponent(type, x, y, { params });
+    if (!r.ok) throw new Error(`${type} 放置失败：${r.error}`);
+    return r.component.id;
+  };
+
+  /* ---- H1：分压 1k:1k → 比较器（阈值 2.5V） ---- */
+  const buildH1 = (mode) => {
+    resetMix();
+    const vs = place('vsource', 2, 2, { voltage: 5 });
+    const r1 = place('resistor', 6, 2, { resistance: 1000 });
+    const r2 = place('resistor', 10, 2, { resistance: 1000 });
+    const r3 = place('resistor', 2, 8, { resistance: 1000 });
+    const r4 = place('resistor', 6, 8, { resistance: 1000 });
+    wire(vs, '+', r1, '1');
+    wire(r1, '2', r2, '1');
+    wire(r2, '2', vs, '-');
+    wire(vs, '+', r3, '1');
+    wire(r3, '2', r4, '1');
+    wire(r4, '2', vs, '-');
+    const cmp = place('comparator', 16, 2, { threshold: 2.5, hysteresis: 0 });
+    wire(cmp, '-', r3, '2');
+    wire(cmp, 'V+', vs, '+');
+    wire(cmp, 'GND', vs, '-');
+    if (mode === 'divider') {
+      wire(r1, '2', cmp, '+');
+    } else {
+      const src = place('vsource', 2, 14, { voltage: 2.49 });
+      wire(src, '+', cmp, '+');
+      wire(src, '-', vs, '-');
+    }
+    const res = ST.solveTransient(M, { duration: 0.002, dt: 0.001 });
+    return { res, state: MIX.mixStateOf(cmp) };
+  };
+
+  const h1a = buildH1('divider');
+  check('H1 分压中点 2.5V → 比较器输出 hi',
+    h1a.res.ok === true && h1a.state && h1a.state.level === 1,
+    `level=${h1a.state && h1a.state.level} diff=${h1a.state && h1a.state.diff}`);
+  const h1b = buildH1('low');
+  check('H1 输入 2.49V（低于阈值）→ 比较器输出 lo',
+    h1b.res.ok === true && h1b.state && h1b.state.level === 0,
+    `level=${h1b.state && h1b.state.level} diff=${h1b.state && h1b.state.diff}`);
+
+  /* ---- H2：ADC Vin=1.25V / Vref=5V → D=64（≤1 LSB） ---- */
+  {
+    resetMix();
+    const vcc = place('vsource', 2, 2, { voltage: 5 });
+    const src = place('vsource', 2, 8, { voltage: 1.25 });
+    const adc = place('adc8', 10, 2, { vref: 5 });
+    wire(adc, 'IN', src, '+');
+    wire(src, '-', vcc, '-');
+    wire(adc, 'VCC', vcc, '+');
+    wire(adc, 'GND', vcc, '-');
+    const res = ST.solveTransient(M, { duration: 0.002, dt: 0.001 });
+    const state = MIX.mixStateOf(adc);
+    const d = state ? state.bits : -1;
+    check('H2 ADC Vin=1.25V/Vref=5V → D=64（误差 ≤1 LSB）',
+      res.ok === true && Math.abs(d - 64) <= 1, `D=${d}`);
+  }
+
+  /* ---- H3：DAC 输入 0x80 → 2.5V±1%、1k 负载电流 2.5mA±1% ---- */
+  {
+    resetMix();
+    const vcc = place('vsource', 2, 2, { voltage: 5 });
+    const dac = place('dac8', 10, 2, { vref: 5 });
+    const r = place('resistor', 2, 10, { resistance: 1000 });
+    wire(dac, 'VCC', vcc, '+');
+    wire(dac, 'GND', vcc, '-');
+    wire(dac, 'OUT', r, '1');
+    wire(r, '2', vcc, '-');
+    const sw = place('logic-switch', 2 + 7 * 3, 12, { state: 'hi' });
+    wire(sw, 'OUT', dac, 'D7');
+    const res = ST.solveTransient(M, { duration: 0.02, dt: 0.01 });
+    const state = MIX.mixStateOf(dac);
+    const vout = state ? state.vout : null;
+    const current = vout === null ? null : vout / 1000;
+    check('H3 DAC 0x80 → Vout=2.5V±1%',
+      res.ok === true && state && state.bits === 128 && Math.abs(vout - 2.5) / 2.5 <= 0.01,
+      `bits=${state && state.bits} vout=${vout}`);
+    check('H3 DAC 0x80 驱动 1k → 电流 2.5mA±1%',
+      current !== null && Math.abs(current - 2.5e-3) / 2.5e-3 <= 0.01,
+      `I=${current}`);
+  }
+
+  /* ---- H4：RC(10k,10µF) + 比较器施密特（1/4、3/4 VCC） ---- */
+  {
+    resetMix();
+    const vcc = place('vsource', 2, 2, { voltage: 5 });
+    const r1 = place('resistor', 2, 8, { resistance: 1000 });
+    const r2 = place('resistor', 6, 8, { resistance: 1000 });
+    const cmp = place('comparator', 12, 2, { threshold: 2.5, hysteresis: 2.5 });
+    const rf = place('resistor', 12, 14, { resistance: 10000 });
+    const c = place('capacitor', 18, 14, { capacitance: 10e-6 });
+    wire(vcc, '+', r1, '1');
+    wire(r1, '2', r2, '1');
+    wire(r2, '2', vcc, '-');
+    wire(cmp, '+', r1, '2');
+    wire(cmp, 'V+', vcc, '+');
+    wire(cmp, 'GND', vcc, '-');
+    wire(cmp, 'OUT', rf, '1');
+    wire(rf, '2', c, '1');
+    wire(c, '2', vcc, '-');
+    wire(c, '1', cmp, '-');
+
+    const res = ST.solveTransient(M, { duration: 0.8, dt: 0.0005 });
+    const wave = res.waveforms ? res.waveforms.find((w) => {
+      const ch = res.channels.find((x) => x.netId === w.netId);
+      return ch && ch.max > 4.5 && ch.min < 0.5;
+    }) : null;
+    const flips = [];
+    if (wave) {
+      for (let i = 1; i < wave.samples.length; i += 1) {
+        if ((wave.samples[i - 1].v > 2.5) !== (wave.samples[i].v > 2.5)) {
+          flips.push(wave.samples[i].t);
+        }
+      }
+    }
+    const periods = [];
+    for (let i = 2; i < flips.length; i += 2) periods.push(flips[i] - flips[i - 2]);
+    const avg = periods.length > 0 ? periods.reduce((a, b) => a + b, 0) / periods.length : 0;
+    // 理论：充电 1/4→3/4 VCC = RC·ln3，放电同理，周期 = 2·RC·ln3
+    const theory = 2 * 0.1 * Math.log(3);
+    check('H4 弛张振荡器周期与理论 2RC·ln3 一致 ±5%',
+      res.ok === true && periods.length >= 2 && Math.abs(avg - theory) / theory <= 0.05,
+      `实测 ${avg.toFixed(4)}s / 理论 ${theory.toFixed(4)}s（${periods.length} 个周期）`);
+    check('H4 联合迭代在 20 次上限内收敛',
+      res.ok === true && res.stats.mix.iterationsMax > 0 && res.stats.mix.iterationsMax <= MIX.MAX_MIX_ITER,
+      `iterationsMax=${res.stats.mix.iterationsMax}`);
+
+    // 混合波形：模拟与数字通道同一时间轴，且都带 type 标注
+    const analogCh = res.channels.filter((ch) => ch.type === 'analog');
+    const digitalCh = res.channels.filter((ch) => ch.type === 'digital');
+    const sameAxis = analogCh.length > 0 && digitalCh.length > 0
+      && analogCh.every((ch) => {
+        const wa = res.waveforms.find((w) => w.netId === ch.netId);
+        const wd = res.waveforms.find((w) => w.netId === digitalCh[0].netId);
+        return wa && wd && wa.samples.length === wd.samples.length
+          && wa.samples.every((s, i) => Math.abs(s.t - wd.samples[i].t) < 1e-9);
+      });
+    check('H4 混合波形：模拟/数字通道同时间轴且标注 type',
+      sameAxis, `analog=${analogCh.length} digital=${digitalCh.length}`);
+  }
+
+  /* ---- H5：跨域组合环路（比较器→非门→DAC→电阻→比较器） ---- */
+  {
+    resetMix();
+    const vcc = place('vsource', 2, 2, { voltage: 5 });
+    const r1 = place('resistor', 2, 8, { resistance: 1000 });
+    const r2 = place('resistor', 6, 8, { resistance: 1000 });
+    const cmp = place('comparator', 12, 2, { threshold: 2.5, hysteresis: 0 });
+    const ic = place('ic74xx', 20, 2, { type: '74LS04' });
+    const dac = place('dac8', 30, 2, { vref: 5 });
+    const rf = place('resistor', 30, 10, { resistance: 1000 });
+    wire(vcc, '+', r1, '1');
+    wire(r1, '2', r2, '1');
+    wire(r2, '2', vcc, '-');
+    wire(cmp, '+', r1, '2');
+    wire(cmp, 'V+', vcc, '+');
+    wire(cmp, 'GND', vcc, '-');
+    wire(cmp, 'OUT', ic, '1');
+    for (let i = 0; i < 8; i += 1) wire(ic, '2', dac, `D${i}`);
+    wire(dac, 'VCC', vcc, '+');
+    wire(dac, 'GND', vcc, '-');
+    wire(dac, 'OUT', rf, '1');
+    wire(rf, '2', cmp, '+');
+
+    const res = ST.solveTransient(M, { duration: 0.01, dt: 0.005 });
+    check('H5 跨域组合环路被检出（ok:false）',
+      res.ok === false && String(res.error).includes('跨域'), res.error);
+    const listed = [cmp, ic, dac, rf].every((id) => String(res.detail).includes(id.split('-')[0]));
+    check('H5 环路报错列出 4 个环上元件',
+      String(res.detail).includes('comparator') && String(res.detail).includes('ic74xx')
+      && String(res.detail).includes('dac8') && String(res.detail).includes('resistor'),
+      res.detail);
+    void listed;
+  }
 }
 
 /* ---------------------------------------------------------------- 汇总 */

@@ -457,6 +457,143 @@ function drawClock(ctx, comp, style) {
   }
 }
 
+/* ==========================================================================
+   混合信号边界元件（指令包 8）
+   ========================================================================== */
+
+/**
+ * 比较器：小 DIP 壳 + 三角符号。
+ * 端子：左「+ / −」，右「OUT / V+ / GND」——与真实 LM393 的双列封装不同，
+ * 这里按教学接线习惯排成单排，避免 8 脚小芯片在面包板上跨度过大。
+ */
+function drawComparator(ctx, comp, style) {
+  const { frame, pinLabels } = style;
+  drawContactShadow(ctx, frame, 0.1, 0.12, frame.w - 0.1, frame.h - 0.12);
+  prism(ctx, frame, 0.3, 0.22, frame.w - 0.3, frame.h - 0.22, 7, '#333a4e', '#1e2332', '#181c28', 'rgba(0,0,0,0.55)');
+
+  const a = lift(frame.project(0.8, 0.62), 7);
+  const b = lift(frame.project(0.8, frame.h - 0.62), 7);
+  const c = lift(frame.project(frame.w - 0.7, frame.h / 2 - 0.5), 7);
+  poly(ctx, [a, b, c]);
+  ctx.closePath();
+  ctx.fillStyle = 'rgba(242, 169, 59, 0.8)';
+  ctx.fill();
+  ctx.strokeStyle = 'rgba(255, 255, 255, 0.35)';
+  ctx.lineWidth = 1;
+  ctx.stroke();
+
+  // 引线：每个端子接到本体边缘
+  const def = PARTS.comparator;
+  def.terminals.forEach((t) => {
+    const to = frame.project(t.dx, t.dy);
+    const from = frame.project(
+      t.dx === 0 ? 0.3 : frame.w - 0.3,
+      Math.min(frame.h - 0.3, Math.max(0.3, t.dy)),
+    );
+    drawLead(ctx, to, from, '#c2c7d4', 1.5);
+  });
+
+  if (pinLabels) {
+    def.terminals.forEach((t) => {
+      drawPinLabel(ctx, frame.project(t.dx, t.dy), t.name, t.name === 'V+' || t.name === 'GND');
+    });
+  }
+}
+
+/** 数字缓冲：4 脚小芯片 + 缓冲三角 */
+function drawBuffer(ctx, comp, style) {
+  const { frame, pinLabels } = style;
+  void comp;
+  drawContactShadow(ctx, frame, 0.12, 0.12, frame.w - 0.12, frame.h - 0.12);
+  prism(ctx, frame, 0.34, 0.24, frame.w - 0.34, frame.h - 0.24, 6, '#31405a', '#1d2738', '#171f2d', 'rgba(0,0,0,0.55)');
+
+  const a = lift(frame.project(0.52, 0.38), 6);
+  const b = lift(frame.project(0.52, frame.h - 0.38), 6);
+  const c = lift(frame.project(frame.w - 0.52, frame.h / 2 - 0.5), 6);
+  poly(ctx, [a, b, c]);
+  ctx.closePath();
+  ctx.fillStyle = 'rgba(127, 214, 194, 0.85)';
+  ctx.fill();
+
+  const def = PARTS.buffer74;
+  def.terminals.forEach((t) => {
+    const to = frame.project(t.dx, t.dy);
+    const from = frame.project(
+      t.dx === 0 ? 0.34 : frame.w - 0.34,
+      Math.min(frame.h - 0.34, Math.max(0.34, t.dy)),
+    );
+    drawLead(ctx, to, from, '#c2c7d4', 1.5);
+  });
+
+  if (pinLabels) {
+    def.terminals.forEach((t) => {
+      drawPinLabel(ctx, frame.project(t.dx, t.dy), t.name, t.name === 'VCC' || t.name === 'GND');
+    });
+  }
+}
+
+/**
+ * 8 位 DAC / ADC 的共用外壳：宽体芯片 + 顶部 8 个数据脚 + 底部 3 个脚。
+ * 数据脚按 D0（最低位）在左、D7（最高位）在右排布，丝印直接写位号。
+ */
+function drawWideChip(ctx, style, label, accent, bottomLabel) {
+  const { frame, pinLabels } = style;
+  drawContactShadow(ctx, frame, 0.05, 0.55, frame.w - 0.05, frame.h - 0.55);
+  prism(
+    ctx, frame, 0.12, 0.55, frame.w - 0.12, frame.h - 0.55, 8,
+    '#32323e', '#1e1e26', '#191920', 'rgba(0,0,0,0.55)',
+  );
+
+  // 顶部 8 个数据脚
+  for (let i = 0; i < 8; i += 1) {
+    drawLead(ctx, frame.project(i, 0), frame.project(0.12 + i, 0.55), '#c2c7d4', 1.4);
+    const dot = lift(frame.project(0.12 + i, 0.62), 8);
+    ctx.beginPath();
+    ctx.arc(dot.x, dot.y, 1.3, 0, Math.PI * 2);
+    ctx.fillStyle = accent;
+    ctx.fill();
+  }
+  // 底部 3 个脚
+  [0, 3, 5].forEach((col) => {
+    drawLead(ctx, frame.project(col, frame.h - 1), frame.project(0.12 + col, frame.h - 0.55), '#c2c7d4', 1.4);
+  });
+
+  // 缺口
+  const notch = lift(frame.project(0.5, 0.55), 8);
+  ctx.beginPath();
+  ctx.arc(notch.x, notch.y, Math.max(2.5, frame.tileW * 0.13), 0, Math.PI * 2);
+  ctx.fillStyle = '#12121a';
+  ctx.fill();
+
+  // 丝印
+  const title = lift(frame.project(frame.w / 2 - 0.5, frame.h / 2 - 0.5), 8);
+  const size = Math.max(7, Math.min(12, frame.tileW * 0.32));
+  ctx.font = `700 ${size}px "Cascadia Mono", Consolas, monospace`;
+  ctx.fillStyle = accent;
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText(label, title.x, title.y);
+
+  if (pinLabels) {
+    for (let i = 0; i < 8; i += 1) {
+      drawPinLabel(ctx, frame.project(i, 0), `D${i}`);
+    }
+    drawPinLabel(ctx, frame.project(0, frame.h - 1), bottomLabel);
+    drawPinLabel(ctx, frame.project(3, frame.h - 1), 'VCC', true);
+    drawPinLabel(ctx, frame.project(5, frame.h - 1), 'GND', true);
+  }
+}
+
+function drawDac8(ctx, comp, style) {
+  void comp;
+  drawWideChip(ctx, style, 'DAC8', 'rgba(242, 169, 59, 0.9)', 'OUT');
+}
+
+function drawAdc8(ctx, comp, style) {
+  void comp;
+  drawWideChip(ctx, style, 'ADC8', 'rgba(127, 214, 194, 0.9)', 'IN');
+}
+
 /** 电源类共用的底座：深色矮模块 + 两侧引线 */
 function drawSourceBase(ctx, style, accent) {
   const { frame } = style;
@@ -765,6 +902,124 @@ export const PARTS = {
     ],
     draw: drawClock,
   },
+
+  /* ---- 混合信号边界元件（指令包 8） ---- */
+
+  comparator: {
+    id: 'comparator',
+    label: '比较器',
+    group: '混合信号',
+    size: { w: 3, h: 3 },
+    terminals: [
+      { name: '+', dx: 0, dy: 0, direction: 'in', role: 'analog' },
+      { name: '-', dx: 0, dy: 2, direction: 'in', role: 'analog' },
+      { name: 'OUT', dx: 2, dy: 0, direction: 'out', role: 'logic' },
+      { name: 'V+', dx: 2, dy: 1, direction: 'power', role: 'VCC' },
+      { name: 'GND', dx: 2, dy: 2, direction: 'power', role: 'GND' },
+    ],
+    defaultParams: { threshold: 2.5, hysteresis: 0 },
+    paramFields: [
+      {
+        key: 'threshold',
+        label: '阈值',
+        type: 'number',
+        unit: 'V',
+        factor: 1,
+        step: 0.1,
+        min: 0,
+        max: 30,
+      },
+      {
+        key: 'hysteresis',
+        label: '滞回',
+        type: 'number',
+        unit: 'V',
+        factor: 1,
+        step: 0.1,
+        min: 0,
+        max: 30,
+      },
+    ],
+    draw: drawComparator,
+  },
+
+  buffer74: {
+    id: 'buffer74',
+    label: '数字缓冲',
+    group: '混合信号',
+    size: { w: 2, h: 2 },
+    terminals: [
+      { name: 'IN', dx: 0, dy: 0, direction: 'in', role: 'logic' },
+      { name: 'OUT', dx: 1, dy: 0, direction: 'out', role: 'logic' },
+      { name: 'VCC', dx: 0, dy: 1, direction: 'power', role: 'VCC' },
+      { name: 'GND', dx: 1, dy: 1, direction: 'power', role: 'GND' },
+    ],
+    defaultParams: {},
+    paramFields: [],
+    draw: drawBuffer,
+  },
+
+  dac8: {
+    id: 'dac8',
+    label: '8 位 DAC',
+    group: '混合信号',
+    size: { w: 8, h: 3 },
+    terminals: (() => {
+      const list = [];
+      for (let i = 0; i < 8; i += 1) {
+        list.push({ name: `D${i}`, dx: i, dy: 0, direction: 'in', role: 'logic' });
+      }
+      list.push({ name: 'OUT', dx: 0, dy: 2, direction: 'out', role: 'analog' });
+      list.push({ name: 'VCC', dx: 3, dy: 2, direction: 'power', role: 'VCC' });
+      list.push({ name: 'GND', dx: 5, dy: 2, direction: 'power', role: 'GND' });
+      return list;
+    })(),
+    defaultParams: { vref: 5 },
+    paramFields: [
+      {
+        key: 'vref',
+        label: '基准',
+        type: 'number',
+        unit: 'V',
+        factor: 1,
+        step: 0.5,
+        min: 0.1,
+        max: 30,
+      },
+    ],
+    draw: drawDac8,
+  },
+
+  adc8: {
+    id: 'adc8',
+    label: '8 位 ADC',
+    group: '混合信号',
+    size: { w: 8, h: 3 },
+    terminals: (() => {
+      const list = [];
+      for (let i = 0; i < 8; i += 1) {
+        list.push({ name: `D${i}`, dx: i, dy: 0, direction: 'out', role: 'logic' });
+      }
+      list.push({ name: 'IN', dx: 0, dy: 2, direction: 'in', role: 'analog' });
+      list.push({ name: 'VCC', dx: 3, dy: 2, direction: 'power', role: 'VCC' });
+      list.push({ name: 'GND', dx: 5, dy: 2, direction: 'power', role: 'GND' });
+      return list;
+    })(),
+    defaultParams: { vref: 5 },
+    paramFields: [
+      {
+        key: 'vref',
+        label: '基准',
+        type: 'number',
+        unit: 'V',
+        factor: 1,
+        step: 0.5,
+        min: 0.1,
+        max: 30,
+      },
+    ],
+    draw: drawAdc8,
+  },
 };
 
 /** 元件库展示顺序 */
@@ -779,6 +1034,10 @@ export const PART_ORDER = [
   'pulse',
   'clock',
   'ic74xx',
+  'comparator',
+  'buffer74',
+  'dac8',
+  'adc8',
 ];
 
 /** 取元件定义，未知类型返回 null */

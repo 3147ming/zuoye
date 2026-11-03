@@ -320,6 +320,20 @@ const ic74xxModel = {
   reason: '数字元件，包 6 处理',
 };
 
+/**
+ * 混合信号边界元件（指令包 8）：跨域换算由 simmix 负责。
+ * 这里显式 skip——它们在模拟方程里不出现（输出经 simtrans/simdig 的驱动源注入），
+ * 但也不是"缺模型"。
+ */
+function mixSkip(id, label) {
+  return {
+    id,
+    label,
+    skip: true,
+    reason: '混合信号边界元件，由 simmix 处理',
+  };
+}
+
 /* ==========================================================================
    注册表与查询
    ========================================================================== */
@@ -332,6 +346,10 @@ export const MODELS = {
   vsource: vsourceModel,
   isource: isourceModel,
   ic74xx: ic74xxModel,
+  comparator: mixSkip('comparator', '比较器'),
+  buffer74: mixSkip('buffer74', '数字缓冲'),
+  dac8: mixSkip('dac8', '8 位 DAC'),
+  adc8: mixSkip('adc8', '8 位 ADC'),
 };
 
 /** 取模型，未知类型返回 null */

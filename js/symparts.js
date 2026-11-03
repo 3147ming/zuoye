@@ -320,6 +320,108 @@ function drawIc(ctx, comp, g) {
 }
 
 /* ==========================================================================
+   混合信号边界元件符号（指令包 8）
+   ========================================================================== */
+
+/** 比较器：三角 + +/− 输入 + 电源脚 */
+function drawComparatorSym(ctx, comp, g) {
+  void comp;
+  const ink = g.color.ink;
+  const muted = g.color.muted;
+  const a = g.p(1.5, 0.9);
+  const b = g.p(1.5, 5.1);
+  const c = g.p(4.6, 3);
+
+  polyline(ctx, [a, b, c, a], ink, 1.8);
+
+  // 输入引线与极性
+  polyline(ctx, [g.p(0, 1.6), g.p(1.5, 1.6)], ink, 1.8);
+  polyline(ctx, [g.p(0, 4.4), g.p(1.5, 4.4)], ink, 1.8);
+  polyline(ctx, [c, g.p(6, 3)], ink, 1.8);
+
+  const fontSize = Math.max(9, Math.min(13, g.cell * 0.62));
+  ctx.font = `600 ${fontSize}px "Cascadia Mono", Consolas, monospace`;
+  ctx.fillStyle = ink;
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText('+', g.p(0.75, 1.6).x, g.p(0.75, 1.6).y);
+  ctx.fillText('−', g.p(0.75, 4.4).x, g.p(0.75, 4.4).y);
+
+  // 电源脚：从三角上下边接入
+  polyline(ctx, [g.p(3, 0), g.p(3, 1.92)], ink, 1.6);
+  polyline(ctx, [g.p(3, 6), g.p(3, 4.08)], ink, 1.6);
+  ctx.font = `${Math.max(7, fontSize * 0.72)}px "Cascadia Mono", Consolas, monospace`;
+  ctx.fillStyle = muted;
+  ctx.textAlign = 'left';
+  ctx.fillText('V+', g.p(3.16, 0.55).x, g.p(3.16, 0.55).y);
+  ctx.fillText('GND', g.p(3.16, 5.5).x, g.p(3.16, 5.5).y);
+}
+
+/** 数字缓冲：小三角 + 电源脚 */
+function drawBufferSym(ctx, comp, g) {
+  void comp;
+  const ink = g.color.ink;
+  const a = g.p(0.9, 0.6);
+  const b = g.p(0.9, 2.4);
+  const c = g.p(3.1, 1.5);
+  polyline(ctx, [a, b, c, a], ink, 1.8);
+  polyline(ctx, [g.p(0, 1.5), g.p(0.9, 1.5)], ink, 1.8);
+  polyline(ctx, [c, g.p(4, 1.5)], ink, 1.8);
+  polyline(ctx, [g.p(2, 0), g.p(2, 1.05)], ink, 1.5);
+  polyline(ctx, [g.p(2, 4), g.p(2, 1.95)], ink, 1.5);
+}
+
+/** 8 位 DAC / ADC：宽体方框 + 8 个数据脚 */
+function drawWideSym(ctx, comp, g, title) {
+  const ink = g.color.ink;
+  const muted = g.color.muted;
+  const x0 = 1.2;
+  const x1 = 5.8;
+  const y0 = 0.6;
+  const y1 = 8.4;
+  box(ctx, g, x0, y0, x1, y1);
+
+  const fontSize = Math.max(7, Math.min(10, g.cell * 0.5));
+  ctx.font = `${fontSize}px "Cascadia Mono", Consolas, monospace`;
+  ctx.textAlign = 'left';
+  ctx.textBaseline = 'middle';
+  ctx.fillStyle = muted;
+
+  g.sym.pins.forEach((pin) => {
+    const vertical = pin.side === 'left' || pin.side === 'right';
+    const inner = pin.side === 'left' ? x0 : pin.side === 'right' ? x1 : pin.dy;
+    if (vertical) {
+      const outer = pin.side === 'left' ? 0 : 7;
+      polyline(ctx, [g.p(outer, pin.dy), g.p(inner, pin.dy)], ink, 1.6);
+      if (pin.side === 'left') {
+        const at = g.p(x0 + 0.26, pin.dy);
+        ctx.textAlign = 'left';
+        ctx.fillText(pin.name, at.x, at.y);
+      }
+    } else {
+      polyline(ctx, [g.p(pin.dx, pin.dy), g.p(pin.dx, pin.side === 'top' ? y0 : y1)], ink, 1.6);
+    }
+  });
+
+  const size = Math.max(9, Math.min(14, g.cell * 0.7));
+  ctx.font = `700 ${size}px "Cascadia Mono", Consolas, monospace`;
+  ctx.textAlign = 'center';
+  ctx.fillStyle = ink;
+  const center = g.p((x0 + x1) / 2 + 0.7, (y0 + y1) / 2);
+  ctx.fillText(title, center.x, center.y);
+}
+
+function drawDacSym(ctx, comp, g) {
+  void comp;
+  drawWideSym(ctx, g, 'DAC8');
+}
+
+function drawAdcSym(ctx, comp, g) {
+  void comp;
+  drawWideSym(ctx, g, 'ADC8');
+}
+
+/* ==========================================================================
    符号注册表
    ========================================================================== */
 
@@ -472,6 +574,76 @@ export const SYMBOLS = {
       const hz = Number(comp.params.frequency);
       return Number.isFinite(hz) ? `CLK ${hz}Hz` : 'CLK';
     },
+  },
+
+  /* ---- 混合信号边界元件（指令包 8） ---- */
+
+  comparator: {
+    id: 'comparator',
+    label: '比较器',
+    size: { w: 6, h: 6 },
+    pins: [
+      { name: '+', dx: 0, dy: 1.6, side: 'left', role: 'in' },
+      { name: '-', dx: 0, dy: 4.4, side: 'left', role: 'in' },
+      { name: 'OUT', dx: 6, dy: 3, side: 'right', role: 'out' },
+      { name: 'V+', dx: 3, dy: 0, side: 'top', role: 'VCC' },
+      { name: 'GND', dx: 3, dy: 6, side: 'bottom', role: 'GND' },
+    ],
+    draw: drawComparatorSym,
+    labelText: (comp) => {
+      const th = Number(comp.params.threshold);
+      return Number.isFinite(th) ? `CMP ${th}V` : 'CMP';
+    },
+  },
+
+  buffer74: {
+    id: 'buffer74',
+    label: '数字缓冲',
+    size: { w: 4, h: 4 },
+    pins: [
+      { name: 'IN', dx: 0, dy: 1.5, side: 'left', role: 'in' },
+      { name: 'OUT', dx: 4, dy: 1.5, side: 'right', role: 'out' },
+      { name: 'VCC', dx: 2, dy: 0, side: 'top', role: 'VCC' },
+      { name: 'GND', dx: 2, dy: 4, side: 'bottom', role: 'GND' },
+    ],
+    draw: drawBufferSym,
+    labelText: () => 'BUF',
+  },
+
+  dac8: {
+    id: 'dac8',
+    label: '8 位 DAC',
+    size: { w: 7, h: 9 },
+    pins: (() => {
+      const list = [];
+      for (let i = 0; i < 8; i += 1) {
+        list.push({ name: `D${i}`, dx: 0, dy: i + 1, side: 'left', role: 'in' });
+      }
+      list.push({ name: 'OUT', dx: 7, dy: 4.5, side: 'right', role: 'out' });
+      list.push({ name: 'VCC', dx: 3.5, dy: 0, side: 'top', role: 'VCC' });
+      list.push({ name: 'GND', dx: 3.5, dy: 9, side: 'bottom', role: 'GND' });
+      return list;
+    })(),
+    draw: drawDacSym,
+    labelText: () => 'DAC8',
+  },
+
+  adc8: {
+    id: 'adc8',
+    label: '8 位 ADC',
+    size: { w: 7, h: 9 },
+    pins: (() => {
+      const list = [];
+      for (let i = 0; i < 8; i += 1) {
+        list.push({ name: `D${i}`, dx: 0, dy: i + 1, side: 'left', role: 'out' });
+      }
+      list.push({ name: 'IN', dx: 7, dy: 4.5, side: 'right', role: 'in' });
+      list.push({ name: 'VCC', dx: 3.5, dy: 0, side: 'top', role: 'VCC' });
+      list.push({ name: 'GND', dx: 3.5, dy: 9, side: 'bottom', role: 'GND' });
+      return list;
+    })(),
+    draw: drawAdcSym,
+    labelText: () => 'ADC8',
   },
 };
 

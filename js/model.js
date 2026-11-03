@@ -344,9 +344,10 @@ export function rotateComponent(id) {
   if (!comp) return { ok: false, error: '元件不存在' };
 
   const def = getPart(comp.type);
-  if (!def || def.size.w === def.size.h) {
-    return { ok: false, error: '该元件为正方占位，旋转无变化' };
-  }
+  if (!def) return { ok: false, error: '未知元件类型' };
+  // 正方占位也允许旋转：比较器（3×3）的端子排布不对称，
+  // 学生需要转 90° 把电源脚换到另一侧来走线。
+  // 占位不变时下面的边界/重叠校验依然生效（不会把元件转出平台）。
 
   // 循环四向：0 → 90 → 180 → 270 → 0（每次 90°）
   const next = (comp.rotation + 90) % 360;
