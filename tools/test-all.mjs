@@ -56,7 +56,7 @@ async function main() {
   results.push(modelStep);
   if (failFast && !modelStep.ok) return finish(results);
 
-  const files = (await readdir(PROBE_DIR)).filter((f) => /^run.*\.mjs$/.test(f)).sort();
+  const files = (await readdir(PROBE_DIR)).filter((f) => /^(run|probe).*\.mjs$/.test(f)).sort();
   for (const file of files) {
     const name = basename(file, '.mjs');
     if (only && !only.includes(name)) continue;

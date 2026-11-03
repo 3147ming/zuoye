@@ -1,31 +1,40 @@
 {
-  "at": "2026-11-03T13:19:29.795Z",
+  "at": "2026-11-03T13:26:19.201Z",
   "ok": true,
-  "totalChecks": 889,
-  "passedChecks": 889,
+  "totalChecks": 904,
+  "passedChecks": 904,
   "steps": [
     {
       "label": "静态检查",
       "code": 0,
-      "ms": 2980,
-      "passed": 28,
-      "total": 28,
+      "ms": 4265,
+      "passed": 29,
+      "total": 29,
       "ok": true,
-      "tail": "OK   symrender.js\nOK   waveview.js\n\n=== 语法检查：28/28 通过 ==="
+      "tail": "OK   version.js\nOK   waveview.js\n\n=== 语法检查：29/29 通过 ==="
     },
     {
       "label": "model 自测",
       "code": 0,
-      "ms": 1082,
+      "ms": 1210,
       "passed": 467,
       "total": 467,
       "ok": true,
       "tail": "=== model 自测：467/467 通过 ==="
     },
     {
+      "label": "probe14",
+      "code": 0,
+      "ms": 231,
+      "passed": 14,
+      "total": 14,
+      "ok": true,
+      "tail": "OK   14 100 元件链式电路：可求解\n     B1 计时：9.2ms\n\n=== 探针结果：14/14 通过 ==="
+    },
+    {
       "label": "run10",
       "code": 0,
-      "ms": 4855,
+      "ms": 4983,
       "passed": 27,
       "total": 27,
       "ok": true,
@@ -34,7 +43,7 @@
     {
       "label": "run11",
       "code": 0,
-      "ms": 6163,
+      "ms": 3918,
       "passed": 21,
       "total": 21,
       "ok": true,
@@ -43,7 +52,7 @@
     {
       "label": "run12",
       "code": 0,
-      "ms": 4578,
+      "ms": 4084,
       "passed": 15,
       "total": 15,
       "ok": true,
@@ -52,7 +61,7 @@
     {
       "label": "run13",
       "code": 0,
-      "ms": 9487,
+      "ms": 4767,
       "passed": 16,
       "total": 16,
       "ok": true,
@@ -61,16 +70,16 @@
     {
       "label": "run5",
       "code": 0,
-      "ms": 15213,
+      "ms": 13792,
       "passed": 40,
       "total": 40,
       "ok": true,
-      "tail": "PASS | 全程无 console 报错/警告\n\n=== 探针结果：40/40 通过 ===\n性能： {\"median\":0.3999999761581421,\"max\":0.699999988079071,\"min\":0.19999998807907104,\"nodes\":1,\"engineMs\":0.8}"
+      "tail": "PASS | 全程无 console 报错/警告\n\n=== 探针结果：40/40 通过 ===\n性能： {\"median\":0.30000001192092896,\"max\":0.699999988079071,\"min\":0.09999996423721313,\"nodes\":1,\"engineMs\":0.6}"
     },
     {
       "label": "run6",
       "code": 0,
-      "ms": 20813,
+      "ms": 14816,
       "passed": 45,
       "total": 45,
       "ok": true,
@@ -79,7 +88,7 @@
     {
       "label": "run7",
       "code": 0,
-      "ms": 11134,
+      "ms": 12989,
       "passed": 35,
       "total": 35,
       "ok": true,
@@ -88,7 +97,7 @@
     {
       "label": "run8",
       "code": 0,
-      "ms": 5559,
+      "ms": 5175,
       "passed": 40,
       "total": 40,
       "ok": true,
@@ -106,7 +115,7 @@
     {
       "label": "runA",
       "code": 0,
-      "ms": 10129,
+      "ms": 10300,
       "passed": 33,
       "total": 33,
       "ok": true,
@@ -115,7 +124,7 @@
     {
       "label": "runB",
       "code": 0,
-      "ms": 32368,
+      "ms": 31692,
       "passed": 87,
       "total": 87,
       "ok": true,
