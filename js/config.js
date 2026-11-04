@@ -13,9 +13,9 @@
   'use strict';
 
   var CONFIG = {
-    version: '1.1.0',
+    version: '1.1.1',
     build: '2026-11-04',
-    stage: '第四批优化 · 总门与区块',
+    stage: '第五批扩展 · 镜头放大 + 手机触屏',
 
     /* assets/bg/ 下的图片文件名。留空则设置里的下拉只有「默认」。
        例：['plaza.jpg', 'forest.png'] */
