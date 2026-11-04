@@ -417,6 +417,23 @@ body[data-scene]:not([data-scene="world"]) .hud-keys {
   font-size: 3cqw; white-space: nowrap; pointer-events: none;
 }
 
+/* ---------- 竖屏触屏：按钮移到舞台外（下方黑边），让游戏画面更宽敞 ---------- */
+@media (orientation: portrait) and (hover: none) {
+  /* position:fixed 逃出 .stage 的 overflow:hidden，覆盖到整屏 */
+  .touch-ui { position: fixed; inset: 0; z-index: 35; }
+  .t-pad {
+    position: fixed; top: auto;
+    bottom: max(14px, env(safe-area-inset-bottom, 0px));
+    left: 0; right: 0; height: auto;
+    display: flex; justify-content: space-between; align-items: flex-end;
+    padding: 0 3cqw;
+  }
+  .t-grp { position: static; bottom: auto; }
+  .t-grp-l { left: auto; }
+  .t-grp-r { right: auto; }
+  .t-cross-hint { position: fixed; bottom: 18cqw; }
+}
+
 /* ---------- 顶栏齿轮（设置入口）---------- */
 .gear {
   position: absolute;

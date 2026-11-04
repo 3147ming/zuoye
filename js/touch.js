@@ -26,6 +26,7 @@
     'iframe-飞机大战': { cross: true },
     'iframe-泡泡龙': { cross: true },
     'iframe-乒乓': { cross: true },
+    'iframe-仓库行动': { cross: true },
     /* 本地开源门（同源）：派发合成键盘事件 */
     'iframe-俄罗斯方块': { keys: [
       K('←', 'ArrowLeft', 'ArrowLeft', 37, 'L'), K('→', 'ArrowRight', 'ArrowRight', 39, 'L'),

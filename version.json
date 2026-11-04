@@ -1,5 +1,5 @@
 {
-  "version": "1.2.0",
+  "version": "1.3.0",
   "build": "2026-11-04",
-  "notes": "第七批：① 游戏区接入脑力街机九门（flappy/tiles/plane/bubble/pong 新增，snake 换 brain 新版，tetris/mines/breaker 同名择优保留开源），iframe 双返回（回上一级/回大厅）；② 工具区新增网址推荐（共享 KV 存储 + 自动自检 + 本地降级）；③ 格斗触屏键位改 ADWS JKL SHIFT（移动映射 P1 的 G/J/Y/H）"
+  "notes": "第七批：① 脑力街机九门 + 同名择优 + 双返回；② 网址推荐区；③ 格斗触屏键位 ADWS JKL SHIFT；④ 全界面中文化 + 屏幕自适应（竖屏触屏按钮移至舞台下方、links 页 1/2/3 列响应式）；⑤ 新增仓库行动（跨域 FPS 直达）"
 }

@@ -175,7 +175,11 @@
     { id: 'gomoku', cat: 'games', group: '🕹 开源小游戏', name: '五子棋', src: 'games/gomoku/index.html',
       color: '#e8b45a', glyph: 'gomoku', desc: '人机对弈 · 五连', seed: 1110 },
     { id: 'breakout', cat: 'games', group: '🕹 开源小游戏', name: '打砖块', src: 'games/breakout/index.html',
-      color: '#f2a0c0', glyph: 'breakout', desc: '反弹消砖 · 逐关', seed: 1111 }
+      color: '#f2a0c0', glyph: 'breakout', desc: '反弹消砖 · 逐关', seed: 1111 },
+    { id: 'warehouse', cat: 'games', group: '🕹 开源小游戏', name: '仓库行动',
+      src: 'https://warehouse-strike.pages.dev/',
+      color: '#ff6b6b', glyph: 'arcade', desc: '网页 FPS · 仓库枪战',
+      cross: true, seed: 1201 }
   ];
 
   /* 每个场景的 NPC 台词：line1 是头顶气泡的第一行（要短），lines 是面板里的全文 */
@@ -345,6 +349,16 @@
         '左右移动挡板，空格开始或者发球。',
         '打累了就从边缘走出去。'
       ]
+    },
+    warehouse: {
+      name: '哨兵',
+      line1: '仓库里不太平。',
+      lines: [
+        '仓库里进了人，拿好枪清场。',
+        '仓库行动：网页 FPS，瞄准射击，把仓库里的敌人清干净。',
+        '鼠标瞄准、点击射击，手机上直接触屏操作；需要联网才能进。',
+        '从画面边缘走出去，就回广场了。'
+      ]
     }
   };
 
@@ -492,7 +506,7 @@
     ['总门', '广场往左 / 往右各有一座总门，站过去按 E 选区块'],
     ['传送', '选完直接落到那个区块中央，先听 NPC 讲，再按 E 进门'],
     ['区块', '任意一侧边缘走出去，就回中心广场'],
-    ['游戏 / 工具', '右上角「← 返回大厅」按钮，或按 Esc 回大厅'],
+    ['游戏 / 工具', '左上「← 回上一级」回到进门前那屏，右上「← 回大厅」回广场'],
     ['设置', '顶栏齿轮或 O 键：场景背景 / 音量 / 全屏 / 重置存档'],
     ['通用', 'Esc 关闭面板 · H 关掉这块面板']
   ];
@@ -2121,7 +2135,7 @@
 
     ctx.fillStyle = 'rgba(255, 217, 168, 0.62)';
     ctx.font = '400 13px ' + SANS;
-    ctx.fillText('W O R L D   H U B', cx, cy - 100);
+    ctx.fillText('游 戏 合 集', cx, cy - 100);
 
     ctx.fillStyle = '#fdf3e4';
     ctx.font = '600 62px ' + SERIF;
@@ -2178,7 +2192,7 @@
 
     ctx.fillStyle = 'rgba(253, 243, 228, 0.34)';
     ctx.font = '400 13px ' + SANS;
-    ctx.fillText('HELP · 全部按键一览', cx, y + 78);
+    ctx.fillText('全部按键一览', cx, y + 78);
 
     ctx.strokeStyle = 'rgba(240, 167, 110, 0.20)';
     ctx.lineWidth = 1;

@@ -10,7 +10,7 @@
   html, body { height: 100%; margin: 0; background: #0b0914; color: #f3e9da; font-family: var(--sans); }
   body { display: flex; flex-direction: column; overflow: hidden; }
 
-  .wrap { flex: 1; display: flex; flex-direction: column; width: min(560px, 100%); margin: 0 auto; padding: 2.2cqw 2.2cqw 3cqw; gap: 1.4cqw; overflow: hidden; }
+  .wrap { flex: 1; display: flex; flex-direction: column; width: min(960px, 100%); margin: 0 auto; padding: 2.2cqw 2.2cqw 3cqw; gap: 1.4cqw; overflow: hidden; container-type: inline-size; }
 
   .head { display: flex; align-items: center; gap: 1cqw; }
   .head h1 { font-size: 3.6cqw; margin: 0; font-weight: 600; letter-spacing: 0.06em; }
@@ -28,7 +28,7 @@
 
   .err { min-height: 2.4cqw; font-size: 2.2cqw; color: #ff9f9f; letter-spacing: 0.04em; }
 
-  .list { flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 1cqw; padding-right: 0.4cqw; }
+  .list { flex: 1; overflow-y: auto; display: grid; grid-template-columns: 1fr; gap: 1cqw; padding-right: 0.4cqw; align-content: start; }
   .card { display: flex; align-items: center; gap: 1.4cqw; padding: 1.5cqw 1.8cqw; border-radius: 12px;
     border: 1px solid rgba(255,220,180,0.12); background: rgba(255,255,255,0.035); }
   .card .lc-name { font-size: 2.8cqw; font-weight: 600; color: #ffe3bd; text-decoration: none; flex-shrink: 0; }
@@ -43,12 +43,22 @@
 
   .foot { font-size: 2cqw; color: rgba(243,233,218,0.42); text-align: center; letter-spacing: 0.04em; }
 
-  @media (max-width: 520px) {
+  /* ---- 响应式断点：手机单列 / 平板双列 / 桌面三列 ---- */
+  @media (max-width: 500px) {
+    .wrap { width: 100%; }
     .form { grid-template-columns: 1fr; }
     .head h1 { font-size: 5cqw; }
     .form input, .form button { font-size: 4cqw; padding: 1.6cqw 1.8cqw; }
     .card { flex-wrap: wrap; }
     .card .lc-url { flex-basis: 100%; }
+  }
+  @media (min-width: 501px) and (max-width: 900px) {
+    .wrap { width: min(720px, 100%); }
+    .list { grid-template-columns: 1fr 1fr; }
+  }
+  @media (min-width: 901px) {
+    .wrap { width: min(960px, 100%); }
+    .list { grid-template-columns: 1fr 1fr 1fr; }
   }
 </style>
 </head>
