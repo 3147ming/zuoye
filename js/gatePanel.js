@@ -11,6 +11,16 @@
 (function (global) {
   'use strict';
 
+  /* 记录当前是否有手指/鼠标按键按在屏幕上——用来区分「触屏按 E 开门」与「桌面键盘按 E 开门」。
+     触屏按 E 开门时手指还按着（pointerDown=true），松手那一下会先被整屏浮层接到并合成 click，
+     误点到首行直接传送；桌面键盘按 E 没有按键按住，开门后的第一次点击是用户真实操作，不能吞。 */
+  var pointerDown = false;
+  if (global.addEventListener) {
+    global.addEventListener('pointerdown', function () { pointerDown = true; }, true);
+    global.addEventListener('pointerup', function () { pointerDown = false; }, true);
+    global.addEventListener('pointercancel', function () { pointerDown = false; }, true);
+  }
+
   function esc(s) {
     return String(s == null ? '' : s)
       .replace(/&/g, '&amp;')
@@ -51,6 +61,10 @@
       this._key = function (e) { self.onKey(e); };
 
       this.root.addEventListener('click', function (e) {
+        /* 触屏开门口：面板是整屏浮层，弹出瞬间覆盖住开门的 E 按钮，松手那一下会被浮层接到
+           并合成 click → 误点到首行直接传送。只在「开门时手指还按着」(触屏) 才吞掉这第一击，
+           桌面键盘开门没有按键按住，第一次点击是用户真实操作，照常生效。 */
+        if (self._swallowTap) { self._swallowTap = false; return; }
         if (e.target === self.root) { self.close(true); return; }
         var row = e.target.closest ? e.target.closest('.gater-row') : null;
         if (row) {
@@ -100,6 +114,8 @@
       this._lastFocus = document.activeElement;
       this.root.classList.add('on');
       this.root.setAttribute('aria-hidden', 'false');
+      /* 仅当开门瞬间有手指/按键按住（触屏按 E），才吞掉随后那一下误触 click */
+      this._swallowTap = pointerDown;
       this.open_ = true;
 
       global.document.addEventListener('keydown', this._key, true);

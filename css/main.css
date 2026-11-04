@@ -331,6 +331,56 @@ body[data-scene]:not([data-scene="world"]) .hud-keys {
   .iframe-back { opacity: 0.92; }
 }
 
+/* ---------- 手机端触屏（第五批②）---------- */
+@media (hover: none) {
+  .hud-keys { display: none; }   /* 触屏隐藏键盘提示条 */
+}
+
+.touch-ui {
+  position: absolute; inset: 0; z-index: 35;
+  pointer-events: none;          /* 默认透传；只有按钮 / 滑动层接收触摸 */
+  font-family: "Microsoft YaHei", "PingFang SC", sans-serif;
+}
+.t-pad { position: absolute; inset: 0; pointer-events: none; z-index: 2; }
+.t-grp {
+  position: absolute; bottom: 3cqw; display: flex; gap: 2.4cqw; align-items: flex-end;
+  pointer-events: none;
+}
+.t-grp-l { left: 3cqw; }
+.t-grp-r { right: 3cqw; }
+
+.tbtn {
+  pointer-events: auto;
+  -webkit-tap-highlight-color: transparent;
+  touch-action: none;
+  display: grid; place-items: center;
+  width: 13cqw; height: 13cqw; min-width: 52px; min-height: 52px;
+  border: 1px solid rgba(255, 240, 220, 0.28);
+  border-radius: 18%;
+  background: rgba(10, 8, 18, 0.5);
+  color: #f6ede0; font-size: 5.5cqw; font-weight: 700;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.4);
+  user-select: none;
+}
+.tbtn.pressed { background: rgba(255, 196, 120, 0.55); color: #1a1206; transform: scale(0.94); }
+
+.t-back {
+  position: absolute; top: 2.6cqw; left: 2.6cqw; z-index: 2;
+  width: 11cqw; height: 11cqw; min-width: 46px; min-height: 46px;
+  border-radius: 50%; font-size: 6cqw;
+}
+.t-launch { width: 16cqw; height: 16cqw; min-width: 64px; min-height: 64px; font-size: 4.6cqw; }
+
+.t-swipe { position: absolute; inset: 0; pointer-events: auto; touch-action: none; z-index: 1; }
+
+.rotate-hint {
+  position: absolute; top: 2.6cqw; left: 50%; transform: translateX(-50%);
+  display: none;
+  padding: 1.2cqw 3cqw; border-radius: 999px;
+  background: rgba(10, 8, 18, 0.62); color: #f6ede0;
+  font-size: 3cqw; white-space: nowrap;
+}
+
 /* ---------- 顶栏齿轮（设置入口）---------- */
 .gear {
   position: absolute;

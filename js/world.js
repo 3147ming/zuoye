@@ -12,7 +12,9 @@
  *   4) 每个场景都可以在设置里换一张自定义背景图（存 localStorage 或 assets/bg/）。
  *   5) 自建内容通过 WorldHub.register 注册进来，会出现在对应总门的选单里。
  *
- * 一屏仍是 1280×720 本地坐标，GROUND_Y = 566，摄像机不滚。
+ * 一屏仍是 1280×720 本地坐标，GROUND_Y = 566。
+ * 第五批①：镜头跟随 + 拉近一倍 —— 摄像机窗口 640×360，纵向固定 [206, 566]（地面贴屏幕底边），
+ *   render 里 scale(2) 把 640×360 的窗口铺满 1280×720 画布；玩法坐标与区块结构一概不动。
  * ============================================================ */
 (function (global) {
   'use strict';
@@ -32,6 +34,13 @@
   var TELEPORT_X = 640;
   /* 从区块回广场的落点：按类别分左右，保留空间连续感 */
   var PLAZA_LAND = { tools: 420, games: 860 };
+
+  /* ---- 镜头（第五批①）：窗口 640×360，拉近一倍；纵向固定，地面贴屏幕底边 ---- */
+  var CAM_W = 640;
+  var CAM_H = 360;
+  var CAM_SCALE = 2;                 // 世界层放大倍数 = VIEW_W / CAM_W
+  var CAM_Y = GROUND_Y - CAM_H;      // 206：窗口上沿，下沿正好落在 GROUND_Y
+  var BG_SCALE = 2;                  // 背景按 2 倍烘焙，放大后不糊
 
   var SERIF = '"Songti SC", "STSong", "Source Han Serif SC", "SimSun", serif';
   var SANS = '"Microsoft YaHei", "PingFang SC", "Hiragino Sans GB", sans-serif';
@@ -770,6 +779,10 @@
     this._photoSrc = '';
     this._photoFail = '';
 
+    /* 镜头：横向跟随玩家，纵向固定在 CAM_Y（地面贴屏幕底边） */
+    this.cam = global.Camera ? new global.Camera(CAM_W, CAM_H, VIEW_W, VIEW_H) : null;
+    if (this.cam) this.cam.y = CAM_Y;
+
     this.groundY = GROUND_Y;
     this.fgPhase = 0;
     this.hueK = 1;
@@ -1080,6 +1093,9 @@
       this.player.x = this.scene.kind === 'plaza' ? 640 : 300;
     }
 
+    /* 首帧就把镜头放到位，别从 x=0 滑过来 */
+    if (this.cam) this.cam.snap(this.player);
+
     this.near = null;
     this.npcNear = false;
 
@@ -1152,6 +1168,7 @@
     if (this.player) {
       this.player.x = clamp(this.player.x, EDGE_L, EDGE_R);
       this.player.vx = 0;
+      if (this.cam) this.cam.snap(this.player);
     }
     if (global.HUD) global.HUD.toast('');
   };
@@ -1265,6 +1282,9 @@
     this.player.onGround = true;
     this.player.facing = it.cat === 'tools' ? -1 : 1;
 
+    /* 传送是瞬移：镜头直接归位，不要横穿整屏 */
+    if (this.cam) this.cam.snap(this.player);
+
     this.near = null;
     this.npcNear = false;
     this.edgeT = 0;
@@ -1291,6 +1311,8 @@
     this.player.vy = 0;
     this.player.onGround = true;
     this.player.facing = cat === 'tools' ? 1 : -1;
+
+    if (this.cam) this.cam.snap(this.player);
 
     this.near = null;
     this.npcNear = false;
@@ -1345,6 +1367,8 @@
     this.player.vy = 0;
     this.player.onGround = true;
 
+    if (this.cam) this.cam.snap(this.player);
+
     this.near = null;
     this.npcNear = false;
     this.edgeT = 0;
@@ -1385,6 +1409,9 @@
     var prevGround = this.prevGround;
 
     this.player.update(dt, this);
+
+    /* 镜头跟随：指数平滑，帧率无关；换屏 / 传送处会 snap 直接归位 */
+    if (this.cam) this.cam.follow(this.player, dt);
 
     if (prevGround && this.player.vy < -60) sfx('jump');
     if (!prevGround && this.player.onGround) sfx('land');
@@ -1464,13 +1491,21 @@
 
   /* ---------------- render ---------------- */
   WorldScene.prototype.render = function (ctx) {
-    if (this.bg) ctx.drawImage(this.bg, 0, 0);
+    var i;
+
+    /* ================= 世界层：拉近一倍 + 镜头平移 =================
+       scale 叠在 SceneManager 的 DPR 变换之上；窗口 640×360 → 画布 1280×720。
+       窗口纵向 [206, 566]：地面线正好落在屏幕底边（屏内 y=720）。 */
+    ctx.save();
+    ctx.scale(CAM_SCALE, CAM_SCALE);
+    if (this.cam) this.cam.begin(ctx);
+    else ctx.translate(0, -CAM_Y);
+
+    if (this.bg) ctx.drawImage(this.bg, 0, 0, VIEW_W, VIEW_H);
     else {
       ctx.fillStyle = '#0a0814';
       ctx.fillRect(0, 0, VIEW_W, VIEW_H);
     }
-
-    var i;
 
     /* 星（会呼吸） */
     ctx.save();
@@ -1531,6 +1566,11 @@
     /* 前景草叶 */
     this.drawForeground(ctx);
 
+    /* ================= 世界层结束：撤掉镜头与放大 ================= */
+    if (this.cam) this.cam.end(ctx);
+    ctx.restore();
+
+    /* ---- 覆盖层：按 1280×720 原尺寸画，不放大、不随镜头 ---- */
     /* 暗角 + 纸纹 */
     ctx.drawImage(this.vignette, 0, 0);
     if (this.grainPattern) {
@@ -1559,25 +1599,15 @@
   /* ---------------- 路标牌 ---------------- */
   WorldScene.prototype.drawSign = function (ctx) {
     var z = this.scene;
-    if (z.kind === 'gate') return;      /* 总门屏有门牌 + 名录板，不再挂路标 */
+    /* 只有广场挂路标：区块屏的门口已经有门牌，总门屏有名录板。
+       拉近后一屏只剩 640 宽，再叠一块牌子只会互相挤。 */
+    if (z.kind !== 'plaza') return;
 
-    var text, align, anchorX;
+    var text = '中心广场 · 左工具 · 右游戏';
+    var align = 'center';
+    var anchorX = VIEW_W / 2;
 
-    if (z.kind === 'plaza') {
-      text = '中心广场 · 左工具 · 右游戏';
-      align = 'center';
-      anchorX = VIEW_W / 2;
-    } else if (z.cat === 'games') {
-      text = CAT_NAME[z.cat] + ' · ' + z.title;
-      align = 'left';
-      anchorX = 62;
-    } else {
-      text = CAT_NAME[z.cat] + ' · ' + z.title;
-      align = 'right';
-      anchorX = VIEW_W - 62;
-    }
-
-    var accent = z.door ? z.door.color : '#e8b45a';
+    var accent = '#e8b45a';
 
     ctx.save();
     ctx.font = '600 17px ' + SERIF;
@@ -1588,7 +1618,7 @@
     var w = tw + 40;
     var h = 40;
     var bx = align === 'left' ? anchorX : (align === 'right' ? anchorX - w : anchorX - w / 2);
-    var by = GROUND_Y - (z.kind === 'plaza' ? 300 : 206);
+    var by = GROUND_Y - 300;
 
     ctx.fillStyle = 'rgba(24, 18, 34, 0.96)';
     ctx.fillRect(anchorX - 2.5, by + h, 5, GROUND_Y - by - h + 4);
@@ -1894,18 +1924,22 @@
     }
   };
 
-  /* ---------------- 前景草叶 ---------------- */
+  /* ---------------- 前景草叶 ----------------
+   * 拉近后窗口下沿就是地面线（566），原来画在地面以下的草叶会整个跑到画面外，
+   * 所以草根统一压到地面线上，只留一窄条剪影；视差改成跟镜头走。
+   */
   WorldScene.prototype.drawForeground = function (ctx) {
     var layers = [
-      { f: 1.12, base: 724, h0: 22, h1: 62, step: 47, skip: 6 },
-      { f: 1.34, base: 734, h0: 56, h1: 122, step: 133, skip: 9 }
+      { f: 1.12, base: 570, h0: 8, h1: 22, step: 47, skip: 6 },
+      { f: 1.34, base: 574, h0: 14, h1: 40, step: 133, skip: 9 }
     ];
     var span = 2048;
     var theme = THEME[this.scene.themeKey] || THEME.center;
+    var camX = this.cam ? this.cam.x : 0;
 
     for (var li = 0; li < layers.length; li++) {
       var L = layers[li];
-      var off = -((this.fgPhase * L.f) % span);
+      var off = -(((camX * L.f + this.fgPhase * 0.35) % span + span) % span);
       ctx.fillStyle = li === 0 ? shade(theme.grass, 0.9) : '#050309';
       ctx.beginPath();
       for (var i = 0; i < 52; i++) {

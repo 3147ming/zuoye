@@ -109,7 +109,11 @@
 
   Camera.prototype.begin = function (ctx) {
     ctx.save();
-    ctx.translate(-Math.round(this.x * 100) / 100, 0);
+    /* 横向跟随；纵向由使用方给定（大厅里 y 固定为 206，窗口下沿正好压在地面线上） */
+    ctx.translate(
+      -Math.round(this.x * 100) / 100,
+      -Math.round((this.y || 0) * 100) / 100
+    );
   };
 
   Camera.prototype.end = function (ctx) {
