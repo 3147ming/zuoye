@@ -1,31 +1,40 @@
 {
-  "at": "2026-11-04T08:01:18.201Z",
+  "at": "2026-11-04T09:04:41.915Z",
   "ok": true,
-  "totalChecks": 935,
-  "passedChecks": 935,
+  "totalChecks": 976,
+  "passedChecks": 976,
   "steps": [
     {
       "label": "静态检查",
       "code": 0,
-      "ms": 6297,
-      "passed": 30,
-      "total": 30,
+      "ms": 3858,
+      "passed": 32,
+      "total": 32,
       "ok": true,
-      "tail": "OK   version.js\nOK   waveview.js\n\n=== 语法检查：30/30 通过 ==="
+      "tail": "OK   version.js\nOK   waveview.js\n\n=== 语法检查：32/32 通过 ==="
     },
     {
       "label": "model 自测",
       "code": 0,
-      "ms": 920,
+      "ms": 1218,
       "passed": 474,
       "total": 474,
       "ok": true,
       "tail": "=== model 自测：474/474 通过 ==="
     },
     {
+      "label": "probe-hep",
+      "code": 0,
+      "ms": 5508,
+      "passed": 39,
+      "total": 39,
+      "ok": true,
+      "tail": "OK   HEP 三档分辨率无横向溢出\nOK   HEP console 无报错\n\n=== 探针结果：39/39 通过 ==="
+    },
+    {
       "label": "probe-markers",
       "code": 0,
-      "ms": 4512,
+      "ms": 5139,
       "passed": 23,
       "total": 23,
       "ok": true,
@@ -34,16 +43,16 @@
     {
       "label": "probe14",
       "code": 0,
-      "ms": 160,
+      "ms": 205,
       "passed": 14,
       "total": 14,
       "ok": true,
-      "tail": "OK   14 100 元件链式电路：可求解\n     B1 计时：5.9ms\n\n=== 探针结果：14/14 通过 ==="
+      "tail": "OK   14 100 元件链式电路：可求解\n     B1 计时：7.5ms\n\n=== 探针结果：14/14 通过 ==="
     },
     {
       "label": "run10",
       "code": 0,
-      "ms": 3724,
+      "ms": 7116,
       "passed": 27,
       "total": 27,
       "ok": true,
@@ -52,7 +61,7 @@
     {
       "label": "run11",
       "code": 0,
-      "ms": 3702,
+      "ms": 6249,
       "passed": 21,
       "total": 21,
       "ok": true,
@@ -61,7 +70,7 @@
     {
       "label": "run12",
       "code": 0,
-      "ms": 3837,
+      "ms": 4959,
       "passed": 15,
       "total": 15,
       "ok": true,
@@ -70,7 +79,7 @@
     {
       "label": "run13",
       "code": 0,
-      "ms": 4603,
+      "ms": 8406,
       "passed": 16,
       "total": 16,
       "ok": true,
@@ -79,16 +88,16 @@
     {
       "label": "run5",
       "code": 0,
-      "ms": 11136,
+      "ms": 12258,
       "passed": 40,
       "total": 40,
       "ok": true,
-      "tail": "PASS | 全程无 console 报错/警告\n\n=== 探针结果：40/40 通过 ===\n性能： {\"median\":0.19999998807907104,\"max\":0.5,\"min\":0,\"nodes\":1,\"engineMs\":0.6}"
+      "tail": "PASS | 全程无 console 报错/警告\n\n=== 探针结果：40/40 通过 ===\n性能： {\"median\":0.2999999523162842,\"max\":0.699999988079071,\"min\":0.10000002384185791,\"nodes\":1,\"engineMs\":0.5}"
     },
     {
       "label": "run6",
       "code": 0,
-      "ms": 12256,
+      "ms": 17757,
       "passed": 45,
       "total": 45,
       "ok": true,
@@ -97,7 +106,7 @@
     {
       "label": "run7",
       "code": 0,
-      "ms": 9183,
+      "ms": 9992,
       "passed": 35,
       "total": 35,
       "ok": true,
@@ -106,7 +115,7 @@
     {
       "label": "run8",
       "code": 0,
-      "ms": 4390,
+      "ms": 5232,
       "passed": 40,
       "total": 40,
       "ok": true,
@@ -115,7 +124,7 @@
     {
       "label": "run9",
       "code": 0,
-      "ms": 3714,
+      "ms": 7146,
       "passed": 35,
       "total": 35,
       "ok": true,
@@ -124,7 +133,7 @@
     {
       "label": "runA",
       "code": 0,
-      "ms": 9789,
+      "ms": 12856,
       "passed": 33,
       "total": 33,
       "ok": true,
@@ -133,7 +142,7 @@
     {
       "label": "runB",
       "code": 0,
-      "ms": 38937,
+      "ms": 33878,
       "passed": 87,
       "total": 87,
       "ok": true,
