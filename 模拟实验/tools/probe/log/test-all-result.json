@@ -1,31 +1,49 @@
 {
-  "at": "2026-11-04T10:01:07.242Z",
+  "at": "2026-11-04T16:29:36.289Z",
   "ok": true,
-  "totalChecks": 1023,
-  "passedChecks": 1023,
+  "totalChecks": 1121,
+  "passedChecks": 1121,
   "steps": [
     {
       "label": "静态检查",
       "code": 0,
-      "ms": 3719,
-      "passed": 32,
-      "total": 32,
+      "ms": 5709,
+      "passed": 34,
+      "total": 34,
       "ok": true,
-      "tail": "OK   version.js\nOK   waveview.js\n\n=== 语法检查：32/32 通过 ==="
+      "tail": "OK   version.js\nOK   waveview.js\n\n=== 语法检查：34/34 通过 ==="
     },
     {
       "label": "model 自测",
       "code": 0,
-      "ms": 1245,
-      "passed": 474,
-      "total": 474,
+      "ms": 9061,
+      "passed": 530,
+      "total": 530,
       "ok": true,
-      "tail": "=== model 自测：474/474 通过 ==="
+      "tail": "=== model 自测：530/530 通过 ==="
+    },
+    {
+      "label": "芯片模型",
+      "code": 0,
+      "ms": 90,
+      "passed": 19,
+      "total": 19,
+      "ok": true,
+      "tail": "OK   LS194 并行置数 0001\nOK   LS194 右移 DSR=1 → 1100\n\n=== 芯片模型自测：19/19 通过 ==="
+    },
+    {
+      "label": "probe-feel",
+      "code": 0,
+      "ms": 8044,
+      "passed": 21,
+      "total": 21,
+      "ok": true,
+      "tail": "OK   E6 三档分辨率无横向溢出\nOK   E6 console 无报错\n\n=== 探针结果：21/21 通过 ==="
     },
     {
       "label": "probe-hep",
       "code": 0,
-      "ms": 11107,
+      "ms": 14873,
       "passed": 86,
       "total": 86,
       "ok": true,
@@ -34,7 +52,7 @@
     {
       "label": "probe-markers",
       "code": 0,
-      "ms": 3035,
+      "ms": 2710,
       "passed": 23,
       "total": 23,
       "ok": true,
@@ -43,16 +61,16 @@
     {
       "label": "probe14",
       "code": 0,
-      "ms": 202,
+      "ms": 158,
       "passed": 14,
       "total": 14,
       "ok": true,
-      "tail": "OK   14 100 元件链式电路：可求解\n     B1 计时：6.5ms\n\n=== 探针结果：14/14 通过 ==="
+      "tail": "OK   14 100 元件链式电路：可求解\n     B1 计时：6.3ms\n\n=== 探针结果：14/14 通过 ==="
     },
     {
       "label": "run10",
       "code": 0,
-      "ms": 4234,
+      "ms": 4592,
       "passed": 27,
       "total": 27,
       "ok": true,
@@ -61,7 +79,7 @@
     {
       "label": "run11",
       "code": 0,
-      "ms": 4153,
+      "ms": 3648,
       "passed": 21,
       "total": 21,
       "ok": true,
@@ -70,7 +88,7 @@
     {
       "label": "run12",
       "code": 0,
-      "ms": 4258,
+      "ms": 4501,
       "passed": 15,
       "total": 15,
       "ok": true,
@@ -79,7 +97,7 @@
     {
       "label": "run13",
       "code": 0,
-      "ms": 4876,
+      "ms": 4614,
       "passed": 16,
       "total": 16,
       "ok": true,
@@ -88,16 +106,16 @@
     {
       "label": "run5",
       "code": 0,
-      "ms": 12003,
+      "ms": 11125,
       "passed": 40,
       "total": 40,
       "ok": true,
-      "tail": "PASS | 全程无 console 报错/警告\n\n=== 探针结果：40/40 通过 ===\n性能： {\"median\":0.30000001192092896,\"max\":1.699999988079071,\"min\":0.09999996423721313,\"nodes\":1,\"engineMs\":0.7}"
+      "tail": "PASS | 全程无 console 报错/警告\n\n=== 探针结果：40/40 通过 ===\n性能： {\"median\":0.30000001192092896,\"max\":0.699999988079071,\"min\":0.09999996423721313,\"nodes\":1,\"engineMs\":0.5}"
     },
     {
       "label": "run6",
       "code": 0,
-      "ms": 12891,
+      "ms": 12200,
       "passed": 45,
       "total": 45,
       "ok": true,
@@ -106,7 +124,7 @@
     {
       "label": "run7",
       "code": 0,
-      "ms": 9654,
+      "ms": 9246,
       "passed": 35,
       "total": 35,
       "ok": true,
@@ -115,7 +133,7 @@
     {
       "label": "run8",
       "code": 0,
-      "ms": 4815,
+      "ms": 4539,
       "passed": 40,
       "total": 40,
       "ok": true,
@@ -124,7 +142,7 @@
     {
       "label": "run9",
       "code": 0,
-      "ms": 4213,
+      "ms": 3753,
       "passed": 35,
       "total": 35,
       "ok": true,
@@ -133,7 +151,7 @@
     {
       "label": "runA",
       "code": 0,
-      "ms": 9910,
+      "ms": 9470,
       "passed": 33,
       "total": 33,
       "ok": true,
@@ -142,7 +160,7 @@
     {
       "label": "runB",
       "code": 0,
-      "ms": 32019,
+      "ms": 32340,
       "passed": 87,
       "total": 87,
       "ok": true,

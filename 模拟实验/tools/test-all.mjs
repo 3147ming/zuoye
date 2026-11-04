@@ -56,6 +56,11 @@ async function main() {
   results.push(modelStep);
   if (failFast && !modelStep.ok) return finish(results);
 
+  // 指令包 16：8 颗 MSI 芯片真值表 / 时序行为自测
+  const chipsStep = await run(process.execPath, ['tools/test-chips.mjs'], '芯片模型');
+  results.push(chipsStep);
+  if (failFast && !chipsStep.ok) return finish(results);
+
   const files = (await readdir(PROBE_DIR)).filter((f) => /^(run|probe).*\.mjs$/.test(f)).sort();
   for (const file of files) {
     const name = basename(file, '.mjs');

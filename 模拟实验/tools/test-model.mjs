@@ -619,11 +619,13 @@ function check(name, ok, detail) {
       ? !D.hasModel(t)
       : (D.hasModel(t) || D.isSkipped(t)))),
     types.filter((t) => (DIG.isDigital(t) ? D.hasModel(t) : (!D.hasModel(t) && !D.isSkipped(t)))).join(','));
-  check('数字域覆盖 7 种 IC + 3 个数字源',
-    DIG.DIG_MODEL_ORDER.length === 7 && Object.keys(DIG.DIG_SOURCES).length === 3,
+  check('数字域覆盖 15 种 IC（7 种 DIP-14 + 8 种 DIP-16）+ 3 个数字源',
+    DIG.DIG_MODEL_ORDER.length === 15 && Object.keys(DIG.DIG_SOURCES).length === 3,
     `${DIG.DIG_MODEL_ORDER.length}+${Object.keys(DIG.DIG_SOURCES).length}`);
   check('数字元件 74 系列是「有意跳过」而非「缺模型」',
-    D.hasModel('ic74xx') === false && D.isSkipped('ic74xx') === true, D.modelNote('ic74xx'));
+    D.hasModel('ic74xx') === false && D.isSkipped('ic74xx') === true
+      && D.hasModel('ic74xx16') === false && D.isSkipped('ic74xx16') === true,
+    `${D.modelNote('ic74xx')} / ${D.modelNote('ic74xx16')}`);
   const MIX = await import('../js/simmix.js');
   // 混合信号边界元件（包 8）与 IC 一样是"有意跳过"：它们不在 MNA 方程里，
   // 而是由 simmix 的边界换算 + 驱动源注入参与求解。
@@ -863,24 +865,51 @@ function check(name, ok, detail) {
     ic.terminals.filter((t) => t.role !== 'GND' && t.role !== 'VCC').every((t) => t.role === 'io'), '');
 
   const options = ic.paramFields[0].options.map((option) => option.value);
-  check('型号下拉覆盖七种芯片', options.length === 7 && options.every((id) => DG.DIG_MODELS[id]),
+  const order14 = DG.DIG_MODEL_ORDER.filter((id) => DG.DIG_MODELS[id].power.vcc === '14');
+  const order16 = DG.DIG_MODEL_ORDER.filter((id) => DG.DIG_MODELS[id].power.vcc === '16');
+  check('DIP-14 型号下拉只列 14 脚芯片',
+    options.length === 7 && options.every((id) => DG.DIG_MODELS[id].power.vcc === '14'),
     options.join(','));
-  check('下拉顺序与 digmodels 完全一致',
-    options.length === DG.DIG_MODEL_ORDER.length
-    && options.every((id, index) => id === DG.DIG_MODEL_ORDER[index]), options.join(','));
+  check('DIP-14 下拉顺序与 digmodels 的 14 脚子集完全一致',
+    options.length === order14.length
+    && options.every((id, index) => id === order14[index]), options.join(','));
   check('旧存档型号 7408 仍能归一化', DG.normalizeType('7408') === '74LS08', DG.normalizeType('7408'));
   check('74hc00 也归一化到 74LS00', DG.normalizeType('74hc00') === '74LS00', DG.normalizeType('74hc00'));
 
-  // 每种芯片的引脚表都必须覆盖 1..14，且每个门的输出脚确实是 out
+  /* ---- DIP-16 封装（指令包 16 · 任务 B） ---- */
+  const ic16 = P3.ic74xx16;
+  check('DIP-16 封装已注册', Boolean(ic16), '');
+  check('DIP-16 有 16 个端子', ic16.terminals.length === 16, String(ic16.terminals.length));
+  const byName16 = new Map(ic16.terminals.map((t) => [t.name, t]));
+  check('DIP-16：8 脚 = GND / 16 脚 = VCC',
+    byName16.get('8').role === 'GND' && byName16.get('16').role === 'VCC',
+    `${byName16.get('8').role}/${byName16.get('16').role}`);
+  check('DIP-16：8 / 16 脚标为 power 方向',
+    byName16.get('8').direction === 'power' && byName16.get('16').direction === 'power',
+    `${byName16.get('8').direction}/${byName16.get('16').direction}`);
+  check('DIP-16 尺寸 8×3', ic16.size.w === 8 && ic16.size.h === 3, `${ic16.size.w}×${ic16.size.h}`);
+  check('DIP-16 默认型号 74LS138', ic16.defaultParams.type === '74LS138', ic16.defaultParams.type);
+  const opt16 = ic16.paramFields[0].options.map((option) => option.value);
+  check('DIP-16 型号下拉只列 8 种 16 脚芯片',
+    opt16.length === 8 && opt16.every((id) => DG.DIG_MODELS[id].power.vcc === '16'), opt16.join(','));
+  check('DIP-16 下拉顺序与 digmodels 的 16 脚子集完全一致',
+    opt16.length === order16.length
+    && opt16.every((id, index) => id === order16[index]), opt16.join(','));
+  check('14 / 16 脚型号不串（两个下拉无交集）',
+    options.every((id) => opt16.indexOf(id) < 0), '');
+
+  // 每种芯片的引脚表都必须覆盖自己的封装脚数，且每个门的输出脚确实是 out
   DG.DIG_MODEL_ORDER.forEach((id) => {
     const model = DG.DIG_MODELS[id];
+    const total = Number(model.power.vcc) === 16 ? 16 : 14;
     const pins = Object.keys(model.pins).sort((a, b) => Number(a) - Number(b));
-    check(`${id} 引脚表覆盖 1..14`,
-      pins.length === 14 && pins.every((pin, index) => Number(pin) === index + 1), pins.join(','));
+    check(`${id} 引脚表覆盖 1..${total}`,
+      pins.length === total && pins.every((pin, index) => Number(pin) === index + 1), pins.join(','));
     check(`${id} 每个门的输出脚都标成 out`,
       model.units.every((unit) => unit.outputs.every((pin) => model.pins[pin] && model.pins[pin].dir === 'out')), '');
-    check(`${id} 电源脚固定 7=GND / 14=VCC`,
-      model.power.gnd === '7' && model.power.vcc === '14', `${model.power.gnd}/${model.power.vcc}`);
+    check(`${id} 电源脚固定 ${total === 16 ? '8=GND / 16=VCC' : '7=GND / 14=VCC'}`,
+      model.power.gnd === String(total === 16 ? 8 : 7) && model.power.vcc === String(total),
+      `${model.power.gnd}/${model.power.vcc}`);
   });
 
   check('74LS00 四个门共 4 个单元', DG.DIG_MODELS['74LS00'].units.length === 4, '');
@@ -2198,8 +2227,8 @@ function relErr(actual, expected) {
   const EM = await import('../js/examples-measure.js');
   const RP = await import('../js/report.js');
 
-  check('12 示例实验共 8 个', EX.EXAMPLES.length === 8, String(EX.EXAMPLES.length));
-  check('12 示例 id 唯一', new Set(EX.EXAMPLES.map((e) => e.id)).size === 8, '');
+  check('12+16 示例实验共 20 个（8 模拟 + 12 数字）', EX.EXAMPLES.length === 20, String(EX.EXAMPLES.length));
+  check('示例 id 唯一', new Set(EX.EXAMPLES.map((e) => e.id)).size === EX.EXAMPLES.length, '');
 
   let passed = 0;
   EX.EXAMPLES.forEach((example) => {
@@ -2214,7 +2243,7 @@ function relErr(actual, expected) {
       allPass,
       `${report.skippedComponents} 个跳过 / ${JSON.stringify(measured.items.map((i) => [i.label, i.measured, i.pass]))}`);
   });
-  check('12 8 个示例全部复算通过', passed === 8, `${passed}/8`);
+  check('20 个示例全部复算通过', passed === 20, `${passed}/20`);
 
   // 模板自带 measured 与复算值一致（防止模板值与求解器漂移）
   {
@@ -2389,9 +2418,29 @@ function relErr(actual, expected) {
       back.ok === true && back.plan.id === 'S3' && back.plan.measurements.length === 2, JSON.stringify(back.plan && back.plan.id));
     const bad = CFG.planFromJson('{"id":"x"}');
     check('13 方案 JSON 缺字段给出可读错误', bad.ok === false, bad.error);
-    check('13 4 个预置方案齐全 + 故障文案',
-      CFG.PRESET_PLANS.length === 4 && CFG.faultLabel({ type: 'open', componentId: 'r1' }).includes('开路'),
+    check('13+16 11 个预置方案齐全 + 故障文案',
+      CFG.PRESET_PLANS.length === 11 && CFG.faultLabel({ type: 'open', componentId: 'r1' }).includes('开路'),
       CFG.PRESET_PLANS.map((p) => p.id).join(','));
+
+    /* ---- 数字方案（指令包 16 · 任务 C） ---- */
+    const EX2 = await import('../js/examples-data.js');
+    const badPlans = CFG.PRESET_PLANS.filter((p) => !EX2.EXAMPLES.some((e) => e.id === p.exampleId));
+    check('16 每个方案的 exampleId 都指向真实实验', badPlans.length === 0, badPlans.map((p) => p.id).join(','));
+    const digPlans = CFG.PRESET_PLANS.filter((p) => p.id.startsWith('D'));
+    check('16 数字方案 7 个（D1/D3/D6/D9/D10/D11/D12）',
+      digPlans.length === 7, digPlans.map((p) => p.id).join(','));
+
+    let planPass = 0;
+    digPlans.forEach((plan) => {
+      const example = CFG.planExample(plan);
+      M.createCircuit(example.circuit.platform || 'exp-box');
+      M.loadCircuit(JSON.parse(JSON.stringify(example.circuit)), example.circuit.platform);
+      const m = CFG.measurePlan(M, plan);
+      if (m.ok) planPass += 1;
+      check(`16 数字方案 ${plan.id} 复算通过`, m.ok === true,
+        JSON.stringify((m.items || []).map((i) => [i.key, i.measured, i.pass])));
+    });
+    check('16 7 个数字方案全部复算通过', planPass === 7, `${planPass}/7`);
   }
 }
 
