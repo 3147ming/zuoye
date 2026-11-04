@@ -361,18 +361,43 @@ Save.reset()                      // 清空（调试用）
 
 ### 部署
 
-线上是 Cloudflare Pages 的**直接上传**（不是 Git 集成），所以每次更新都要手动传一次整包：
+线上 <https://zuoye-e0c.pages.dev/> 是 **Cloudflare Pages + GitHub 集成**：仓库
+`3147ming/zuoye` 的 `master` 分支一推，Cloudflare 自动构建上线。项目里**没有「上传资产」入口**，
+也不需要——推代码就是发布。
 
 ```bash
-node tools/make-deploy.mjs      # 生成 deploy/（白名单拷贝 + 自检）
-# 然后把 deploy/ 整个目录拖进 Cloudflare Pages 的上传框
+git push origin master        # 推完等 1~2 分钟；构建进度会挂在这个提交的 check 上
 ```
 
-- 脚本只拷「页面真正会加载的东西」：`index.html`、`version.json`、`css/`、`js/`（不含历史留档
+- 构建配置是「无构建命令 + 输出目录 = 仓库根」，所以根目录的 `index.html` 就是站点入口，
+  子目录（`games/`、`tools/`、`模拟实验/`）原样可访问；
+- 这个仓库被**多个作业共用**：`模拟实验/` 是另一个项目的目录，别删别覆盖；
+- 构建偶发失败：第一次推第五批时卡了 20 多分钟然后 `Build failed`，同一份内容补一个空提交重推，
+  1 分钟就过。遇到失败先看是不是这种偶发，再怀疑内容；
+- 验证：打开 `<域名>/version.json`，返回 `{"version":"1.1.0",...}` 才算上线成功；
+  返回 HTML 说明还在跑旧版本（Pages 会把未知路径回落到 `index.html`）。
+
+`tools/make-deploy.mjs` 仍然保留，用途变成**生成离线/备用静态包**（比如要拷给别人、或临时挂到别处）：
+
+```bash
+node tools/make-deploy.mjs       # → deploy/：891 文件、约 26MB，白名单拷贝 + 自检
+```
+
+- 只拷页面真正加载的东西：`index.html`、`version.json`、`css/`、`js/`（不含历史留档
   `js/games/`）、`games/`、`tools/noise|pomodoro`、`contrib/`、`assets/`；
-  探针、`.workbuddy/`、`tools/*.mjs` 都不会进包（当前包内 891 个文件、约 26MB）；
-- `deploy/` **不进 git**：它随时可以由源码重建，没必要把 26MB 副本塞进仓库；
-- 传完打开 `<域名>/version.json` 确认返回 JSON（如果返回的是 `index.html`，
-  说明这个文件没传上去，「检查更新」会如实报「读不到 version.json」）；
-- `file://` 与 `http(s)` 两种打开方式都要能跑：前者靠 `fetch` 失败时兜底，
-  后者能读 `version.json` 与 `assets/bg/`。
+  探针、`.workbuddy/`、`tools/*.mjs` 都不进包；
+- `deploy/` 与 `deploy-upload.zip` 都在 `.gitignore` 里，随时可由源码重建；
+- 若真要手动传，注意 Windows 上 `Compress-Archive` 打出的 zip 路径分隔符是反斜杠，
+  解压会得到一堆名字里带 `\` 的垃圾文件——用 `python -m zipfile` 或 bsdtar 重打。
+
+### 只在 `http(s)` 下才会暴露的坑
+
+本地 `file://` 直开全绿，不代表线上全绿。已经踩过三个：
+
+| 现象 | 原因 | 处理 |
+| --- | --- | --- |
+| `Failed to construct 'Worker'…origin 'null'` | `file://` 是不透明源，不能读本地 worker 脚本 | 扫雷 `initWorkers()` 加 try/catch，退回主线程等价实现 |
+| `unsupported MIME type ('text/html')` | 引用了仓库里不存在的脚本，Pages 用 `index.html` 兜底（200, text/html） | 番茄钟的 `sw.js` 注册已整段移除 |
+| 页面白屏但控制台无报错 | 缺图被兜底成 HTML，`<img>` 静默失败 | 逐页查 `document.images` 的 `naturalWidth === 0` |
+
+另外 Pages 对**大小写敏感**：`Images/x.png` 在 Windows 上能读到，线上 404。改资源路径后务必在线上再点一遍。
