@@ -1,0 +1,263 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>网址推荐</title>
+<style>
+  :root { --sans: -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif; }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; margin: 0; background: #0b0914; color: #f3e9da; font-family: var(--sans); }
+  body { display: flex; flex-direction: column; overflow: hidden; }
+
+  .wrap { flex: 1; display: flex; flex-direction: column; width: min(960px, 100%); margin: 0 auto; padding: 2.2cqw 2.2cqw 3cqw; gap: 1.4cqw; overflow: hidden; container-type: inline-size; }
+
+  .head { display: flex; align-items: center; gap: 1cqw; }
+  .head h1 { font-size: 3.6cqw; margin: 0; font-weight: 600; letter-spacing: 0.06em; }
+  .mode { font-size: 2cqw; padding: 0.5cqw 1.4cqw; border-radius: 999px; border: 1px solid transparent; letter-spacing: 0.1em; }
+  .mode.on { color: #7fd8c8; border-color: rgba(127,216,200,0.45); background: rgba(127,216,200,0.08); }
+  .mode.off { color: #f6c177; border-color: rgba(246,193,119,0.45); background: rgba(246,193,119,0.08); }
+
+  .form { display: grid; grid-template-columns: 1fr 1fr auto; gap: 1cqw; }
+  .form input { font: inherit; font-size: 2.4cqw; padding: 1.2cqw 1.6cqw; border-radius: 10px;
+    border: 1px solid rgba(255,220,180,0.2); background: rgba(255,255,255,0.04); color: #f3e9da; }
+  .form input:focus { outline: none; border-color: rgba(246,193,119,0.7); }
+  .form button { font: inherit; font-size: 2.4cqw; padding: 1.2cqw 2.4cqw; border-radius: 10px; cursor: pointer;
+    border: 1px solid rgba(246,193,119,0.5); background: rgba(246,193,119,0.14); color: #ffe3bd; }
+  .form button:hover { background: rgba(246,193,119,0.24); }
+
+  .err { min-height: 2.4cqw; font-size: 2.2cqw; color: #ff9f9f; letter-spacing: 0.04em; }
+
+  .list { flex: 1; overflow-y: auto; display: grid; grid-template-columns: 1fr; gap: 1cqw; padding-right: 0.4cqw; align-content: start; }
+  .card { display: flex; align-items: center; gap: 1.4cqw; padding: 1.5cqw 1.8cqw; border-radius: 12px;
+    border: 1px solid rgba(255,220,180,0.12); background: rgba(255,255,255,0.035); }
+  .card .lc-name { font-size: 2.8cqw; font-weight: 600; color: #ffe3bd; text-decoration: none; flex-shrink: 0; }
+  .card .lc-name:hover { text-decoration: underline; }
+  .card .lc-url { flex: 1; min-width: 0; font-size: 2.2cqw; color: rgba(243,233,218,0.55);
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .card .lc-pending { flex-shrink: 0; font-size: 1.9cqw; color: #f6c177; border: 1px solid rgba(246,193,119,0.4);
+    padding: 0.3cqw 1cqw; border-radius: 6px; }
+  .card .lc-del { flex-shrink: 0; font: inherit; font-size: 2cqw; cursor: pointer; padding: 0.6cqw 1.4cqw;
+    border-radius: 8px; border: 1px solid rgba(255,140,140,0.4); background: transparent; color: #ffb0b0; }
+  .card .lc-del:hover { background: rgba(255,140,140,0.14); }
+
+  .foot { font-size: 2cqw; color: rgba(243,233,218,0.42); text-align: center; letter-spacing: 0.04em; }
+
+  /* ---- 响应式断点：手机单列 / 平板双列 / 桌面三列 ---- */
+  @media (max-width: 500px) {
+    .wrap { width: 100%; }
+    .form { grid-template-columns: 1fr; }
+    .head h1 { font-size: 5cqw; }
+    .form input, .form button { font-size: 4cqw; padding: 1.6cqw 1.8cqw; }
+    .card { flex-wrap: wrap; }
+    .card .lc-url { flex-basis: 100%; }
+  }
+  @media (min-width: 501px) and (max-width: 900px) {
+    .wrap { width: min(720px, 100%); }
+    .list { grid-template-columns: 1fr 1fr; }
+  }
+  @media (min-width: 901px) {
+    .wrap { width: min(960px, 100%); }
+    .list { grid-template-columns: 1fr 1fr 1fr; }
+  }
+</style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="head">
+      <h1>网址推荐</h1>
+      <span class="mode on" id="mode">云端共享</span>
+    </div>
+
+    <div class="form">
+      <input id="name" maxlength="30" placeholder="名称（≤30 字）">
+      <input id="url" placeholder="网址 https://…">
+      <button id="add" type="button">添加</button>
+    </div>
+    <div class="err" id="err"></div>
+
+    <div class="list" id="list"></div>
+
+    <div class="foot">添加即自动检查 · 通过直接上墙 · 点名称在新标签打开</div>
+  </div>
+
+<script>
+(function () {
+  'use strict';
+
+  var API = '/api/links';
+  var MY_KEY = 'worldhub.links.mine.v1';
+  var LS_KEY = 'worldhub.links.local.v1';
+
+  var PRESET = { id: 'preset-ming-games', name: '我的游戏合集 · ming-games', url: 'https://ming-games.pages.dev/', preset: true };
+
+  var BLACKLIST = ['赌博', '博彩', '赌场', '彩票', '时时彩', '六合彩', '色情', '成人', '淫秽', '黄色', '嫖娼',
+    '诈骗', '刷单', '外挂', '代练', '私服', '恶意软件', '钓鱼', '毒品', '枪支', '传销', '高利贷', '裸聊'];
+
+  function $(id) { return document.getElementById(id); }
+
+  var list = [];
+  var mine = [];
+  var mode = 'shared';
+
+  function loadJSON(key) { try { return JSON.parse(localStorage.getItem(key) || 'null'); } catch (e) { return null; } }
+  function saveJSON(key, v) { try { localStorage.setItem(key, JSON.stringify(v)); } catch (e) {} }
+
+  function loadMine() { var v = loadJSON(MY_KEY); return Array.isArray(v) ? v : []; }
+  function loadLocal() { var v = loadJSON(LS_KEY); return Array.isArray(v) ? v : []; }
+
+  function uid() { return 'l' + Date.now().toString(36) + Math.random().toString(36).slice(2, 7); }
+
+  /* ---------- 存储层：共享 KV 优先，失败降级 localStorage ---------- */
+  var LinksStore = {
+    async get() {
+      try {
+        var r = await fetch(API, { headers: { 'Accept': 'application/json' } });
+        if (!r.ok) throw new Error('api ' + r.status);
+        var data = await r.json();
+        list = Array.isArray(data && data.items) ? data.items : [];
+        mode = 'shared';
+      } catch (e) {
+        list = loadLocal();
+        if (!list.length) list = [clonePreset()];
+        mode = 'local';
+      }
+    },
+    async add(item) {
+      try {
+        var r = await fetch(API, { method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name: item.name, url: item.url }) });
+        if (!r.ok) throw new Error('post ' + r.status);
+        var data = await r.json();
+        if (data && Array.isArray(data.items)) { list = data.items; }
+        mode = 'shared';
+        return true;
+      } catch (e) {
+        list.push(item);
+        saveJSON(LS_KEY, list);
+        mode = 'local';
+        return false;
+      }
+    },
+    async remove(id) {
+      try {
+        var r = await fetch(API + '?id=' + encodeURIComponent(id), { method: 'DELETE' });
+        if (r.ok) {
+          var data = await r.json();
+          if (data && Array.isArray(data.items)) { list = data.items; }
+          mode = 'shared';
+          return;
+        }
+        throw new Error('del ' + r.status);
+      } catch (e) {
+        list = list.filter(function (x) { return x.id !== id; });
+        saveJSON(LS_KEY, list);
+        mode = 'local';
+      }
+    }
+  };
+
+  function clonePreset() { return { id: PRESET.id, name: PRESET.name, url: PRESET.url, preset: true }; }
+
+  /* ---------- 渲染：一律 textContent，禁止 innerHTML 注入 ---------- */
+  function render() {
+    var modeEl = $('mode');
+    modeEl.textContent = mode === 'shared' ? '云端共享' : '本地模式';
+    modeEl.className = 'mode ' + (mode === 'shared' ? 'on' : 'off');
+
+    var ul = $('list');
+    ul.innerHTML = '';
+    list.forEach(function (it) {
+      var card = document.createElement('div');
+      card.className = 'card';
+
+      var nm = document.createElement('a');
+      nm.className = 'lc-name';
+      nm.textContent = it.name;
+      nm.href = it.url;
+      nm.target = '_blank';
+      nm.rel = 'noopener noreferrer';
+
+      var ur = document.createElement('span');
+      ur.className = 'lc-url';
+      ur.textContent = it.url;
+
+      card.appendChild(nm);
+      card.appendChild(ur);
+
+      if (it.pending) {
+        var b = document.createElement('span');
+        b.className = 'lc-pending';
+        b.textContent = '待验证';
+        card.appendChild(b);
+      }
+
+      /* 删除：预置条目锁死，只能删自己添加的 */
+      if (!it.preset && mine.indexOf(it.id) >= 0) {
+        var del = document.createElement('button');
+        del.type = 'button';
+        del.className = 'lc-del';
+        del.textContent = '删除';
+        del.addEventListener('click', function () { LinksStore.remove(it.id).then(render); });
+        card.appendChild(del);
+      }
+
+      ul.appendChild(card);
+    });
+  }
+
+  /* ---------- 自动自检 ---------- */
+  function validate(name, url) {
+    if (!name) return '请填写名称';
+    if (name.length > 30) return '名称最多 30 字';
+    if (!url) return '请填写网址';
+    var u;
+    try { u = new URL(url); } catch (e) { return '网址格式不正确'; }
+    if (u.protocol !== 'http:' && u.protocol !== 'https:') return '只支持 http / https 链接';
+    for (var i = 0; i < BLACKLIST.length; i++) {
+      if (name.indexOf(BLACKLIST[i]) >= 0 || url.indexOf(BLACKLIST[i]) >= 0) {
+        return '内容包含违禁词：' + BLACKLIST[i];
+      }
+    }
+    for (var j = 0; j < list.length; j++) {
+      if (list[j].url === url) return '该网址已在列表中';
+    }
+    return null;
+  }
+
+  function reachable(url) {
+    return new Promise(function (resolve) {
+      var done = false;
+      var ctrl = (typeof AbortController !== 'undefined') ? new AbortController() : null;
+      var timer = setTimeout(function () { done = true; if (ctrl) ctrl.abort(); resolve(false); }, 5000);
+      fetch(url, { mode: 'no-cors', signal: ctrl ? ctrl.signal : undefined })
+        .then(function () { if (!done) resolve(true); })
+        .catch(function () { if (!done) resolve(false); })
+        .finally(function () { clearTimeout(timer); });
+    });
+  }
+
+  async function onAdd() {
+    var name = $('name').value.trim();
+    var url = $('url').value.trim();
+    var err = validate(name, url);
+    $('err').textContent = err || '';
+    if (err) return;
+
+    var pending = !(await reachable(url));
+    var item = { id: uid(), name: name, url: url, pending: pending };
+    if (mine.indexOf(item.id) < 0) { mine.push(item.id); saveJSON(MY_KEY, mine); }
+
+    await LinksStore.add(item);
+    $('name').value = '';
+    $('url').value = '';
+    render();
+  }
+
+  mine = loadMine();
+  $('add').addEventListener('click', onAdd);
+  LinksStore.get().then(render);
+})();
+</script>
+</body>
+</html>

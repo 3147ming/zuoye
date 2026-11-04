@@ -99,8 +99,14 @@
       if (this.titleEl) this.titleEl.textContent = '选一个' + (opt.cat === 'tools' ? '工具' : '区块') + '传送过去';
 
       var html = '';
+      var lastGroup = null;
       for (var i = 0; i < this.items.length; i++) {
         var it = this.items[i];
+        /* 分组表头：只在同门内 item 带 group 且变化时插入（工具区无 group，不插） */
+        if (it.group && it.group !== lastGroup) {
+          html += '<li class="gater-group" role="presentation">' + esc(it.group) + '</li>';
+          lastGroup = it.group;
+        }
         html += '<li class="gater-row" role="option" id="gaterOpt' + i + '" data-i="' + i + '"' +
                 ' aria-selected="' + (i === 0 ? 'true' : 'false') + '">' +
                   '<span class="gater-num">' + (i + 1) + '</span>' +
@@ -125,7 +131,8 @@
 
     mark: function () {
       if (!this.listEl) return;
-      var rows = this.listEl.children;
+      /* 只看 .gater-row，分组表头不参与高亮/序号 */
+      var rows = this.listEl.querySelectorAll('.gater-row');
       for (var i = 0; i < rows.length; i++) {
         var on = i === this.idx;
         rows[i].classList.toggle('sel', on);
