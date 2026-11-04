@@ -115,20 +115,159 @@ jQuery(function ($) {
       msObj.worker.postMessage(JSON.stringify(job));
     };
 
-    this.initWorkers = function (wPath) {
-      if (window.Worker) {
-        // Create a background web worker to process the grid "painting" with a stack
-        msObj.worker = new Worker(wPath);
-        msObj.worker.onmessage = function (e) {
-          let data = JSON.parse(e.data);
-          msObj.handleWorkerMessage(data);
-        };
-      } else {
-        alert(
-          'Minesweeper requires Web Worker support. ' +
-            'See https://browser-update.org/update.html'
-        );
+    // ── WorldHub 接入补丁：file:// 下的 Worker 兜底 ──────────────────────────
+    // 双击 index.html 直接打开时，页面的源是「不透明源」(origin 'null')，浏览器据此
+    // 拒绝 Worker 加载同目录脚本（SecurityError: Failed to construct 'Worker'），
+    // 整局会抛未捕获异常。下面在主线程里跑等价实现：算法逐行对应 js/cell_toucher.js，
+    // 只把 postMessage 换成 setTimeout 一拍；http(s) 下仍走真 Worker。
+    function localAdjacent(obj, grid) {
+      var cell,
+        x = parseInt(obj.x, 10),
+        y = parseInt(obj.y, 10),
+        mY = grid.length - 1,
+        mX = grid[0].length - 1,
+        results = [],
+        i,
+        j;
+
+      for (i = Math.max(0, y - 1); i <= Math.min(mY, y + 1); i++) {
+        for (j = Math.max(0, x - 1); j <= Math.min(mX, x + 1); j++) {
+          if (i !== y || j !== x) {
+            cell = grid[i][j];
+            if (cell) {
+              results.push(cell);
+            }
+          }
+        }
       }
+
+      return results;
+    }
+
+    function localTouch(cell, grid) {
+      var stack = [cell];
+
+      while (stack.length > 0) {
+        var curCell = stack.pop(),
+          squares = localAdjacent(curCell, grid),
+          numMines = 0,
+          i,
+          sq;
+
+        for (i = 0; i < squares.length; i++) {
+          if (squares[i].mine) {
+            numMines += 1;
+          }
+        }
+        curCell.number = numMines;
+        if (numMines > 0) {
+          curCell.state = 'number';
+        } else {
+          curCell.state = 'open';
+          for (i = 0; i < squares.length; i++) {
+            sq = squares[i];
+            if (sq.state !== 'open' && sq.state !== 'number') {
+              stack.push(sq);
+            }
+          }
+        }
+      }
+    }
+
+    function localCalcWin(grid, mines) {
+      var closedCells = 0,
+        cell,
+        y,
+        x;
+
+      for (y = 0; y < grid.length; y++) {
+        for (x = 0; x < grid[0].length; x++) {
+          cell = grid[y][x];
+          if (!(cell.state === 'open' || cell.state === 'number')) {
+            closedCells += 1;
+          }
+        }
+      }
+
+      return mines === closedCells;
+    }
+
+    function localRun(payload) {
+      var data = JSON.parse(payload),
+        grid = data.grid,
+        resp = {},
+        i,
+        j;
+
+      resp.type = data.type;
+      if (data.type === 'calc_win') {
+        resp.win = localCalcWin(grid, data.mines);
+      } else {
+        var cell = grid[data.y][data.x];
+        if (data.type === 'touch_adjacent') {
+          localTouch(cell, grid);
+        } else if (data.type === 'get_adjacent') {
+          var squares = localAdjacent(cell, grid),
+            nrFlag = 0;
+          for (i = 0; i < squares.length; i++) {
+            if (squares[i].state === 'flagged') {
+              nrFlag++;
+            }
+          }
+          if (nrFlag === parseInt(cell.number, 10)) {
+            for (j = 0; j < squares.length; j++) {
+              var sq = squares[j];
+              if (sq.mine) {
+                if (sq.state !== 'flagged') {
+                  resp.type = 'explode';
+                  resp.cell = sq;
+                  break;
+                }
+              } else {
+                localTouch(sq, grid);
+              }
+            }
+          }
+        }
+        resp.grid = grid;
+      }
+
+      return JSON.stringify(resp);
+    }
+
+    function makeLocalWorker() {
+      var lw = { onmessage: null };
+      lw.postMessage = function (payload) {
+        setTimeout(function () {
+          var out;
+          try {
+            out = localRun(payload);
+          } catch (err) {
+            out = JSON.stringify({ type: 'log', obj: String(err) });
+          }
+          if (typeof lw.onmessage === 'function') {
+            lw.onmessage({ data: out });
+          }
+        }, 0);
+      };
+      return lw;
+    }
+
+    this.initWorkers = function (wPath) {
+      var worker = null;
+      if (window.Worker) {
+        try {
+          // Create a background web worker to process the grid "painting" with a stack
+          worker = new Worker(wPath);
+        } catch (err) {
+          worker = null; // file:// 不许 Worker 读本地脚本，见上方补丁说明
+        }
+      }
+      msObj.worker = worker || makeLocalWorker();
+      msObj.worker.onmessage = function (e) {
+        let data = JSON.parse(e.data);
+        msObj.handleWorkerMessage(data);
+      };
     };
 
     this.initCleanUpTimer = function () {

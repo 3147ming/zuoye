@@ -65,7 +65,12 @@
       state: state,
       peek: function () { return buffer; },
       take: function () { var b = buffer; buffer = 0; return b; },
-      decay: function (dt) { if (buffer > 0) buffer = Math.max(0, buffer - dt); }
+      decay: function (dt) { if (buffer > 0) buffer = Math.max(0, buffer - dt); },
+      /* 打开面板时调用：把按住的键与跳跃缓冲一起清掉，免得关掉面板瞬间角色窜出去 */
+      reset: function () {
+        state.left = state.right = state.jump = false;
+        buffer = 0;
+      }
     };
   })();
 

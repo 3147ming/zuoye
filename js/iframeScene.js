@@ -71,7 +71,8 @@
       document.body.dataset.scene = 'iframe-' + this.title;
     }
 
-    /* 悬停时给按钮一点存在感：鼠标移到顶部才完全显形（由 CSS 处理） */
+    /* 大厅音乐压到 0.18：游戏自己的声音（如果有）才听得清，回来也不会从头开始 */
+    if (global.BGM) global.BGM.suspend();
   };
 
   IFrameScene.prototype.update = function () { /* 游戏自己跑主循环，外层不需要推进 */ };
@@ -97,6 +98,9 @@
     if (document.body && document.body.dataset) {
       document.body.dataset.scene = 'world';
     }
+
+    /* 回大厅：音乐恢复原音量 */
+    if (global.BGM) global.BGM.resume();
   };
 
   global.SceneManager.register('iframe', function () { return new IFrameScene(); });

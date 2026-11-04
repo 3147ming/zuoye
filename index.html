@@ -5,6 +5,8 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>世界大厅 World Hub</title>
 <meta name="description" content="基于 Web 的 2D 横版世界大厅游戏合集">
+<!-- 内联 SVG 图标：不额外发请求，http(s) 与 file:// 下都不会有 /favicon.ico 404 -->
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='7' fill='%230b0817'/><path d='M9 25V15a7 7 0 0 1 14 0v10' fill='none' stroke='%23f0a76e' stroke-width='2.6'/><circle cx='16' cy='18' r='2.1' fill='%23ffd9a8'/></svg>">
 <link rel="stylesheet" href="css/main.css">
 </head>
 <body>
@@ -17,7 +19,7 @@
       <div class="hud">
         <div class="hud-title">
           <h1>世界大厅 <span>World Hub</span></h1>
-          <p>区块世界 · 左工具 · 右游戏</p>
+          <p>三屏走道 · 两座总门 · 九个区块</p>
         </div>
 
         <div class="hud-keys">
@@ -25,21 +27,115 @@
           <span class="sep"></span>
           <span><kbd>空格</kbd> 跳跃</span>
           <span class="sep"></span>
-          <span><kbd>E</kbd> 进入</span>
+          <span><kbd>E</kbd> 交互</span>
           <span class="sep"></span>
           <span><kbd>H</kbd> 帮助</span>
+          <span class="sep"></span>
+          <span><kbd>O</kbd> 设置</span>
         </div>
 
         <div class="toast" id="toast" role="status" aria-live="polite"></div>
       </div>
 
-      <!-- 对话面板：守灯人说话时才显示（E 逐句推进 / Esc 关闭） -->
+      <button class="gear" id="gear" type="button" aria-label="设置（O 键）" title="设置 · O">
+        <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
+          <path d="M12 8a4 4 0 1 0 0 8 4 4 0 0 0 0-8z" fill="none" stroke="currentColor" stroke-width="1.6"/>
+          <path d="M10.6 2h2.8l.4 2.4 1.9.8 2-1.4 2 2-1.4 2 .8 1.9 2.4.4v2.8l-2.4.4-.8 1.9 1.4 2-2 2-2-1.4-1.9.8-.4 2.4h-2.8l-.4-2.4-1.9-.8-2 1.4-2-2 1.4-2-.8-1.9L2 13.4v-2.8l2.4-.4.8-1.9-1.4-2 2-2 2 1.4 1.9-.8z" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/>
+        </svg>
+      </button>
+
+      <!-- 对话面板：NPC 说话时才显示（E 逐句推进 / Esc 关闭） -->
       <div class="dialogue" id="dialogue" role="dialog" aria-live="polite">
         <span class="dialogue-name" id="dialogueName">守灯人</span>
         <p class="dialogue-text" id="dialogueText"></p>
         <div class="dialogue-foot">
           <span class="dialogue-step" id="dialogueStep"></span>
           <span class="dialogue-hint">E 继续 · Esc 关闭</span>
+        </div>
+      </div>
+
+      <!-- 总门选单：站到总门前按 E 弹出 -->
+      <div class="gater" id="gater" role="dialog" aria-modal="true" aria-labelledby="gaterTitle" aria-hidden="true">
+        <div class="gater-card">
+          <header class="gater-head">
+            <span class="gater-kicker" id="gaterKicker">游戏区</span>
+            <h2 id="gaterTitle">选一个区块传送过去</h2>
+            <button class="gater-x" id="gaterClose" type="button" aria-label="关闭">×</button>
+          </header>
+          <ul class="gater-list" id="gaterList" role="listbox" aria-labelledby="gaterTitle"></ul>
+          <footer class="gater-foot">
+            <span>↑ ↓ 选择 · 回车 传送 · 数字键 直选 · Esc 关闭</span>
+          </footer>
+        </div>
+      </div>
+
+      <!-- 设置面板：顶栏齿轮或 O 键 -->
+      <div class="settings" id="settings" role="dialog" aria-modal="true" aria-labelledby="setTitle" aria-hidden="true">
+        <div class="set-card">
+          <header class="set-head">
+            <h2 id="setTitle">设置</h2>
+            <button class="set-x" id="setClose" type="button" aria-label="关闭">×</button>
+          </header>
+
+          <div class="set-body">
+            <section class="set-sec">
+              <h3>场景背景</h3>
+              <p class="set-cur" id="setScene">当前场景：中心广场</p>
+              <div class="set-row">
+                <button class="set-btn" id="bgPick" type="button">选择本地图片</button>
+                <select class="set-sel" id="bgList" aria-label="assets/bg 里的背景图">
+                  <option value="">默认（剪纸）</option>
+                </select>
+                <button class="set-btn ghost" id="bgReset" type="button">恢复默认</button>
+              </div>
+              <p class="set-note" id="bgHint">这一屏用的是默认剪纸背景</p>
+              <p class="set-tip">图片会压到 1440×810 后存在这台电脑的浏览器里（换设备不会带走）。也可以把图片放进 <code>assets/bg/</code>，写进 <code>js/config.js</code> 的 <code>bgFiles</code> 后从下拉里选。</p>
+              <input type="file" id="bgFile" accept="image/*" hidden>
+            </section>
+
+            <section class="set-sec">
+              <h3>声音</h3>
+              <div class="set-slide">
+                <label for="bgmVol">背景音乐</label>
+                <input type="range" id="bgmVol" min="0" max="100" step="1" value="55">
+                <span class="set-num" id="bgmVolV">55%</span>
+                <button class="set-mini" id="bgmMute" type="button">静音</button>
+              </div>
+              <div class="set-slide">
+                <label for="sfxVol">音效</label>
+                <input type="range" id="sfxVol" min="0" max="100" step="1" value="80">
+                <span class="set-num" id="sfxVolV">80%</span>
+                <button class="set-mini" id="sfxMute" type="button">静音</button>
+              </div>
+              <div class="set-row">
+                <button class="set-btn ghost" id="sfxTry" type="button">试听音效</button>
+                <button class="set-btn ghost" id="bgmTry" type="button">试听音乐</button>
+                <span class="set-tip" id="tryTip">用当前音量放一小段</span>
+              </div>
+              <p class="set-note" id="bgmState">曲目表还是空的：把 mp3 放进 <code>audio/bgm/</code>，写进 <code>js/config.js</code> 的 <code>bgm</code> 就会响。</p>
+            </section>
+
+            <section class="set-sec">
+              <h3>其它</h3>
+              <div class="set-row">
+                <button class="set-btn ghost" id="openHelp" type="button">操作说明</button>
+                <button class="set-btn ghost" id="toggleFull" type="button">全屏</button>
+                <button class="set-btn danger" id="resetSave" type="button">重置存档</button>
+              </div>
+            </section>
+
+            <section class="set-sec">
+              <h3>自建内容</h3>
+              <p class="set-note" id="contribEmpty">还没有东西注册进来。把做好的页面放进 <code>contrib/</code>，在 <code>contrib/manifest.js</code> 里调一次 <code>WorldHub.register()</code>，它就会出现在上面的总门选单里。</p>
+              <ul class="set-contribs" id="contribList"></ul>
+            </section>
+          </div>
+
+          <footer class="set-foot">
+            <span id="setVer">大厅</span>
+            <span class="set-upd" id="setUpd"></span>
+            <button class="set-btn ghost" id="checkUpd" type="button">检查更新</button>
+          </footer>
         </div>
       </div>
     </div>
@@ -52,6 +148,12 @@
   <script src="js/player.js"></script>
   <script src="js/npc.js"></script>
   <script src="js/save.js"></script>
+  <script src="js/config.js"></script>
+  <script src="js/contrib.js"></script>
+  <script src="contrib/manifest.js"></script>
+  <script src="js/bgm.js"></script>
+  <script src="js/gatePanel.js"></script>
+  <script src="js/settings.js"></script>
   <script src="js/world.js"></script>
   <script src="js/iframeScene.js"></script>
   <!--
@@ -84,12 +186,25 @@
       return new WorldScene();
     });
 
+    /* ---------- 背景音乐：先初始化（自动播放等第一次手势） ---------- */
+    if (window.BGM) window.BGM.init();
+
     /* ---------- 启动 ---------- */
     SceneManager.start(document.getElementById('game'));
     SceneManager.change('world');
 
-    // 供手动调试：SceneManager.change('world')
-    window.WorldHub = { SceneManager: SceneManager };
+    /* ---------- 顶栏齿轮 ---------- */
+    var gear = document.getElementById('gear');
+    if (gear) {
+      gear.addEventListener('click', function () {
+        var s = SceneManager.current;
+        if (s && s.openSettings) s.openSettings();
+      });
+    }
+
+    /* 供手动调试：SceneManager.change('world') */
+    window.WorldHub = window.WorldHub || {};
+    window.WorldHub.SceneManager = SceneManager;
   })();
   </script>
 </body>

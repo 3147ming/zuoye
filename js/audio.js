@@ -64,6 +64,10 @@
     enabled: true,
     failed: false,
 
+    /* 设置面板用的音量：0~1，master 增益仍按 0.5 封顶，避免叠加后爆音 */
+    volume: 0.8,
+    muted: false,
+
     /* 首次用户手势后创建 / 恢复上下文。重复调用无副作用。 */
     init: function () {
       if (this.failed || !this.enabled) return;
@@ -74,6 +78,12 @@
           this.ctx = new AC();
           this.master = this.ctx.createGain();
           this.master.gain.value = 0.5;
+
+          /* 音量从偏好里取：设置面板调过之后即使刷新也记得 */
+          var p = (global.Prefs && global.Prefs.get) ? global.Prefs.get() : null;
+          if (p) { this.volume = p.sfxVol; this.muted = p.sfxMute; }
+          this.applyGain();
+
           this.master.connect(this.ctx.destination);
         }
         if (this.ctx.state === 'suspended') this.ctx.resume();
@@ -109,7 +119,7 @@
 
     /* 播放一个具名音效。未知名字、没初始化、异常——都安静地什么都不做 */
     play: function (name) {
-      if (!this.enabled) return;
+      if (!this.enabled || this.muted) return;
       var steps = RECIPES[name];
       if (!steps) return;
       if (!this.ctx) return;          /* 还没解锁：静默 */
@@ -121,12 +131,33 @@
       } catch (e) { /* 忽略 */ }
     },
 
-    /* 静音开关（预留：以后要做设置面板直接调它） */
+    /* 立即把 volume / muted 落到 master 增益上 */
+    applyGain: function () {
+      if (!this.master) return;
+      try {
+        this.master.gain.value = this.muted ? 0 : 0.5 * this.volume;
+      } catch (e) { /* 忽略 */ }
+    },
+
+    /* 音量（0~1）：设置面板的「音效」滑条 */
+    setVolume: function (v) {
+      var n = Number(v);
+      if (!isFinite(n)) n = 0.8;
+      this.volume = n < 0 ? 0 : (n > 1 ? 1 : n);
+      this.applyGain();
+      if (global.Prefs) global.Prefs.set({ sfxVol: this.volume });
+    },
+
+    setMute: function (on) {
+      this.muted = !!on;
+      this.applyGain();
+      if (global.Prefs) global.Prefs.set({ sfxMute: this.muted });
+    },
+
+    /* 静音开关（保留老接口） */
     setEnabled: function (on) {
       this.enabled = !!on;
-      if (this.master) {
-        try { this.master.gain.value = this.enabled ? 0.5 : 0; } catch (e) { /* 忽略 */ }
-      }
+      this.setMute(!this.enabled);
     }
   };
 

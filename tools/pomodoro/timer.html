@@ -49,7 +49,11 @@
   -->
 
   <!-- ── PWA: Progressive Web App support ── -->
+  <!-- 接入适配（WorldHub）：本工具始终嵌在 iframe 里，PWA 安装无意义；
+       且 file:// 直开时浏览器拉 manifest.json 会被 CORS 拦下（origin 'null'），
+       控制台必然留一条 error。故整行注释掉，manifest.json 文件保留以备将来上线用。
   <link rel="manifest" href="manifest.json">
+  -->
   <!--
     manifest.json tells the browser how to "install" this app:
     - App name, icon, and colors shown on the home screen / taskbar
@@ -506,27 +510,12 @@
     Bottom of <body> = all HTML is ready before JS runs. ✓
   -->
 
-  <!-- ── PWA: Register the service worker ── -->
-  <script>
-    if ("serviceWorker" in navigator) {
-      /*
-        "serviceWorker" in navigator checks if this browser supports SWs.
-        Old browsers (IE 11) don't — the check prevents errors.
-      */
-      navigator.serviceWorker.register("./sw.js")
-        .then(reg  => console.log("✅ Service worker registered:", reg.scope))
-        .catch(err => console.log("ℹ️  Service worker skipped:", err.message));
-      /*
-        On file:// URLs (opening timer.html directly from a folder),
-        service workers are blocked by the browser for security reasons.
-        .catch() handles this silently — the app still runs, just without offline support.
-
-        To enable the full PWA experience (install + offline):
-          → Use VS Code's "Live Server" extension, then open http://localhost:5500
-          → OR host the files on any HTTPS server (GitHub Pages, Netlify, etc.)
-      */
-    }
-  </script>
+  <!-- ── PWA: service worker 注册已移除（WorldHub 接入适配） ──
+       这里原本是 navigator.serviceWorker.register("./sw.js")，但仓库里从来没有 sw.js：
+       线上会 404，控制台必留一条
+       "A bad HTTP response code (404) was received when fetching the script"。
+       而且本工具始终嵌在大厅的 iframe 里，离线缓存没有意义；
+       SW 一旦控制根作用域还会把整站缓存住，导致大厅更新后仍拿到旧文件。 -->
 
 </body>
 </html>
