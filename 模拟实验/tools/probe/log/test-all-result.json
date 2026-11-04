@@ -1,5 +1,5 @@
 {
-  "at": "2026-11-03T13:32:05.531Z",
+  "at": "2026-11-04T05:18:55.497Z",
   "ok": true,
   "totalChecks": 904,
   "passedChecks": 904,
@@ -7,7 +7,7 @@
     {
       "label": "静态检查",
       "code": 0,
-      "ms": 2547,
+      "ms": 2515,
       "passed": 29,
       "total": 29,
       "ok": true,
@@ -16,7 +16,7 @@
     {
       "label": "model 自测",
       "code": 0,
-      "ms": 1359,
+      "ms": 888,
       "passed": 467,
       "total": 467,
       "ok": true,
@@ -25,16 +25,16 @@
     {
       "label": "probe14",
       "code": 0,
-      "ms": 135,
+      "ms": 159,
       "passed": 14,
       "total": 14,
       "ok": true,
-      "tail": "OK   14 100 元件链式电路：可求解\n     B1 计时：3.9ms\n\n=== 探针结果：14/14 通过 ==="
+      "tail": "OK   14 100 元件链式电路：可求解\n     B1 计时：4.4ms\n\n=== 探针结果：14/14 通过 ==="
     },
     {
       "label": "run10",
       "code": 0,
-      "ms": 9947,
+      "ms": 3848,
       "passed": 27,
       "total": 27,
       "ok": true,
@@ -43,7 +43,7 @@
     {
       "label": "run11",
       "code": 0,
-      "ms": 6373,
+      "ms": 3983,
       "passed": 21,
       "total": 21,
       "ok": true,
@@ -52,7 +52,7 @@
     {
       "label": "run12",
       "code": 0,
-      "ms": 9091,
+      "ms": 4045,
       "passed": 15,
       "total": 15,
       "ok": true,
@@ -61,7 +61,7 @@
     {
       "label": "run13",
       "code": 0,
-      "ms": 5502,
+      "ms": 6172,
       "passed": 16,
       "total": 16,
       "ok": true,
@@ -70,16 +70,16 @@
     {
       "label": "run5",
       "code": 0,
-      "ms": 11111,
+      "ms": 11829,
       "passed": 40,
       "total": 40,
       "ok": true,
-      "tail": "PASS | 全程无 console 报错/警告\n\n=== 探针结果：40/40 通过 ===\n性能： {\"median\":0.19999998807907104,\"max\":0.6000000238418579,\"min\":0.09999996423721313,\"nodes\":1,\"engineMs\":0.5}"
+      "tail": "PASS | 全程无 console 报错/警告\n\n=== 探针结果：40/40 通过 ===\n性能： {\"median\":0.20000004768371582,\"max\":0.800000011920929,\"min\":0.09999996423721313,\"nodes\":1,\"engineMs\":0.5}"
     },
     {
       "label": "run6",
       "code": 0,
-      "ms": 12849,
+      "ms": 13403,
       "passed": 45,
       "total": 45,
       "ok": true,
@@ -88,7 +88,7 @@
     {
       "label": "run7",
       "code": 0,
-      "ms": 9057,
+      "ms": 9529,
       "passed": 35,
       "total": 35,
       "ok": true,
@@ -97,7 +97,7 @@
     {
       "label": "run8",
       "code": 0,
-      "ms": 4390,
+      "ms": 4701,
       "passed": 40,
       "total": 40,
       "ok": true,
@@ -106,7 +106,7 @@
     {
       "label": "run9",
       "code": 0,
-      "ms": 3500,
+      "ms": 5502,
       "passed": 35,
       "total": 35,
       "ok": true,
@@ -115,7 +115,7 @@
     {
       "label": "runA",
       "code": 0,
-      "ms": 9315,
+      "ms": 12274,
       "passed": 33,
       "total": 33,
       "ok": true,
@@ -124,7 +124,7 @@
     {
       "label": "runB",
       "code": 0,
-      "ms": 33380,
+      "ms": 35704,
       "passed": 87,
       "total": 87,
       "ok": true,
