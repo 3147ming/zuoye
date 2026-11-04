@@ -2395,6 +2395,92 @@ function relErr(actual, expected) {
   }
 }
 
+/* ---------------------------------------------------------------- 数字结构缓存（包 14 建议 1） */
+{
+  const SD = await import('../js/simdig.js');
+  const place = (type, x, y, params) => {
+    const r = M.addComponent(type, x, y, params ? { params } : undefined);
+    if (!r.ok) throw new Error(`${type}:${r.error}`);
+    return r.component.id;
+  };
+  const wire = (a, ta, b, tb) => M.addWire({ componentId: a, terminal: ta }, { componentId: b, terminal: tb });
+  const reset = () => { M.createCircuit('exp-box'); SD.resetDigState(); };
+  const outOf = (res, id, pin) => {
+    const c = res.compStates.find((x) => x.componentId === id);
+    return c ? c.outputs[pin] : undefined;
+  };
+  const strip = (res) => JSON.stringify({ n: res.digNets, c: res.compStates, u: res.units });
+
+  /* 命中：同电路连续两次，结果逐项一致且第二次走缓存 */
+  reset();
+  const u1 = place('ic74xx', 2, 2, { type: '74LS00' });
+  const s1 = place('logic-switch', 2, 10, { state: 'hi' });
+  const s2 = place('logic-switch', 5, 10, { state: 'hi' });
+  const load = place('resistor', 14, 2, { resistance: 1000 });
+  wire(u1, '1', s1, 'OUT');
+  wire(u1, '2', s2, 'OUT');
+  wire(u1, '3', load, '1');
+  wire(load, '2', u1, '7');
+  SD.resetDigPlanCache();
+  const r1 = SD.solveDig(M);
+  const r2 = SD.solveDig(M);
+  const st2 = SD.digPlanCacheStats();
+  check('14 结构缓存：第二次求值命中缓存', st2.misses === 1 && st2.hits === 1, JSON.stringify(st2));
+  check('14 结构缓存：命中后结果逐项一致（网表/元件/单元）', strip(r1) === strip(r2), '');
+  check('14 结构缓存：与非门 11 输出低', outOf(r2, u1, '3') === 0, String(outOf(r2, u1, '3')));
+
+  /* 参数变化必须失效 */
+  M.updateParams(s2, { state: 'lo' });
+  const r3 = SD.solveDig(M);
+  check('14 结构缓存：开关参数变化后失效重算（输出回到 1）',
+    outOf(r3, u1, '3') === 1 && SD.digPlanCacheStats().misses === 2,
+    `${outOf(r3, u1, '3')}/${JSON.stringify(SD.digPlanCacheStats())}`);
+
+  /* 连线变化必须失效 */
+  const u2 = place('ic74xx', 12, 10, { type: '74LS00' });
+  const s3 = place('logic-switch', 22, 10, { state: 'hi' });
+  wire(u2, '1', s3, 'OUT');
+  SD.solveDig(M);
+  const beforeMiss = SD.digPlanCacheStats().misses;
+  wire(u2, '2', s3, 'OUT');
+  SD.solveDig(M);
+  check('14 结构缓存：加导线后失效重算（仅多一次重建）',
+    SD.digPlanCacheStats().misses === beforeMiss + 1,
+    `${beforeMiss} → ${SD.digPlanCacheStats().misses}`);
+
+  /* 源的运行态（时钟）不缓存：stepClock 后电平必须变 */
+  reset();
+  const clk = place('clock', 2, 2, { frequency: 1000, duty: 50 });
+  const rl = place('resistor', 8, 2, { resistance: 1000 });
+  wire(clk, '+', rl, '1');
+  wire(rl, '2', clk, 'GND');
+  const clkNet = M.getNetlist().netOf.get(`c:${clk}:+`);
+  // stepClock 内部会「拉高求值一次 + 拉低求值一次」：同一份结构缓存下两次电平必须不同，
+  // 否则就是把时钟电平也缓存了（时钟会被冻住）
+  const step = SD.stepClock(M);
+  const levelIn = (res) => {
+    const found = res && res.digNets ? res.digNets.find((n) => n.netId === clkNet) : null;
+    return found ? found.level : null;
+  };
+  const highLvl = levelIn(step.high);
+  const lowLvl = levelIn(step.low);
+  check('14 结构缓存：时钟不被冻住（stepClock 高/低两次求值电平不同）',
+    highLvl === 1 && lowLvl === 0,
+    `high=${highLvl} low=${lowLvl}`);
+
+  /* fatal 也走缓存，但错误与环上元件必须一致 */
+  reset();
+  const n1 = place('ic74xx', 2, 2, { type: '74LS00' });
+  const n2 = place('ic74xx', 12, 2, { type: '74LS00' });
+  wire(n1, '3', n2, '1');
+  wire(n2, '3', n1, '1');
+  const f1 = SD.solveDig(M);
+  const f2 = SD.solveDig(M);
+  check('14 结构缓存：组合环两次都报错且文案一致',
+    f1.ok === false && f2.ok === false && f1.error === f2.error && f2.cycle.length > 0,
+    `${f1.ok}/${f2.ok} ${f2.error}`);
+}
+
 /* ---------------------------------------------------------------- 汇总 */
 console.log(`\n=== model 自测：${pass}/${pass + fail} 通过 ===`);
 if (fail > 0) {
