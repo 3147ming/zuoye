@@ -19,17 +19,26 @@
   /* 各游戏按 data-scene（= 'iframe-' + ITEMS.name）反查配置。
      side: 'L' 落在左下方向组，'R' 落在右下动作组。 */
   var GAMES = {
-    'iframe-贪吃蛇': { keys: [
-      K('←', 'ArrowLeft', 'ArrowLeft', 37, 'L'), K('→', 'ArrowRight', 'ArrowRight', 39, 'L'),
-      K('↑', 'ArrowUp', 'ArrowUp', 38, 'R'), K('↓', 'ArrowDown', 'ArrowDown', 40, 'R')
-    ] },
+    /* 脑力街机（跨域 https 直达）：游戏自带触屏控制，WorldHub 不派发任何按键 */
+    'iframe-贪吃蛇': { cross: true },
+    'iframe-飞扬的小鸟': { cross: true },
+    'iframe-别踩白块儿': { cross: true },
+    'iframe-飞机大战': { cross: true },
+    'iframe-泡泡龙': { cross: true },
+    'iframe-乒乓': { cross: true },
+    /* 本地开源门（同源）：派发合成键盘事件 */
     'iframe-俄罗斯方块': { keys: [
       K('←', 'ArrowLeft', 'ArrowLeft', 37, 'L'), K('→', 'ArrowRight', 'ArrowRight', 39, 'L'),
       K('↻', 'ArrowUp', 'ArrowUp', 38, 'R'), K('▼', 'ArrowDown', 'ArrowDown', 40, 'R')
     ] },
     'iframe-格斗': { keys: [
-      K('←', 'ArrowLeft', 'ArrowLeft', 37, 'L'), K('→', 'ArrowRight', 'ArrowRight', 39, 'L'),
-      K('跳', 'ArrowUp', 'ArrowUp', 38, 'R'), K('拳', 'KeyA', 'a', 65, 'R'), K('踢', 'KeyD', 'd', 68, 'R')
+      /* 左组：移动 + 跳跃/下蹲（标签 A/D/W/S，映射到本体 P1 的 G/J/Y/H）
+         P1 = Sub-Zero，其移动键是 G(71)/J(74)/Y(89)/H(72)；箭头键是 P2(Kano) 的，别派发错。 */
+      K('A', 'KeyG', 'g', 71, 'L'), K('D', 'KeyJ', 'j', 74, 'L'),
+      K('W', 'KeyY', 'y', 89, 'L'), K('S', 'KeyH', 'h', 72, 'L'),
+      /* 右组：攻击 + 防御（标签 J/K/L/SHIFT，映射到本体 P1 的 A/D/F/Shift） */
+      K('J', 'KeyA', 'a', 65, 'R'), K('K', 'KeyD', 'd', 68, 'R'),
+      K('L', 'KeyF', 'f', 70, 'R'), K('SHIFT', 'ShiftLeft', 'Shift', 16, 'R')
     ], note: '双人对战建议电脑端' },
     'iframe-打砖块': { swipe: true, keys: [ K('开球', 'Space', ' ', 32, 'R') ] }
     /* 其余（2048 / 五子棋 / 扫雷 / 白噪音 / 番茄钟）：原生触摸即可，只保留返回键 */
@@ -79,6 +88,11 @@
   hint.textContent = '建议横屏获得最佳体验';
   root.appendChild(hint);
 
+  var crossHint = document.createElement('div'); crossHint.className = 't-cross-hint';
+  crossHint.textContent = '本游戏支持触屏直接操作';
+  crossHint.style.display = 'none';
+  root.appendChild(crossHint);
+
   /* 按住态：每项是 { btn, code, key, keyCode, target } */
   var held = [];
   function releaseAll() {
@@ -113,6 +127,7 @@
 
   function buildKeys(list, getTarget) {
     grpL.innerHTML = ''; grpR.innerHTML = '';
+    grpL.classList.remove('t-grid'); grpR.classList.remove('t-grid');
     for (var i = 0; i < list.length; i++) {
       var k = list[i];
       var b = document.createElement('button');
@@ -121,6 +136,9 @@
       (k.side === 'R' ? grpR : grpL).appendChild(b);
       bindHold(b, k, getTarget);
     }
+    /* 单侧 4 键（如格斗 A/D/W/S 与 J/K/L/SHIFT）→ 2×2 网格，避免竖屏一排互相重叠 */
+    if (grpL.children.length === 4) grpL.classList.add('t-grid');
+    if (grpR.children.length === 4) grpR.classList.add('t-grid');
   }
 
   /* 打砖块：手指在场上左右半屏 → 按住对应方向键；开球按钮单独发 Space */
@@ -153,6 +171,7 @@
     curScene = sc;
     releaseAll();
     swipeDir = 0;
+    crossHint.style.display = 'none';
 
     if (sc.indexOf('iframe-') !== 0) {
       buildKeys(HALL, function () { return global; });
@@ -160,7 +179,12 @@
       return;
     }
     var cfg = GAMES[sc];
-    if (cfg && cfg.swipe) {
+    if (cfg && cfg.cross) {
+      /* 跨域脑力街机：游戏自带触屏，只保留返回键，提示直接操作 */
+      grpL.innerHTML = ''; grpR.innerHTML = '';
+      pad.style.display = 'none';
+      crossHint.style.display = '';
+    } else if (cfg && cfg.swipe) {
       buildKeys(cfg.keys, iframeDoc);
       root.appendChild(swipe);
       bindSwipe();

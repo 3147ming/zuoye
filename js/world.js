@@ -142,19 +142,39 @@
       color: '#7fd8c8', glyph: 'noise', desc: '棕噪音 · 计时 · 便签', seed: 1103 },
     { id: 'pomodoro', cat: 'tools', name: '番茄钟', src: 'tools/pomodoro/index.html',
       color: '#f07167', glyph: 'pomodoro', desc: '专注计时 · 陪伴小猫', seed: 1104 },
-    { id: 'snake', cat: 'games', name: '贪吃蛇', src: 'games/snake/index.html',
-      color: '#5fd39a', glyph: 'snake', desc: '经典蛇 · 越吃越快', seed: 1105 },
-    { id: 'game2048', cat: 'games', name: '2048', src: 'games/game2048/index.html',
+    { id: 'links', cat: 'tools', name: '网址推荐', src: 'tools/links/index.html',
+      color: '#f6c177', glyph: 'links', desc: '大家分享的好网站', seed: 1117 },
+    /* ---- 🎮 脑力街机（brain 直达，需联网；手机直接触屏玩，WorldHub 不派发按键） ---- */
+    { id: 'snake', cat: 'games', group: '🎮 脑力街机', name: '贪吃蛇',
+      src: 'https://ming-games.pages.dev/brain-gym/?game=snake',
+      color: '#5fd39a', glyph: 'snake', desc: '人机蛇 · 经验豆 · 无限地图', cross: true, seed: 1105 },
+    { id: 'flappy', cat: 'games', group: '🎮 脑力街机', name: '飞扬的小鸟',
+      src: 'https://ming-games.pages.dev/brain-gym/?game=flappy',
+      color: '#ffd166', glyph: 'arcade', desc: '点触飞行 · 穿水管', cross: true, seed: 1112 },
+    { id: 'tiles', cat: 'games', group: '🎮 脑力街机', name: '别踩白块儿',
+      src: 'https://ming-games.pages.dev/brain-gym/?game=tiles',
+      color: '#a5b4fc', glyph: 'arcade', desc: '踩白块 · 别踩黑', cross: true, seed: 1113 },
+    { id: 'plane', cat: 'games', group: '🎮 脑力街机', name: '飞机大战',
+      src: 'https://ming-games.pages.dev/brain-gym/?game=plane',
+      color: '#7ec8ff', glyph: 'arcade', desc: '射击弹幕 · 躲避', cross: true, seed: 1114 },
+    { id: 'bubble', cat: 'games', group: '🎮 脑力街机', name: '泡泡龙',
+      src: 'https://ming-games.pages.dev/brain-gym/?game=bubble',
+      color: '#d0a5ff', glyph: 'arcade', desc: '同色消除 · 连击', cross: true, seed: 1115 },
+    { id: 'pong', cat: 'games', group: '🎮 脑力街机', name: '乒乓',
+      src: 'https://ming-games.pages.dev/brain-gym/?game=pong',
+      color: '#ff9f9f', glyph: 'arcade', desc: '挡板对拍 · 接球', cross: true, seed: 1116 },
+    /* ---- 🕹 开源小游戏（本地，可离线） ---- */
+    { id: 'game2048', cat: 'games', group: '🕹 开源小游戏', name: '2048', src: 'games/game2048/index.html',
       color: '#f2cc60', glyph: 'n2048', desc: '数字合璧', seed: 1106 },
-    { id: 'tetris', cat: 'games', name: '俄罗斯方块', src: 'games/tetris/index.html',
+    { id: 'tetris', cat: 'games', group: '🕹 开源小游戏', name: '俄罗斯方块', src: 'games/tetris/index.html',
       color: '#9b8afb', glyph: 'tetris', desc: '方块下落 · 消行', seed: 1107 },
-    { id: 'fight', cat: 'games', name: '格斗', src: 'games/fight/index.html',
+    { id: 'fight', cat: 'games', group: '🕹 开源小游戏', name: '格斗', src: 'games/fight/index.html',
       color: '#e8545f', glyph: 'fight', desc: '本地双人 · 出招掉血', seed: 1108 },
-    { id: 'mine', cat: 'games', name: '扫雷', src: 'games/mine/index.html',
+    { id: 'mine', cat: 'games', group: '🕹 开源小游戏', name: '扫雷', src: 'games/mine/index.html',
       color: '#6fc2ef', glyph: 'mine', desc: '翻格子 · 插旗', seed: 1109 },
-    { id: 'gomoku', cat: 'games', name: '五子棋', src: 'games/gomoku/index.html',
+    { id: 'gomoku', cat: 'games', group: '🕹 开源小游戏', name: '五子棋', src: 'games/gomoku/index.html',
       color: '#e8b45a', glyph: 'gomoku', desc: '人机对弈 · 五连', seed: 1110 },
-    { id: 'breakout', cat: 'games', name: '打砖块', src: 'games/breakout/index.html',
+    { id: 'breakout', cat: 'games', group: '🕹 开源小游戏', name: '打砖块', src: 'games/breakout/index.html',
       color: '#f2a0c0', glyph: 'breakout', desc: '反弹消砖 · 逐关', seed: 1111 }
   ];
 
@@ -196,13 +216,73 @@
         '走出画面边缘，就回广场了。'
       ]
     },
+    links: {
+      name: '引路者',
+      line1: '好网站，一起攒。',
+      lines: [
+        '这里收录大家推荐的好网站，谁都能加、谁都能看。',
+        '网址推荐：点卡片在新标签打开；你也可以提交自己的收藏。',
+        '添加时会自动检查格式和内容，通过就直接上墙，不用等审核。',
+        '走出画面边缘，就回广场了。'
+      ]
+    },
     snake: {
       name: '养蛇人',
-      line1: '小心脚下。',
+      line1: '这条蛇通了灵。',
       lines: [
-        '小心脚下，我的蛇在这一屏乱窜。',
-        '贪吃蛇：吃果子会变长，撞墙或者咬到自己就结束。',
-        '方向键或 WASD 转弯，回车开始；越吃越快，别贪。',
+        '这条蛇通了灵——会吃经验豆长本事，还有人机对手追着你咬。',
+        '贪吃蛇（脑力街机版）：地图没有边界，吃掉经验豆升级，别被人机蛇咬到。',
+        '手机上直接点屏幕或滑方向键就能玩，不用额外按键；需要联网才能进。',
+        '从画面边缘走出去，就回广场了。'
+      ]
+    },
+    flappy: {
+      name: '飞鸟使',
+      line1: '点一下，飞一下。',
+      lines: [
+        '点一下，鸟就往上飞一下；不点就往下坠。',
+        '飞扬的小鸟：穿过一根根水管，撞上就结束。',
+        '手机上点屏幕就能玩，需要联网。',
+        '从画面边缘走出去，就回广场了。'
+      ]
+    },
+    tiles: {
+      name: '琴键师',
+      line1: '别踩黑块。',
+      lines: [
+        '只有白块能踩，黑块一碰就断。',
+        '别踩白块儿：跟着节奏往下踩白块，越快分越高。',
+        '手机上点屏幕就能玩，需要联网。',
+        '从画面边缘走出去，就回广场了。'
+      ]
+    },
+    plane: {
+      name: '王牌',
+      line1: '敌机来了。',
+      lines: [
+        '你的飞机要边躲弹幕边开火。',
+        '飞机大战：左右移动，自动开火，打掉敌机攒分。',
+        '手机上滑动屏幕控制飞机，需要联网。',
+        '从画面边缘走出去，就回广场了。'
+      ]
+    },
+    bubble: {
+      name: '泡泡龙',
+      line1: '瞄准，同色。',
+      lines: [
+        '发射泡泡，三个同色就连消。',
+        '泡泡龙：把泡泡射到同色的旁边，连成三个就消除。',
+        '手机上点屏幕瞄准发射，需要联网。',
+        '从画面边缘走出去，就回广场了。'
+      ]
+    },
+    pong: {
+      name: '球手',
+      line1: '别让球落地。',
+      lines: [
+        '挡板接住球，别让它落地。',
+        '乒乓：左右移动挡板，把球顶回对手那边。',
+        '手机上滑屏幕控制挡板，需要联网。',
         '从画面边缘走出去，就回广场了。'
       ]
     },
@@ -710,6 +790,32 @@
       ctx.strokeStyle = 'rgba(255, 255, 255, 0.26)';
       ctx.stroke();
 
+    } else if (kind === 'arcade') {
+      /* 街机手柄：机身 + 十字键 + 两粒按键 */
+      roundRect(ctx, cx - 30, cy - 18, 60, 36, 18);
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.moveTo(cx - 20, cy); ctx.lineTo(cx - 6, cy);
+      ctx.moveTo(cx - 13, cy - 7); ctx.lineTo(cx - 13, cy + 7);
+      ctx.stroke();
+      ctx.beginPath(); ctx.arc(cx + 8, cy - 3, 3.4, 0, Math.PI * 2); ctx.fill();
+      ctx.beginPath(); ctx.arc(cx + 18, cy + 3, 3.4, 0, Math.PI * 2); ctx.fill();
+
+    } else if (kind === 'links') {
+      /* 网址推荐：两节相连的链环 */
+      for (i = 0; i < 2; i++) {
+        x = cx + (i ? 14 : -14);
+        ctx.beginPath();
+        ctx.arc(x, cy, 13, Math.PI * 0.75, Math.PI * 1.75);
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.arc(x, cy, 13, -Math.PI * 0.25, Math.PI * 0.25);
+        ctx.stroke();
+      }
+      ctx.beginPath();
+      ctx.moveTo(cx - 22, cy + 2); ctx.lineTo(cx + 22, cy + 2);
+      ctx.stroke();
+
     } else {
       /* pomodoro：番茄 + 指针 */
       ctx.beginPath();
@@ -1049,8 +1155,9 @@
   };
 
   /* ---------------- init ---------------- */
-  WorldScene.prototype.init = function (ctx) {
+  WorldScene.prototype.init = function (ctx, opts) {
     var self = this;
+    opts = opts || {};
     this.ctx = ctx;
     this.t = 0;
 
@@ -1069,7 +1176,10 @@
     }
 
     var saved = (global.Save && global.Save.get) ? global.Save.get() : null;
-    var idx = (saved && saved.zone) ? sceneIndexById(saved.zone) : -1;
+    var idx = -1;
+    /* 双返回「回上一级」：从 iframe 壳回来时指定 sceneId，优先于存档落点 */
+    if (opts.sceneId) idx = sceneIndexById(opts.sceneId);
+    if (idx < 0) idx = (saved && saved.zone) ? sceneIndexById(saved.zone) : -1;
     if (idx < 0) idx = sceneIndexById('plaza');
 
     this.setScene(idx);
@@ -1081,8 +1191,15 @@
 
     this.seedMotes();
 
-    /* ---- 读档：回到上次的屏与位置 ---- */
-    if (saved && saved.player) {
+    /* ---- 读档：回到上次的屏与位置（「回上一级」时优先用 opts 里的 px/pf） ---- */
+    if (opts.sceneId && isFinite(opts.px)) {
+      this.player.x = clamp(opts.px, EDGE_L, EDGE_R);
+      this.player.facing = opts.pf === -1 ? -1 : 1;
+      this.player.y = GROUND_Y;
+      this.player.vx = 0;
+      this.player.vy = 0;
+      this.player.onGround = true;
+    } else if (saved && saved.player) {
       this.player.x = clamp(saved.player.x, EDGE_L, EDGE_R);
       this.player.facing = saved.player.facing;
       this.player.y = GROUND_Y;
@@ -1245,7 +1362,13 @@
     sfx('portal');
     if (global.HUD) global.HUD.toast('');
     if (global.SceneManager && global.SceneManager.has('iframe')) {
-      global.SceneManager.change('iframe', { title: d.name, src: d.src });
+      global.SceneManager.change('iframe', {
+        title: d.name, src: d.src,
+        from: this.scene ? this.scene.id : 'plaza',
+        px: this.player ? this.player.x : 0,
+        pf: this.player ? this.player.facing : 1,
+        cross: d.cross === true
+      });
     } else if (global.HUD) {
       global.HUD.toast('场景壳（iframeScene.js）没加载，进不去');
     }

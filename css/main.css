@@ -326,6 +326,31 @@ body[data-scene]:not([data-scene="world"]) .hud-keys {
   outline-offset: 2px;
 }
 
+/* 回上一级：与回大厅并排，落在左上角 */
+.iframe-back-prev {
+  left: 1.5cqw;
+  right: auto;
+}
+
+/* 断网 / 加载失败提示：轻量居中，不挡返回按钮 */
+.iframe-offline {
+  position: absolute;
+  top: 6cqw;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 32;
+  padding: 0.7cqw 1.5cqw;
+  border-radius: 8px;
+  background: rgba(14, 11, 24, 0.85);
+  color: #ffd6aa;
+  font-family: var(--sans);
+  font-size: 0.92cqw;
+  letter-spacing: 0.08em;
+  border: 1px solid rgba(255, 180, 120, 0.42);
+  pointer-events: none;
+  backdrop-filter: blur(6px);
+}
+
 /* 触屏没有 hover：直接把按钮做成常亮 */
 @media (hover: none) {
   .iframe-back { opacity: 0.92; }
@@ -348,6 +373,8 @@ body[data-scene]:not([data-scene="world"]) .hud-keys {
 }
 .t-grp-l { left: 3cqw; }
 .t-grp-r { right: 3cqw; }
+/* 单侧 4 键（格斗 A/D/W/S、J/K/L/SHIFT）→ 2×2 网格，竖屏不重叠 */
+.t-grp.t-grid { display: grid; grid-template-columns: repeat(2, auto); gap: 1.6cqw; }
 
 .tbtn {
   pointer-events: auto;
@@ -379,6 +406,15 @@ body[data-scene]:not([data-scene="world"]) .hud-keys {
   padding: 1.2cqw 3cqw; border-radius: 999px;
   background: rgba(10, 8, 18, 0.62); color: #f6ede0;
   font-size: 3cqw; white-space: nowrap;
+}
+
+/* 跨域脑力街机：提示「自带触屏直接操作」 */
+.t-cross-hint {
+  position: absolute; bottom: 12cqw; left: 50%; transform: translateX(-50%);
+  display: none;
+  padding: 1.1cqw 2.6cqw; border-radius: 999px;
+  background: rgba(10, 8, 18, 0.68); color: #f6ede0;
+  font-size: 3cqw; white-space: nowrap; pointer-events: none;
 }
 
 /* ---------- 顶栏齿轮（设置入口）---------- */
@@ -514,6 +550,15 @@ body[data-scene]:not([data-scene="world"]) .gear {
   margin: 0;
   padding: 0.4cqw 0;
   overflow-y: auto;
+}
+
+.gater-group {
+  padding: 0.9cqw 1.7cqw 0.35cqw;
+  font-size: 0.82cqw;
+  letter-spacing: 0.1em;
+  color: rgba(244, 232, 214, 0.5);
+  font-weight: 600;
+  pointer-events: none;
 }
 
 .gater-row {

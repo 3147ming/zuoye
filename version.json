@@ -1,5 +1,5 @@
 {
-  "version": "1.1.1",
+  "version": "1.2.0",
   "build": "2026-11-04",
-  "notes": "第五批扩展：镜头跟随与放大（取景框 640×360、渲染 ×2 跟随角色）；手机端触屏适配（js/touch.js 虚拟按键派发合成键盘事件，覆盖贪吃蛇/俄罗斯方块/格斗/打砖块等，打砖块左右半屏滑动控挡板）；README 补触屏操作表与镜头/触屏设计小节"
+  "notes": "第七批：① 游戏区接入脑力街机九门（flappy/tiles/plane/bubble/pong 新增，snake 换 brain 新版，tetris/mines/breaker 同名择优保留开源），iframe 双返回（回上一级/回大厅）；② 工具区新增网址推荐（共享 KV 存储 + 自动自检 + 本地降级）；③ 格斗触屏键位改 ADWS JKL SHIFT（移动映射 P1 的 G/J/Y/H）"
 }
