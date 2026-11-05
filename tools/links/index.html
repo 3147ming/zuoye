@@ -30,17 +30,23 @@
 
   .list { flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 1cqw; padding-right: 0.4cqw; align-content: start; }
 
-  /* ---- 分类折叠 ---- */
-  .cat { border: 1px solid rgba(255,220,180,0.14); border-radius: 12px; overflow: hidden; background: rgba(255,255,255,0.02); }
-  .cat-h { width: 100%; display: flex; align-items: center; gap: 1.2cqw; padding: 1.5cqw 1.8cqw;
-    background: rgba(255,220,180,0.05); border: none; cursor: pointer; color: #ffe3bd; font: inherit;
-    font-size: 2.9cqw; font-weight: 600; letter-spacing: 0.03em; text-align: left; }
-  .cat-h:hover { background: rgba(255,220,180,0.09); }
-  .cat-h .cnt { font-size: 2.1cqw; font-weight: 400; color: rgba(243,233,218,0.55); }
-  .cat-h .arw { margin-left: auto; transition: transform 0.18s ease; color: rgba(243,233,218,0.5); }
-  .cat.open .cat-h .arw { transform: rotate(90deg); }
-  .cat-body { display: none; padding: 1cqw 1.2cqw 1.4cqw; }
-  .cat.open .cat-body { display: grid; grid-template-columns: minmax(0, 1fr); gap: 1cqw; }
+  /* ---- 分页：分类标签 + 翻页条 + 卡片网格 ---- */
+  .tabs { display: flex; flex-wrap: wrap; gap: 0.8cqw; }
+  .tab { font: inherit; font-size: 2cqw; padding: 0.7cqw 1.4cqw; border-radius: 999px; cursor: pointer;
+    border: 1px solid rgba(255,220,180,0.18); background: rgba(255,255,255,0.03); color: rgba(243,233,218,0.7);
+    white-space: nowrap; }
+  .tab:hover { border-color: rgba(246,193,119,0.5); color: #ffe3bd; }
+  .tab.active { border-color: rgba(246,193,119,0.7); background: rgba(246,193,119,0.16); color: #ffe3bd; font-weight: 600; }
+
+  .pager { display: flex; align-items: center; justify-content: center; gap: 2cqw; }
+  .pager button { font: inherit; font-size: 2.4cqw; padding: 0.7cqw 2.4cqw; border-radius: 999px; cursor: pointer;
+    border: 1px solid rgba(246,193,119,0.5); background: rgba(246,193,119,0.14); color: #ffe3bd; }
+  .pager button:hover:not(:disabled) { background: rgba(246,193,119,0.26); }
+  .pager button:disabled { opacity: 0.35; cursor: not-allowed; }
+  .pager .pinfo { font-size: 2.2cqw; color: rgba(243,233,218,0.7); letter-spacing: 0.05em; min-width: 20cqw; text-align: center; }
+
+  .grid { display: grid; grid-template-columns: minmax(0, 1fr); gap: 1cqw; align-content: start; width: 100%; }
+  .empty { grid-column: 1 / -1; text-align: center; font-size: 2.4cqw; color: rgba(243,233,218,0.4); padding: 6cqw 0; }
 
   .card { display: flex; flex-direction: column; gap: 0.5cqw; padding: 1.4cqw 1.6cqw; border-radius: 12px; min-width: 0;
     border: 1px solid rgba(255,220,180,0.12); background: rgba(255,255,255,0.035); }
@@ -65,16 +71,20 @@
     .form { grid-template-columns: 1fr; }
     .head h1 { font-size: 5cqw; }
     .form input, .form button { font-size: 4cqw; padding: 1.6cqw 1.8cqw; }
+    .tab { font-size: 3.4cqw; padding: 1cqw 1.8cqw; }
+    .pager button { font-size: 3.6cqw; padding: 1cqw 2.4cqw; }
+    .pager .pinfo { min-width: 26cqw; }
     .card { flex-wrap: wrap; }
     .card .lc-url { flex-basis: 100%; }
+    .card .lc-name { max-width: 100%; }
   }
   @media (min-width: 501px) and (max-width: 900px) {
     .wrap { width: min(720px, 100%); }
-    .cat.open .cat-body { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+    .grid { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
   }
   @media (min-width: 901px) {
     .wrap { width: min(960px, 100%); }
-    .cat.open .cat-body { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1fr); }
+    .grid { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1fr); }
   }
 </style>
 </head>
@@ -92,9 +102,16 @@
     </div>
     <div class="err" id="err"></div>
 
+    <div class="tabs" id="tabs"></div>
+    <div class="pager">
+      <button id="prev" type="button">‹ 上一类</button>
+      <span class="pinfo" id="pinfo"></span>
+      <button id="next" type="button">下一类 ›</button>
+    </div>
+
     <div class="list" id="list"></div>
 
-    <div class="foot">添加即自动检查 · 自动归类到对应分组 · 点名称在新标签打开</div>
+    <div class="foot">添加即自动检查 · 自动归类到对应分组 · 翻页查看每类 · 点名称在新标签打开</div>
   </div>
 
 <script>
@@ -1291,46 +1308,76 @@
 
   function clonePreset() { return PRESETS.map(function (x) { return JSON.parse(JSON.stringify(x)); }); }
 
-  /* ---------- 渲染：分类折叠，一律 textContent，禁止 innerHTML 注入 ---------- */
+  /* 固定分类顺序（取自预置，保证翻页结构稳定：即使某类为空也仍占一页） */
+  var CAT_ORDER = [];
+  (function () {
+    PRESETS.forEach(function (p) { if (CAT_ORDER.indexOf(p.cat) < 0) CAT_ORDER.push(p.cat); });
+  })();
+
+  /* ---------- 渲染：分页，每个分类单独一页 ---------- */
+  var currentPage = 0;
+
+  function getOrder() {
+    var groups = {};
+    list.forEach(function (it) {
+      var c = it.cat || '未分类';
+      (groups[c] = groups[c] || []).push(it);
+    });
+    /* 固定 11 类始终占页，外加数据里出现的其它分类 */
+    var order = CAT_ORDER.slice();
+    Object.keys(groups).forEach(function (c) { if (order.indexOf(c) < 0) order.push(c); });
+    return order;
+  }
+
   function render() {
     var modeEl = $('mode');
     modeEl.textContent = mode === 'shared' ? '云端共享' : '本地模式';
     modeEl.className = 'mode ' + (mode === 'shared' ? 'on' : 'off');
 
-    var ul = $('list');
-    ul.innerHTML = '';
+    var order = getOrder();
+    if (currentPage > order.length - 1) currentPage = order.length - 1;
+    if (currentPage < 0) currentPage = 0;
 
-    /* 按分类分组，保持分类首次出现的顺序 */
-    var order = [];
+    /* 按分类分组 */
     var groups = {};
     list.forEach(function (it) {
       var c = it.cat || '未分类';
-      if (!groups[c]) { groups[c] = []; order.push(c); }
-      groups[c].push(it);
+      (groups[c] = groups[c] || []).push(it);
     });
 
-    order.forEach(function (c) {
-      var block = document.createElement('div');
-      block.className = 'cat';
-
-      var h = document.createElement('button');
-      h.type = 'button';
-      h.className = 'cat-h';
-      var t = document.createElement('span'); t.textContent = c;
-      var n = document.createElement('span'); n.className = 'cnt'; n.textContent = '（' + groups[c].length + '）';
-      var ar = document.createElement('span'); ar.className = 'arw'; ar.textContent = '▶';
-      h.appendChild(t); h.appendChild(n); h.appendChild(ar);
-
-      var body = document.createElement('div');
-      body.className = 'cat-body';
-      groups[c].forEach(function (it) { body.appendChild(buildCard(it)); });
-
-      h.addEventListener('click', function () { block.classList.toggle('open'); });
-
-      block.appendChild(h);
-      block.appendChild(body);
-      ul.appendChild(block);
+    /* 分类标签 */
+    var tabs = $('tabs');
+    tabs.innerHTML = '';
+    order.forEach(function (c, i) {
+      var b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'tab' + (i === currentPage ? ' active' : '');
+      b.textContent = c + '（' + (groups[c] ? groups[c].length : 0) + '）';
+      b.addEventListener('click', function () { currentPage = i; render(); });
+      tabs.appendChild(b);
     });
+
+    /* 翻页条 */
+    $('pinfo').textContent = '第 ' + (currentPage + 1) + ' / ' + order.length + ' 类';
+    $('prev').disabled = currentPage === 0;
+    $('next').disabled = currentPage === order.length - 1;
+
+    /* 当前页卡片网格 */
+    var ul = $('list');
+    ul.innerHTML = '';
+    var grid = document.createElement('div');
+    grid.className = 'grid';
+    var cur = order[currentPage];
+    var items = groups[cur] || [];
+    if (!items.length) {
+      var empty = document.createElement('div');
+      empty.className = 'empty';
+      empty.textContent = '该分类暂无网址';
+      grid.appendChild(empty);
+    } else {
+      items.forEach(function (it) { grid.appendChild(buildCard(it)); });
+    }
+    ul.appendChild(grid);
   }
 
   function buildCard(it) {
@@ -1461,16 +1508,16 @@
     await LinksStore.add(item);
     $('name').value = '';
     $('url').value = '';
+    /* 跳到新网址所属分类那一页 */
+    var order = getOrder();
+    var idx = order.indexOf(item.cat);
+    if (idx >= 0) currentPage = idx;
     render();
-    /* 自动展开新网址所属分类，让用户看到归类结果 */
-    var blocks = document.querySelectorAll('.cat');
-    for (var b = 0; b < blocks.length; b++) {
-      var sp = blocks[b].querySelector('.cat-h span');
-      if (sp && sp.textContent === item.cat) { blocks[b].classList.add('open'); break; }
-    }
   }
 
   $('add').addEventListener('click', onAdd);
+  $('prev').addEventListener('click', function () { if (currentPage > 0) { currentPage--; render(); } });
+  $('next').addEventListener('click', function () { currentPage++; render(); });
   LinksStore.get().then(render);
 })();
 </script>
