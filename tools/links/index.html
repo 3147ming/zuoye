@@ -1258,7 +1258,7 @@
     async add(item) {
       try {
         var r = await fetch(API, { method: 'POST', headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ name: item.name, url: item.url }) });
+          body: JSON.stringify({ name: item.name, url: item.url, cat: item.cat }) });
         if (!r.ok) throw new Error('post ' + r.status);
         var data = await r.json();
         if (data && Array.isArray(data.items)) { list = data.items; }

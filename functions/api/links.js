@@ -1147,20 +1147,45 @@ function json(data, status = 200) {
   });
 }
 
-async function readList(env) {
+// KV 存储格式：{ items: 用户自建条目[], deleted: 已删除预置的 id/url 集合 }
+async function readRaw(env) {
   const raw = await env.LINKS.get(KEY);
-  if (!raw) return clone(PRESET);
+  if (!raw) return { items: [], deleted: {} };
   try {
-    const arr = JSON.parse(raw);
-    if (Array.isArray(arr)) return arr.length ? arr : [clone(PRESET)];
-    return clone(PRESET);
-  } catch (e) {
-    return clone(PRESET);
-  }
+    const p = JSON.parse(raw);
+    if (Array.isArray(p)) {
+      // 旧版格式兼容：非预置当作用户条目，预置忽略（由 PRESET 兜底），不标记删除
+      return { items: p.filter((x) => !x.preset), deleted: {} };
+    }
+    if (p && typeof p === 'object') {
+      return { items: Array.isArray(p.items) ? p.items : [], deleted: p.deleted || {} };
+    }
+  } catch (e) {}
+  return { items: [], deleted: {} };
 }
 
-async function writeList(env, list) {
-  await env.LINKS.put(KEY, JSON.stringify(list));
+async function writeRaw(env, obj) {
+  await env.LINKS.put(KEY, JSON.stringify(obj));
+}
+
+// 最终列表 = 预置（去掉已删除） + 用户自建，按 id/url 去重
+async function readList(env) {
+  const { items: userItems, deleted } = await readRaw(env);
+  const seen = new Set();
+  const out = [];
+  for (const it of PRESET) {
+    if (deleted[it.id] || deleted[it.url]) continue;
+    if (seen.has(it.id) || seen.has(it.url)) continue;
+    seen.add(it.id); seen.add(it.url);
+    out.push(it);
+  }
+  for (const it of userItems) {
+    if (seen.has(it.id) || seen.has(it.url)) continue;
+    if (it.id) seen.add(it.id);
+    if (it.url) seen.add(it.url);
+    out.push(it);
+  }
+  return out;
 }
 
 function validate(name, url, list) {
@@ -1202,22 +1227,34 @@ export async function onRequestPost(context) {
   try { body = await context.request.json(); } catch (e) { /* ignore */ }
   const name = String((body && body.name) || '').trim();
   const url = String((body && body.url) || '').trim();
-  const list = await readList(context.env);
-  const err = validate(name, url, list);
+  const cat = String((body && body.cat) || '').trim();
+  const merged = await readList(context.env);
+  const err = validate(name, url, merged);
   if (err) return json({ error: err }, 422);
-  if (list.length >= MAX_ITEMS) return json({ error: '列表已满' }, 422);
-  list.push({ id: 'l' + Date.now().toString(36) + Math.random().toString(36).slice(2, 7), name, url, ts: Date.now() });
-  await writeList(context.env, list);
-  return json({ ok: true, items: list });
+  if (merged.length >= MAX_ITEMS) return json({ error: '列表已满' }, 422);
+  const obj = await readRaw(context.env);
+  obj.items = obj.items || [];
+  obj.items.push({ id: 'l' + Date.now().toString(36) + Math.random().toString(36).slice(2, 7), name, url, cat: cat || '未分类', ts: Date.now() });
+  await writeRaw(context.env, obj);
+  return json({ ok: true, items: await readList(context.env) });
 }
 
 export async function onRequestDelete(context) {
   if (!hasKV(context.env)) return json({ error: 'KV 未绑定（LINKS）' }, 503);
   const id = new URL(context.request.url).searchParams.get('id');
   if (!id) return json({ error: '缺少 id' }, 400);
-  if (list.find(function (x) { return x.id === id; }) && list.find(function (x) { return x.id === id; }).locked) return json({ error: '锁定的预置条目不可删' }, 403);
   const list = await readList(context.env);
-  const next = list.filter((x) => x.id !== id);
-  await writeList(context.env, next.length ? next : [clone(PRESET)]);
-  return json({ ok: true, items: next.length ? next : [clone(PRESET)] });
+  const target = list.find((x) => x.id === id);
+  if (!target) return json({ error: '条目不存在' }, 404);
+  if (target.locked) return json({ error: '锁定的预置条目不可删' }, 403);
+  const obj = await readRaw(context.env);
+  if (target.preset) {
+    obj.deleted = obj.deleted || {};
+    obj.deleted[id] = true;
+    if (target.url) obj.deleted[target.url] = true;
+  } else {
+    obj.items = (obj.items || []).filter((x) => x.id !== id);
+  }
+  await writeRaw(context.env, obj);
+  return json({ ok: true, items: await readList(context.env) });
 }

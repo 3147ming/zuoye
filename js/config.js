@@ -13,9 +13,9 @@
   'use strict';
 
   var CONFIG = {
-    version: '1.4.1',
+    version: '1.4.2',
     build: '2026-11-06',
-    stage: '第七批 · 网址推荐区：预置网址 + 用户添加自动归类',
+    stage: '第七批 · 网址推荐区：预置网址 + 用户添加自动归类 + 服务端预置常驻修复',
 
     /* assets/bg/ 下的图片文件名。留空则设置里的下拉只有「默认」。
        例：['plaza.jpg', 'forest.png'] */
