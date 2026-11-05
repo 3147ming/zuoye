@@ -1,13 +1,13 @@
 {
-  "at": "2026-11-04T17:02:54.363Z",
+  "at": "2026-11-05T05:24:12.769Z",
   "ok": true,
-  "totalChecks": 1147,
-  "passedChecks": 1147,
+  "totalChecks": 1221,
+  "passedChecks": 1221,
   "steps": [
     {
       "label": "静态检查",
       "code": 0,
-      "ms": 4883,
+      "ms": 3072,
       "passed": 34,
       "total": 34,
       "ok": true,
@@ -16,7 +16,7 @@
     {
       "label": "model 自测",
       "code": 0,
-      "ms": 12282,
+      "ms": 4621,
       "passed": 530,
       "total": 530,
       "ok": true,
@@ -25,7 +25,7 @@
     {
       "label": "芯片模型",
       "code": 0,
-      "ms": 87,
+      "ms": 82,
       "passed": 19,
       "total": 19,
       "ok": true,
@@ -34,7 +34,7 @@
     {
       "label": "probe-feel",
       "code": 0,
-      "ms": 7923,
+      "ms": 4568,
       "passed": 21,
       "total": 21,
       "ok": true,
@@ -43,7 +43,7 @@
     {
       "label": "probe-hep",
       "code": 0,
-      "ms": 13680,
+      "ms": 11012,
       "passed": 86,
       "total": 86,
       "ok": true,
@@ -52,7 +52,7 @@
     {
       "label": "probe-markers",
       "code": 0,
-      "ms": 2652,
+      "ms": 2813,
       "passed": 23,
       "total": 23,
       "ok": true,
@@ -61,25 +61,34 @@
     {
       "label": "probe-ui",
       "code": 0,
-      "ms": 3930,
+      "ms": 4039,
       "passed": 26,
       "total": 26,
       "ok": true,
       "tail": "OK   P1 375px 无横向溢出\nOK   P1 console 无报错\n\n=== 探针结果：26/26 通过 ==="
     },
     {
+      "label": "probe-view16",
+      "code": 0,
+      "ms": 8021,
+      "passed": 74,
+      "total": 74,
+      "ok": true,
+      "tail": "OK   Z8 电路存档结构未变（无 projection / view 字段）\nOK   Z8 console 无报错 / 异常\n\n=== 探针结果：74/74 通过 ==="
+    },
+    {
       "label": "probe14",
       "code": 0,
-      "ms": 158,
+      "ms": 165,
       "passed": 14,
       "total": 14,
       "ok": true,
-      "tail": "OK   14 100 元件链式电路：可求解\n     B1 计时：4.0ms\n\n=== 探针结果：14/14 通过 ==="
+      "tail": "OK   14 100 元件链式电路：可求解\n     B1 计时：4.5ms\n\n=== 探针结果：14/14 通过 ==="
     },
     {
       "label": "run10",
       "code": 0,
-      "ms": 3757,
+      "ms": 3959,
       "passed": 27,
       "total": 27,
       "ok": true,
@@ -88,7 +97,7 @@
     {
       "label": "run11",
       "code": 0,
-      "ms": 3848,
+      "ms": 3986,
       "passed": 21,
       "total": 21,
       "ok": true,
@@ -97,7 +106,7 @@
     {
       "label": "run12",
       "code": 0,
-      "ms": 3963,
+      "ms": 4175,
       "passed": 15,
       "total": 15,
       "ok": true,
@@ -106,7 +115,7 @@
     {
       "label": "run13",
       "code": 0,
-      "ms": 4823,
+      "ms": 5040,
       "passed": 16,
       "total": 16,
       "ok": true,
@@ -115,25 +124,25 @@
     {
       "label": "run5",
       "code": 0,
-      "ms": 11400,
+      "ms": 11507,
       "passed": 40,
       "total": 40,
       "ok": true,
-      "tail": "PASS | 全程无 console 报错/警告\n\n=== 探针结果：40/40 通过 ===\n性能： {\"median\":0.19999998807907104,\"max\":0.7000000476837158,\"min\":0.09999996423721313,\"nodes\":1,\"engineMs\":0.4}"
+      "tail": "PASS | 全程无 console 报错/警告\n\n=== 探针结果：40/40 通过 ===\n性能： {\"median\":0.30000001192092896,\"max\":0.9000000357627869,\"min\":0.09999996423721313,\"nodes\":1,\"engineMs\":0.5}"
     },
     {
       "label": "run6",
       "code": 0,
-      "ms": 12690,
+      "ms": 12505,
       "passed": 45,
       "total": 45,
       "ok": true,
-      "tail": "  GEO dig-narrow {\"canvas\":[258,416,241,271],\"attr\":[258,415],\"scrollY\":0,\"areaScroll\":0,\"transform\":\"none\",\"view\":{\"scale\":0.2164,\"ox\":99.6,\"oy\":156,\"tileW\":7.36},\"corners\":[[100,156],[232,222],[26,193],[158,259]]}\nPASS | 无 console 报错或异常\n\n=== 数字仿真探针：45/45 通过 ==="
+      "tail": "  GEO dig-narrow {\"canvas\":[258,373,241,314],\"attr\":[258,373],\"scrollY\":0,\"areaScroll\":0,\"transform\":\"none\",\"view\":{\"scale\":0.2164,\"ox\":99.6,\"oy\":135,\"tileW\":7.36},\"corners\":[[100,135],[232,201],[26,172],[158,238]]}\nPASS | 无 console 报错或异常\n\n=== 数字仿真探针：45/45 通过 ==="
     },
     {
       "label": "run7",
       "code": 0,
-      "ms": 9428,
+      "ms": 9725,
       "passed": 35,
       "total": 35,
       "ok": true,
@@ -142,7 +151,7 @@
     {
       "label": "run8",
       "code": 0,
-      "ms": 4643,
+      "ms": 4795,
       "passed": 40,
       "total": 40,
       "ok": true,
@@ -151,7 +160,7 @@
     {
       "label": "run9",
       "code": 0,
-      "ms": 3764,
+      "ms": 3973,
       "passed": 35,
       "total": 35,
       "ok": true,
@@ -160,7 +169,7 @@
     {
       "label": "runA",
       "code": 0,
-      "ms": 9486,
+      "ms": 9685,
       "passed": 33,
       "total": 33,
       "ok": true,
@@ -169,11 +178,11 @@
     {
       "label": "runB",
       "code": 0,
-      "ms": 33110,
+      "ms": 31712,
       "passed": 87,
       "total": 87,
       "ok": true,
-      "tail": "OK   2.12 Shift+Ctrl+Z 重做生效\nOK   2.12 console 错误 0 条\n\n=== 探针结果：87/87 通过 ==="
+      "tail": "OK   2.12 Ctrl+Shift+Z 不再重做（Shift 组合已移除）\nOK   2.12 console 错误 0 条\n\n=== 探针结果：87/87 通过 ==="
     }
   ]
 }
