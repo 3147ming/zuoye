@@ -26,6 +26,13 @@
     border: 1px solid rgba(246,193,119,0.5); background: rgba(246,193,119,0.14); color: #ffe3bd; }
   .form button:hover { background: rgba(246,193,119,0.24); }
 
+  .search { width: 100%; }
+  .search input { width: 100%; box-sizing: border-box; font: inherit; font-size: 2.4cqw; padding: 1.1cqw 1.8cqw; border-radius: 999px;
+    border: 1px solid rgba(127,216,200,0.35); background: rgba(127,216,200,0.06); color: #f3e9da;
+    -webkit-appearance: none; appearance: none; }
+  .search input::placeholder { color: rgba(243,233,218,0.4); }
+  .search input:focus { outline: none; border-color: rgba(127,216,200,0.8); background: rgba(127,216,200,0.12); }
+
   .err { min-height: 2.4cqw; font-size: 2.2cqw; color: #ff9f9f; letter-spacing: 0.04em; }
 
   .list { flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 1cqw; padding-right: 0.4cqw; align-content: start; }
@@ -47,6 +54,12 @@
 
   .grid { display: grid; grid-template-columns: minmax(0, 1fr); gap: 1cqw; align-content: start; width: 100%; }
   .empty { grid-column: 1 / -1; text-align: center; font-size: 2.4cqw; color: rgba(243,233,218,0.4); padding: 6cqw 0; }
+
+  /* 搜索结果视图 */
+  .result-head { font-size: 2.2cqw; color: rgba(243,233,218,0.6); letter-spacing: 0.04em; padding: 0.4cqw 0.4cqw 0.2cqw; }
+  .result-head b { color: #7fd8c8; font-weight: 600; }
+  .rgroup { margin-bottom: 1.6cqw; }
+  .rgroup-h { font-size: 2.4cqw; font-weight: 600; color: #ffe3bd; letter-spacing: 0.03em; padding: 0.6cqw 0.4cqw; border-left: 0.5cqw solid rgba(246,193,119,0.6); }
 
   .card { display: flex; flex-direction: column; gap: 0.5cqw; padding: 1.4cqw 1.6cqw; border-radius: 12px; min-width: 0;
     border: 1px solid rgba(255,220,180,0.12); background: rgba(255,255,255,0.035); }
@@ -71,6 +84,7 @@
     .form { grid-template-columns: 1fr; }
     .head h1 { font-size: 5cqw; }
     .form input, .form button { font-size: 4cqw; padding: 1.6cqw 1.8cqw; }
+    .search input { font-size: 4cqw; padding: 1.6cqw 1.8cqw; }
     .tab { font-size: 3.4cqw; padding: 1cqw 1.8cqw; }
     .pager button { font-size: 3.6cqw; padding: 1cqw 2.4cqw; }
     .pager .pinfo { min-width: 26cqw; }
@@ -100,10 +114,14 @@
       <input id="url" placeholder="网址 https://…">
       <button id="add" type="button">添加</button>
     </div>
+
+    <div class="search">
+      <input id="search" type="search" placeholder="搜索名称 / 网址 / 简介 / 分类…" autocomplete="off">
+    </div>
     <div class="err" id="err"></div>
 
     <div class="tabs" id="tabs"></div>
-    <div class="pager">
+    <div class="pager" id="pager">
       <button id="prev" type="button">‹ 上一类</button>
       <span class="pinfo" id="pinfo"></span>
       <button id="next" type="button">下一类 ›</button>
@@ -111,7 +129,7 @@
 
     <div class="list" id="list"></div>
 
-    <div class="foot">添加即自动检查 · 自动归类到对应分组 · 翻页查看每类 · 点名称在新标签打开</div>
+    <div class="foot">添加即自动检查 · 自动归类到对应分组 · 翻页或搜索查看 · 点名称在新标签打开</div>
   </div>
 
 <script>
@@ -1316,6 +1334,7 @@
 
   /* ---------- 渲染：分页，每个分类单独一页 ---------- */
   var currentPage = 0;
+  var query = '';
 
   function getOrder() {
     var groups = {};
@@ -1334,6 +1353,63 @@
     modeEl.textContent = mode === 'shared' ? '云端共享' : '本地模式';
     modeEl.className = 'mode ' + (mode === 'shared' ? 'on' : 'off');
 
+    var tabs = $('tabs');
+    var pager = $('pager');
+    var ul = $('list');
+    ul.innerHTML = '';
+
+    /* ---------- 搜索模式：跨分类过滤，按分类分组展示 ---------- */
+    if (query) {
+      tabs.style.display = 'none';
+      pager.style.display = 'none';
+
+      var matched = list.filter(function (it) {
+        var hay = (it.name + ' ' + it.url + ' ' + (it.desc || '') + ' ' + (it.cat || '')).toLowerCase();
+        return hay.indexOf(query) >= 0;
+      });
+
+      var head = document.createElement('div');
+      head.className = 'result-head';
+      head.appendChild(document.createTextNode('搜索「'));
+      var b = document.createElement('b'); b.textContent = query; head.appendChild(b);
+      head.appendChild(document.createTextNode('」共 ' + matched.length + ' 条'));
+      ul.appendChild(head);
+
+      if (!matched.length) {
+        var empty0 = document.createElement('div');
+        empty0.className = 'empty';
+        empty0.textContent = '未找到匹配的网址';
+        ul.appendChild(empty0);
+        return;
+      }
+
+      var groups = {};
+      matched.forEach(function (it) {
+        var c = it.cat || '未分类';
+        (groups[c] = groups[c] || []).push(it);
+      });
+      var qorder = CAT_ORDER.slice();
+      Object.keys(groups).forEach(function (c) { if (qorder.indexOf(c) < 0) qorder.push(c); });
+
+      qorder.forEach(function (c) {
+        if (!groups[c]) return;
+        var g = document.createElement('div'); g.className = 'rgroup';
+        var gh = document.createElement('div');
+        gh.className = 'rgroup-h';
+        gh.textContent = c + '（' + groups[c].length + '）';
+        g.appendChild(gh);
+        var grid = document.createElement('div'); grid.className = 'grid';
+        groups[c].forEach(function (it) { grid.appendChild(buildCard(it)); });
+        g.appendChild(grid);
+        ul.appendChild(g);
+      });
+      return;
+    }
+
+    /* ---------- 翻页模式 ---------- */
+    tabs.style.display = '';
+    pager.style.display = '';
+
     var order = getOrder();
     if (currentPage > order.length - 1) currentPage = order.length - 1;
     if (currentPage < 0) currentPage = 0;
@@ -1346,7 +1422,6 @@
     });
 
     /* 分类标签 */
-    var tabs = $('tabs');
     tabs.innerHTML = '';
     order.forEach(function (c, i) {
       var b = document.createElement('button');
@@ -1363,8 +1438,6 @@
     $('next').disabled = currentPage === order.length - 1;
 
     /* 当前页卡片网格 */
-    var ul = $('list');
-    ul.innerHTML = '';
     var grid = document.createElement('div');
     grid.className = 'grid';
     var cur = order[currentPage];
@@ -1518,6 +1591,11 @@
   $('add').addEventListener('click', onAdd);
   $('prev').addEventListener('click', function () { if (currentPage > 0) { currentPage--; render(); } });
   $('next').addEventListener('click', function () { currentPage++; render(); });
+  $('search').addEventListener('input', function () {
+    query = $('search').value.trim().toLowerCase();
+    render();
+  });
+  $('search').addEventListener('keydown', function (e) { if (e.key === 'Escape') { this.value = ''; query = ''; render(); } });
   LinksStore.get().then(render);
 })();
 </script>
