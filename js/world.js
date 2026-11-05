@@ -5,7 +5,7 @@
  *
  * 第五批（第四批优化）改造：
  *   1) 能走的只有三屏：工具总门 ←→ 中心广场 ←→ 游戏总门。
- *      中间的「九个区块」不再串成一条路，只能从总门传送进去。
+ *      中间的「区块」不再串成一条路，只能从总门传送进去。
  *   2) 每座总门按 E 弹出选单，选一项就把人送到对应区块的中央；
  *      区块里走出任意一侧边缘 → 回到广场（工具落偏左、游戏落偏右）。
  *   3) 每个区块常驻一位 NPC，负责讲「这是什么 / 怎么玩 / 怎么回去」。
@@ -132,7 +132,7 @@
   }
 
   /* ============================================================
-   * 1. 内容表：九个内置条目
+   * 1. 内容表：内置条目（数量随下方数组增减，文案不再写死）
    * ------------------------------------------------------------
    * 加一款游戏 = 往这里加一条 + 把页面放到 games/ 或 tools/ 下。
    * cat 决定它归哪座总门、用哪套配色。
@@ -182,6 +182,14 @@
       cross: true, seed: 1201 }
   ];
 
+  /* 动态计数：避免文案把数字写死（区块/游戏数量随内容增减） */
+  var ZONE_COUNT = ITEMS.length;                                                    // 16 个区块
+  var GAME_COUNT = ITEMS.filter(function (i) { return i.cat === 'games'; }).length; // 13 款小游戏
+
+  /* HUD 标题里的区块数随内容走（首屏 HTML 里是兜底值） */
+  var _hudP = document.querySelector('.hud-title p');
+  if (_hudP) _hudP.textContent = '三屏走道 · 两座总门 · ' + ZONE_COUNT + ' 个区块';
+
   /* 每个场景的 NPC 台词：line1 是头顶气泡的第一行（要短），lines 是面板里的全文 */
   var NPC_LINES = {
     plaza: {
@@ -191,7 +199,7 @@
         '……又一位旅行者。欢迎来到中心广场。',
         '这里不再是一条直路。左右各有一座总门，路只留着三屏。',
         '往左走，是工具总门：白噪音和番茄钟。',
-        '往右走，是游戏总门：七款小游戏都在那后面。',
+        '往右走，是游戏总门：' + GAME_COUNT + ' 款小游戏都在那后面。',
         '站到门前按 E，会列出那一整排区块，选一个就能直接传过去。',
         '每个区块里都有人等着给你讲怎么用——先听，再按 E 进门。',
         '想回来？在区块里往任意一边走出画面就行。',
@@ -1083,7 +1091,7 @@
     for (i = 0; i < 56; i++) {
       this.stars.push({
         x: rng() * VIEW_W,
-        y: 20 + rng() * 200,
+        y: 210 + rng() * 90,          /* 落在可见天区 [206,566]；旧值 20+200 有 ≈93% 在视野外 */
         r: 0.6 + rng() * 1.5,
         p: rng() * Math.PI * 2,
         s: 0.5 + rng() * 1.4
@@ -1174,6 +1182,8 @@
     opts = opts || {};
     this.ctx = ctx;
     this.t = 0;
+    /* 尊重系统「减少动态效果」：星光呼吸 / 尘埃飘动改为静态 */
+    this.reduceMotion = !!(global.matchMedia && global.matchMedia('(prefers-reduced-motion: reduce)').matches);
 
     this.grain = buildGrain();
     this.vignette = buildVignette();
@@ -1649,7 +1659,8 @@
     ctx.globalCompositeOperation = 'lighter';
     for (i = 0; i < this.stars.length; i++) {
       var s = this.stars[i];
-      var a = 0.18 + 0.5 * Math.abs(Math.sin(this.t * s.s + s.p));
+      if (s.y < CAM_Y - 8 || s.y > GROUND_Y + 8) continue;   /* 视野外不画 */
+      var a = this.reduceMotion ? 0.42 : (0.18 + 0.5 * Math.abs(Math.sin(this.t * s.s + s.p)));
       ctx.fillStyle = 'rgba(255, 236, 210, ' + a.toFixed(3) + ')';
       ctx.beginPath();
       ctx.arc(s.x, s.y, s.r, 0, Math.PI * 2);
@@ -1687,18 +1698,20 @@
     if (this.npc) this.npc.render(ctx);
     if (this.player) this.player.render(ctx);
 
-    /* 尘埃 */
-    ctx.save();
-    ctx.globalCompositeOperation = 'lighter';
-    for (i = 0; i < this.motes.length; i++) {
-      var mo = this.motes[i];
-      var ma = 0.10 + 0.30 * Math.abs(Math.sin(this.t * mo.s + mo.p));
-      ctx.fillStyle = 'rgba(255, 206, 140, ' + ma.toFixed(3) + ')';
-      ctx.beginPath();
-      ctx.arc(mo.x, mo.y, mo.r, 0, Math.PI * 2);
-      ctx.fill();
+    /* 尘埃（减少动态时整层不画，省一次 lighter 合成） */
+    if (!this.reduceMotion) {
+      ctx.save();
+      ctx.globalCompositeOperation = 'lighter';
+      for (i = 0; i < this.motes.length; i++) {
+        var mo = this.motes[i];
+        var ma = 0.10 + 0.30 * Math.abs(Math.sin(this.t * mo.s + mo.p));
+        ctx.fillStyle = 'rgba(255, 206, 140, ' + ma.toFixed(3) + ')';
+        ctx.beginPath();
+        ctx.arc(mo.x, mo.y, mo.r, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      ctx.restore();
     }
-    ctx.restore();
 
     /* 前景草叶 */
     this.drawForeground(ctx);
@@ -2146,7 +2159,7 @@
 
     ctx.fillStyle = 'rgba(253, 243, 228, 0.62)';
     ctx.font = '400 17px ' + SANS;
-    ctx.fillText('广场左右各一座总门 · 九个区块传送抵达', cx, cy + 30);
+    ctx.fillText('广场左右各一座总门 · ' + ZONE_COUNT + ' 个区块传送抵达', cx, cy + 30);
 
     ctx.globalAlpha = a * Math.min(1, k / 0.6);
     ctx.fillStyle = 'rgba(255, 217, 168, 0.72)';

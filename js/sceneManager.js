@@ -39,6 +39,7 @@
     _last: 0,
     _boundFrame: null,
     _boundResize: null,
+    _ro: null,
 
     /* ---------- 注册 ---------- */
     register: function (name, factory) {
@@ -108,7 +109,16 @@
       this._boundResize = this._boundResize || this._resize.bind(this);
 
       this._resize();
-      global.addEventListener('resize', this._boundResize);
+      /* 舞台宽度是 min() 算出来的，窗口变化由 ResizeObserver 统一回调；
+         老浏览器退回 window.resize */
+      if (global.ResizeObserver) {
+        try {
+          this._ro = new global.ResizeObserver(this._boundResize);
+          this._ro.observe(this.canvas.parentElement || this.canvas);
+        } catch (e) { global.addEventListener('resize', this._boundResize); }
+      } else {
+        global.addEventListener('resize', this._boundResize);
+      }
 
       if (!this.running) {
         this.running = true;
@@ -122,19 +132,25 @@
       this.running = false;
       if (this._raf) global.cancelAnimationFrame(this._raf);
       this._raf = 0;
+      if (this._ro) { try { this._ro.disconnect(); } catch (e) {} this._ro = null; }
       if (this._boundResize) global.removeEventListener('resize', this._boundResize);
       return this;
     },
 
-    /* ---------- 内部：按 DPR 设定后备缓冲 ---------- */
+    /* ---------- 内部：后备缓冲对齐「舞台实际像素」----------
+     * 旧做法固定 1280*DPR（手机 2560×1440），与显示尺寸脱钩 → 手机 5–12 倍像素空转。
+     * 新做法：_dpr = 舞台CSS宽/逻辑宽 × DPR，夹在 [0.4, 2]，让 canvas 像素 ≈ 屏幕像素。
+     * 视觉大小不变，只是不再先画 10 倍再缩回来。 */
     _resize: function () {
       if (!this.canvas) return;
+      var stage = this.canvas.parentElement;
+      var cssW = (stage && stage.clientWidth) || this.width;
       var dpr = Math.min(global.devicePixelRatio || 1, MAX_DPR);
-      var w = Math.round(this.width * dpr);
-      var h = Math.round(this.height * dpr);
+      this._dpr = Math.max(0.4, Math.min(2, (cssW / this.width) * dpr));
+      var w = Math.round(this.width * this._dpr);
+      var h = Math.round(this.height * this._dpr);
       if (this.canvas.width !== w) this.canvas.width = w;
       if (this.canvas.height !== h) this.canvas.height = h;
-      this._dpr = dpr;
     },
 
     /* ---------- 主循环 ---------- */
@@ -148,12 +164,16 @@
 
       this.time += dt;
 
+      var scene = this.current;
+      if (!scene) return;
+
+      /* 浮层（设置 / 总门选单）打开时冻结：不 update 也不重绘，保留上一帧。
+         canvas 是 alpha:false，不会回黑；关面板后下一帧自动恢复。 */
+      if (scene._frozen === true) return;
+
       var ctx = this.ctx;
       ctx.setTransform(this._dpr, 0, 0, this._dpr, 0, 0);
       ctx.clearRect(0, 0, this.width, this.height);
-
-      var scene = this.current;
-      if (!scene) return;
 
       scene.update(dt);
 

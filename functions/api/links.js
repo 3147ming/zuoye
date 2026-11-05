@@ -4,7 +4,9 @@
  * Cloudflare Pages Function（路由 /api/links）
  * · 主案：KV 共享（namespace 变量名 LINKS，需在 Pages 后台绑定一次）
  * · KV 未绑定时返回 503，前端自动降级 localStorage（本地模式）
- * · GET 返回列表；POST 校验后追加；DELETE 按 id 删除（开放，课程演示，README 注明风险）
+ * · GET 返回列表；POST 校验后追加；DELETE 按 id 删除
+ * · 写入防护（v1.4.5）：POST/DELETE 校 Origin/Referer 必须同源 + 按 IP 限速（KV 计数，10 次/分）
+ * · 锁死条目（locked）在服务端判定，前端字段不生效
  * ============================================================ */
 
 const PRESET = [
@@ -1135,6 +1137,44 @@ const MAX_ITEMS = 500;
 const clone = (o) => JSON.parse(JSON.stringify(o));
 const hasKV = (env) => !!(env && env.LINKS);
 
+/* ---------- 写入防护 ---------- */
+// 同源校验：带 Origin / Referer 的请求，其 hostname 必须与请求本身一致。
+// 跨域 JS 一定带 Origin（且为外部站点），因此无法写入；无来源头（curl/服务端）放行。
+function sameOrigin(request) {
+  let url;
+  try { url = new URL(request.url); } catch (e) { return false; }
+  const refs = [request.headers.get('Origin'), request.headers.get('Referer')];
+  for (const r of refs) {
+    if (!r) continue;
+    try {
+      const h = new URL(r).hostname;
+      if (h !== url.hostname) return false;   // 有来源头但不同源 → 拒绝
+    } catch (e) { return false; }             // 来源头非法 → 拒绝
+  }
+  return true;
+}
+
+function clientIp(request) {
+  return request.headers.get('CF-Connecting-IP')
+    || (request.cf && request.cf.connectingIp)
+    || request.headers.get('X-Forwarded-For')
+    || 'unknown';
+}
+
+// 固定窗口限速：每个 IP 每分钟最多 10 次写入；KV TTL 自动过期
+const RL_LIMIT = 10;
+async function rateLimited(env, request) {
+  if (!hasKV(env)) return false;
+  const ip = clientIp(request);
+  const bucket = Math.floor(Date.now() / 60000);
+  const key = 'rl:' + ip + ':' + bucket;
+  let cur = 0;
+  try { cur = parseInt((await env.LINKS.get(key)) || '0', 10) || 0; } catch (e) { return false; }
+  if (cur >= RL_LIMIT) return true;
+  try { await env.LINKS.put(key, String(cur + 1), { expirationTtl: 70 }); } catch (e) {}
+  return false;
+}
+
 function json(data, status = 200) {
   return new Response(JSON.stringify(data), {
     status,
@@ -1223,6 +1263,8 @@ export async function onRequestGet(context) {
 
 export async function onRequestPost(context) {
   if (!hasKV(context.env)) return json({ error: 'KV 未绑定（LINKS）' }, 503);
+  if (!sameOrigin(context.request)) return json({ error: '跨域请求被拒绝' }, 403);
+  if (await rateLimited(context.env, context.request)) return json({ error: '请求过于频繁，请稍后再试' }, 429);
   let body = {};
   try { body = await context.request.json(); } catch (e) { /* ignore */ }
   const name = String((body && body.name) || '').trim();
@@ -1241,6 +1283,8 @@ export async function onRequestPost(context) {
 
 export async function onRequestDelete(context) {
   if (!hasKV(context.env)) return json({ error: 'KV 未绑定（LINKS）' }, 503);
+  if (!sameOrigin(context.request)) return json({ error: '跨域请求被拒绝' }, 403);
+  if (await rateLimited(context.env, context.request)) return json({ error: '请求过于频繁，请稍后再试' }, 429);
   const id = new URL(context.request.url).searchParams.get('id');
   if (!id) return json({ error: '缺少 id' }, 400);
   const list = await readList(context.env);

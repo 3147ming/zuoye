@@ -35,6 +35,9 @@
     };
 
     function onDown(e) {
+      /* 焦点在按钮/输入框等可交互元素上时，别抢空格/方向键（否则空格按不动按钮） */
+      var t = e.target;
+      if (t && t.closest && t.closest('button,input,select,textarea,a,[contenteditable]')) return;
       var k = MAP[e.code];
       if (!k) return;
       if (k === 'jump') {
@@ -47,6 +50,8 @@
     }
 
     function onUp(e) {
+      var t = e.target;
+      if (t && t.closest && t.closest('button,input,select,textarea,a,[contenteditable]')) return;
       var k = MAP[e.code];
       if (!k) return;
       state[k] = false;

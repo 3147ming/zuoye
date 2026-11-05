@@ -48,7 +48,8 @@ body::before {
     radial-gradient(rgba(255, 230, 200, 0.06) 1px, transparent 1px);
   background-size: 39px 39px, 17px 17px;
   background-position: 0 0, 9px 13px;
-  mix-blend-mode: overlay;
+  /* 去掉 mix-blend-mode:overlay —— 它把整块游戏画面每帧拖进一次混合（移动端掉帧）；
+     纯 alpha 静态纸纹视觉效果基本一致，合成开销低得多。 */
 }
 
 .frame {
@@ -294,6 +295,22 @@ body[data-scene]:not([data-scene="world"]) .hud-keys {
   z-index: 30;
 }
 
+/* 加载骨架：iframe 就绪前居中提示，加载完成/失败即移除 */
+.iframe-loading {
+  position: absolute; inset: 0; z-index: 33;
+  display: flex; align-items: center; justify-content: center; gap: 0.9cqw;
+  background: #07060c;
+  color: rgba(255, 233, 208, 0.72);
+  font-family: var(--sans); font-size: 1.1cqw; letter-spacing: 0.08em;
+  pointer-events: none;
+}
+.iframe-loading::before {
+  content: ''; width: 1.4cqw; height: 1.4cqw; flex-shrink: 0;
+  border: 2px solid rgba(255, 214, 170, 0.25); border-top-color: rgba(255, 214, 170, 0.9);
+  border-radius: 50%; animation: iframe-spin 0.9s linear infinite;
+}
+@keyframes iframe-spin { to { transform: rotate(360deg); } }
+
 .iframe-back {
   position: absolute;
   top: 1.5cqw;
@@ -396,6 +413,10 @@ body[data-scene]:not([data-scene="world"]) .hud-keys {
   width: 11cqw; height: 11cqw; min-width: 46px; min-height: 46px;
   border-radius: 50%; font-size: 6cqw;
 }
+
+/* 触屏下补的 帮助H / 设置O 入口（手机无实体键） */
+.t-top { position: absolute; top: 2.6cqw; left: 50%; transform: translateX(-50%); display: flex; gap: 2.4cqw; z-index: 3; pointer-events: none; }
+.t-util { width: 9cqw; height: 9cqw; min-width: 38px; min-height: 38px; font-size: 4cqw; border-radius: 50%; pointer-events: auto; }
 .t-launch { width: 16cqw; height: 16cqw; min-width: 64px; min-height: 64px; font-size: 4.6cqw; }
 
 .t-swipe { position: absolute; inset: 0; pointer-events: auto; touch-action: none; z-index: 1; }
@@ -965,6 +986,14 @@ body[data-scene]:not([data-scene="world"]) .gear {
   .set-contrib-txt i { font-size: 11px; }
   .set-toggle { font-size: 11px; padding: 4px 10px; }
   .set-foot { font-size: 11px; padding: 8px 16px 10px; }
+
+  /* 对话面板：手机上改用固定 px，避免 cqw 太小读不出；并抬到触屏方向键上方 */
+  .dialogue { width: 94%; bottom: calc(13cqw + 26px); padding: 14px 16px 10px; border-radius: 12px; }
+  .dialogue-name { left: 14px; top: -10px; font-size: 11px; padding: 3px 9px; }
+  .dialogue-text { font-size: 14px; line-height: 1.62; min-height: 2.6em; }
+  .dialogue-foot { font-size: 10px; margin-top: 8px; padding-top: 6px; }
+  .hud-title p { font-size: 11px; }
+  .toast { font-size: 12px; padding: 8px 15px; bottom: 4px; }
 }
 
 /* ---------- 降低动效偏好 ---------- */

@@ -79,6 +79,22 @@
   btnBack.textContent = '⤾'; btnBack.setAttribute('aria-label', '返回');
   root.appendChild(btnBack);
 
+  /* 帮助 H / 设置 O：手机无实体键盘，补两个触屏入口（派发合成键复用现有监听） */
+  var topBar = document.createElement('div'); topBar.className = 't-top';
+  function utilBtn(label, code, key, keyCode, aria) {
+    var b = document.createElement('button');
+    b.type = 'button'; b.className = 'tbtn t-util'; b.textContent = label; b.setAttribute('aria-label', aria);
+    b.addEventListener('pointerdown', function (e) {
+      e.preventDefault();
+      fire(global, code, key, keyCode, 'keydown');
+      fire(global, code, key, keyCode, 'keyup');
+    });
+    return b;
+  }
+  topBar.appendChild(utilBtn('H', 'KeyH', 'h', 72, '帮助'));
+  topBar.appendChild(utilBtn('O', 'KeyO', 'o', 79, '设置'));
+  root.appendChild(topBar);
+
   var grpL = document.createElement('div'); grpL.className = 't-grp t-grp-l';
   var grpR = document.createElement('div'); grpR.className = 't-grp t-grp-r';
   var pad = document.createElement('div'); pad.className = 't-pad';
@@ -203,8 +219,9 @@
   /* 返回键：发 Escape（大厅关面板 / iframe 回大厅，iframeScene 已监听） */
   btnBack.addEventListener('pointerdown', function (e) {
     e.preventDefault();
-    fire(global, 'Escape', 'Escape', 27, 'keydown');
-    fire(global, 'Escape', 'Escape', 27, 'keyup');
+    /* 发到 document：GatePanel / Settings 在 document 捕获阶段监听，发在 window 上它们收不到 */
+    fire(document, 'Escape', 'Escape', 27, 'keydown');
+    fire(document, 'Escape', 'Escape', 27, 'keyup');
   });
 
   /* 监听场景名变化；MutationObserver 不可用时退化为轮询 */

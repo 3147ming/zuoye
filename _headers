@@ -1,0 +1,17 @@
+/*
+  X-Content-Type-Options: nosniff
+  Referrer-Policy: strict-origin-when-cross-origin
+  Permissions-Policy: camera=(), microphone=(), geolocation=()
+
+/js/*
+  Cache-Control: public, max-age=3600, stale-while-revalidate=86400
+/css/*
+  Cache-Control: public, max-age=3600, stale-while-revalidate=86400
+
+/games/*
+  Cache-Control: public, max-age=86400
+/tools/*
+  Cache-Control: public, max-age=86400
+
+/api/*
+  Cache-Control: public, max-age=30

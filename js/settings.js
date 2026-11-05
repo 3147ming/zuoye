@@ -16,7 +16,9 @@
 
   var MAX_W = 1440;
   var MAX_H = 810;
-  var MAX_CHARS = 300000;      /* dataURL 字符数上限，约 220KB 二进制；12 屏也就 3.6MB */
+  /* 背景存 IndexedDB（数百 MB 配额），单张上限放宽到约 2.2MB 二进制，
+     1440×810 JPEG 一般 q≈0.8 就够，不会被反复压糊。 */
+  var MAX_CHARS = 3000000;
 
   function el(id) { return document.getElementById(id); }
 
@@ -42,9 +44,10 @@
           e.preventDefault();
           e.stopPropagation();
           self.close();
-        } else if (e.code !== 'Tab') {
-          e.stopPropagation();       /* 面板开着时别让角色动 */
+          return;
         }
+        if (e.code === 'Tab') { self._trapTab(e); return; }
+        e.stopPropagation();         /* 面板开着时别让角色动 */
       };
 
       el('setClose').addEventListener('click', function () { self.close(); });
@@ -244,7 +247,12 @@
 
       el('resetSave').addEventListener('click', function () {
         if (!global.confirm('会清空：所在区块、所有自定义背景、音量设置、自建内容开关。\n确定要重置吗？')) return;
-        try { global.localStorage.clear(); } catch (e) { /* 忽略 */ }
+        try {
+          /* 只清本应用（worldhub.*）的键，别误伤同源其它页面（如 tools/*）的存储 */
+          Object.keys(global.localStorage)
+            .filter(function (k) { return /^worldhub\./.test(k); })
+            .forEach(function (k) { global.localStorage.removeItem(k); });
+        } catch (e) { /* 忽略 */ }
         try { global.location.reload(); } catch (e) { /* 忽略 */ }
       });
     },
@@ -312,8 +320,24 @@
     },
 
     /* ---------------- 开关 ---------------- */
+    /* 焦点陷阱：Tab / Shift+Tab 只在面板内循环，不跑到背后的 canvas */
+    _trapTab: function (e) {
+      var nodes = this.root.querySelectorAll(
+        'a[href],button:not([disabled]),input:not([disabled]),select:not([disabled]),textarea:not([disabled]),[tabindex]:not([tabindex="-1"])');
+      var list = [];
+      for (var i = 0; i < nodes.length; i++) {
+        if (nodes[i].offsetParent !== null) list.push(nodes[i]);
+      }
+      if (!list.length) return;
+      var first = list[0], last = list[list.length - 1];
+      if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
+      else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
+      else if (list.indexOf(document.activeElement) < 0) { e.preventDefault(); first.focus(); }
+    },
+
     open: function (sceneId, sceneTitle) {
       if (!this.mount()) return false;
+      this._lastFocus = document.activeElement;
       this.sceneId = sceneId || 'plaza';
       this.sceneTitle = sceneTitle || '当前场景';
       this.open_ = true;
@@ -355,6 +379,10 @@
       this.root.classList.remove('on');
       this.root.setAttribute('aria-hidden', 'true');
       document.removeEventListener('keydown', this._key, true);
+      if (this._lastFocus && typeof this._lastFocus.focus === 'function') {
+        try { this._lastFocus.focus(); } catch (e) { /* 忽略 */ }
+      }
+      this._lastFocus = null;
     },
 
     isOpen: function () {
@@ -401,6 +429,29 @@
       fin('检查失败：' + e.message);
     }
   }
+
+  /* 启动后静默查一次版本：有新版本才 toast，且每天最多提示一次 */
+  function silentVersionCheck() {
+    if (global.location.protocol === 'file:') return;
+    var cfg = global.WH_CONFIG || {};
+    if (!cfg.version) return;
+
+    var today = new Date().toISOString().slice(0, 10);
+    var KEY = 'worldhub.updcheck';
+    try { if (global.localStorage.getItem(KEY) === today) return; } catch (e) {}
+    try { global.localStorage.setItem(KEY, today); } catch (e) {}
+
+    try {
+      global.fetch('version.json', { cache: 'no-store' }).then(function (r) {
+        return r.ok ? r.json() : null;
+      }).then(function (v) {
+        if (v && v.version && v.version !== cfg.version && global.HUD) {
+          global.HUD.toast('发现新版本 v' + v.version + '，刷新页面即可更新');
+        }
+      }).catch(function () {});
+    } catch (e) {}
+  }
+  if (global.addEventListener) global.addEventListener('load', silentVersionCheck);
 
   global.Settings = Panel;
 })(window);

@@ -54,6 +54,8 @@
       this.titleEl = document.getElementById('gaterTitle');
       this.kickEl = document.getElementById('gaterKicker');
       if (!this.root || !this.listEl) return false;
+      /* listbox 需要可聚焦，读屏才会读到 aria-activedescendant 指向的项 */
+      this.listEl.setAttribute('tabindex', '0');
 
       var self = this;
 
@@ -141,7 +143,8 @@
           try { rows[i].scrollIntoView({ block: 'nearest' }); } catch (e) { /* 忽略 */ }
         }
       }
-      this.root.setAttribute('aria-activedescendant', 'gaterOpt' + this.idx);
+      this.listEl.setAttribute('aria-activedescendant', 'gaterOpt' + this.idx);
+      this.root.removeAttribute('aria-activedescendant');
     },
 
     move: function (d) {

@@ -13,9 +13,9 @@
   'use strict';
 
   var CONFIG = {
-    version: '1.4.4',
-    build: '2026-11-06',
-    stage: '第七批 · 网址推荐区：分类翻页 + 站内搜索框（跨分类实时过滤、分组展示）',
+    version: '1.5.0',
+    build: '2026-11-07',
+    stage: '优化批次 1.5.0：移动端对话可读 + 自适应画布 + 缓存/404/PWA + 写入防护 + 背景 IndexedDB + 无障碍/交互',
 
     /* assets/bg/ 下的图片文件名。留空则设置里的下拉只有「默认」。
        例：['plaza.jpg', 'forest.png'] */
@@ -84,48 +84,107 @@
     }
   };
 
-  /* ---------------- 背景图 ---------------- */
-  var BgStore = {
-    all: function () {
-      var raw = readObj(BG_KEY) || {};
-      var out = {};
-      for (var k in raw) {
-        if (typeof raw[k] === 'string' && raw[k]) out[k] = raw[k];
-      }
-      return out;
-    },
+  /* ---------------- 背景图（IndexedDB 持久化 + 内存同步缓存） ----------------
+   * bakeBg() 是同步调用 BgStore.get() 的，而 IDB 是异步的。
+   * 所以：get / all / count 一律读内存 cache（同步、立即返回）；
+   *       set / clear 立刻改 cache，再异步写 IDB（配额数百 MB，摆脱 5MB 上限）；
+   *       启动时先同步迁移 localStorage 旧值，再异步从 IDB 载入并广播 wh:bg 重新烘焙。 */
+  var BG_DB = 'worldhub';
+  var BG_STORE = 'bg';
 
-    get: function (id) {
-      var all = this.all();
-      return all[id] || '';
-    },
+  var BgStore = (function () {
+    var cache = {};
+    var db = null;
 
-    /* 返回 false 表示没写进盘（配额满）——调用方要提示用户 */
-    set: function (id, src) {
-      if (!id || typeof src !== 'string' || !src) return false;
-      var all = this.all();
-      all[id] = src;
-      return writeObj(BG_KEY, all);
-    },
-
-    clear: function (id) {
-      var all = this.all();
-      if (!Object.prototype.hasOwnProperty.call(all, id)) return true;
-      delete all[id];
-      return writeObj(BG_KEY, all);
-    },
-
-    count: function () {
-      var n = 0;
-      var all = this.all();
-      for (var k in all) n++;
-      return n;
-    },
-
-    reset: function () {
-      try { global.localStorage.removeItem(BG_KEY); } catch (e) { /* 忽略 */ }
+    /* 1) 同步迁移旧 localStorage 数据，保证首帧即可读到 */
+    var legacy = readObj(BG_KEY) || {};
+    for (var lk in legacy) {
+      if (typeof legacy[lk] === 'string' && legacy[lk]) cache[lk] = legacy[lk];
     }
-  };
+
+    function idbPut(id, src) {
+      if (!db) return;
+      try { db.transaction(BG_STORE, 'readwrite').objectStore(BG_STORE).put(src, id); } catch (e) {}
+    }
+    function idbDel(id) {
+      if (!db) return;
+      try { db.transaction(BG_STORE, 'readwrite').objectStore(BG_STORE).delete(id); } catch (e) {}
+    }
+    function idbClear() {
+      if (!db) return;
+      try { db.transaction(BG_STORE, 'readwrite').objectStore(BG_STORE).clear(); } catch (e) {}
+    }
+
+    function onLoaded() {
+      Object.keys(cache).forEach(function (k) { idbPut(k, cache[k]); });   // 旧值迁入 IDB
+      try { global.localStorage.removeItem(BG_KEY); } catch (e) {}
+      emit('wh:bg', { detail: {} });                                       // 让 world 重烘焙当前场景
+    }
+
+    function open() {
+      if (!global.indexedDB) return;             // 不支持：退化为内存 + localStorage 旧值
+      var req;
+      try { req = global.indexedDB.open(BG_DB, 1); } catch (e) { return; }
+      req.onupgradeneeded = function () {
+        if (!req.result.objectStoreNames.contains(BG_STORE)) req.result.createObjectStore(BG_STORE);
+      };
+      req.onsuccess = function () {
+        db = req.result;
+        try {
+          var r = db.transaction(BG_STORE, 'readonly').objectStore(BG_STORE).openCursor();
+          r.onsuccess = function () {
+            var cur = r.result;
+            if (cur) {
+              if (typeof cur.value === 'string' && cur.value) cache[cur.key] = cur.value;
+              cur.continue();
+            } else { onLoaded(); }
+          };
+          r.onerror = function () { onLoaded(); };
+        } catch (e) { onLoaded(); }
+      };
+      req.onerror = function () { /* IDB 不可用：内存 + localStorage 旧值即可 */ };
+    }
+    open();
+
+    return {
+      all: function () {
+        var out = {};
+        for (var k in cache) {
+          if (typeof cache[k] === 'string' && cache[k]) out[k] = cache[k];
+        }
+        return out;
+      },
+
+      get: function (id) { return cache[id] || ''; },
+
+      /* 返回 false 仅表示连 localStorage 兜底都写不进（IDB 正常时恒 true） */
+      set: function (id, src) {
+        if (!id || typeof src !== 'string' || !src) return false;
+        cache[id] = src;
+        if (db) { idbPut(id, src); return true; }
+        try { return writeObj(BG_KEY, this.all()); } catch (e) { return false; }
+      },
+
+      clear: function (id) {
+        if (!Object.prototype.hasOwnProperty.call(cache, id)) return true;
+        delete cache[id];
+        if (db) { idbDel(id); return true; }
+        try { return writeObj(BG_KEY, this.all()); } catch (e) { return false; }
+      },
+
+      count: function () {
+        var n = 0;
+        for (var k in cache) n++;
+        return n;
+      },
+
+      reset: function () {
+        cache = {};
+        if (db) idbClear();
+        try { global.localStorage.removeItem(BG_KEY); } catch (e) { /* 忽略 */ }
+      }
+    };
+  })();
 
   function emit(name, detail) {
     try {

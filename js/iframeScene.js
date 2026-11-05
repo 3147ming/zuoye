@@ -28,6 +28,9 @@
     this._onKey = null;
     this._offline = null;
     this._offlineOv = null;
+    this._loading = null;
+    this._loadTimer = null;
+    this._onMsg = null;
   }
 
   IFrameScene.prototype.init = function (ctx, params) {
@@ -43,20 +46,44 @@
     this.stage = document.getElementById('stage') || document.body;
 
     /* ---- iframe ----
-       不加 sandbox：file:// 下 sandbox 会把本地脚本一起挡掉。
-       allow 里给全屏与自动播放留口，指针锁定给需要鼠标的玩法。 */
+       同源（games/*、tools/*）不加 sandbox：file:// 下 sandbox 会挡本地脚本。
+       跨域 https（脑力街机 / 仓库行动）加 sandbox + no-referrer，收敛权限、防顶层跳走。
+       allow 只留全屏/自动播放/手柄/指针锁定，不再申请摄像头与麦克风。 */
+    var isCross = /^https?:/i.test(params.src || '');
     var f = document.createElement('iframe');
     f.className = 'iframe-scene';
     f.title = this.title;
-    f.setAttribute('allow', 'autoplay; fullscreen; gamepad; microphone; camera; popups');
+    f.setAttribute('allow', 'autoplay; fullscreen; gamepad; pointer-lock');
     f.setAttribute('allowfullscreen', '');
+    if (isCross) {
+      f.setAttribute('sandbox', 'allow-scripts allow-same-origin allow-forms allow-pointer-lock allow-popups allow-popups-to-escape-sandbox');
+      f.setAttribute('referrerpolicy', 'no-referrer');
+    }
     f.src = params.src || 'about:blank';
     this.stage.appendChild(f);
     this.frame = f;
 
+    /* 加载骨架 + 8s 超时提示：避免断网时只看到黑屏 */
+    this._loading = document.createElement('div');
+    this._loading.className = 'iframe-loading';
+    this._loading.textContent = isCross ? '正在连接游戏…' : '正在加载…';
+    this.stage.appendChild(this._loading);
+    this._loadTimer = setTimeout(function () {
+      if (self._loading) self._loading.textContent = '加载有点慢… 如果一直停在这，点「回大厅」';
+    }, 8000);
+    f.addEventListener('load', function () { self._clearLoading(); });
+
     /* 断网 / 加载失败：iframe 导航失败时给轻量提示，返回按钮仍可用 */
     this._offline = function () { self.showOffline(); };
     f.addEventListener('error', this._offline);
+
+    /* 同源游戏可通过 postMessage({type:'exit'}) 通知外层回大厅（焦点在 iframe 内时 Esc 收不到） */
+    this._onMsg = function (e) {
+      if (!self.frame || e.source !== self.frame.contentWindow) return;
+      var d = e.data;
+      if (d === 'exit' || (d && d.type === 'exit')) self.toHall();
+    };
+    global.addEventListener('message', this._onMsg);
 
     /* ---- 返回按钮：回上一级（左）+ 回大厅（右） ---- */
     var bb = document.createElement('button');
@@ -104,7 +131,14 @@
     if (global.BGM) global.BGM.suspend();
   };
 
+  IFrameScene.prototype._clearLoading = function () {
+    if (this._loadTimer) { clearTimeout(this._loadTimer); this._loadTimer = null; }
+    if (this._loading && this._loading.parentNode) this._loading.parentNode.removeChild(this._loading);
+    this._loading = null;
+  };
+
   IFrameScene.prototype.showOffline = function () {
+    this._clearLoading();
     if (this._offlineOv) return;
     var ov = document.createElement('div');
     ov.className = 'iframe-offline';
@@ -133,6 +167,9 @@
   IFrameScene.prototype.destroy = function () {
     if (this._onKey) global.removeEventListener('keydown', this._onKey);
     this._onKey = null;
+    if (this._onMsg) global.removeEventListener('message', this._onMsg);
+    this._onMsg = null;
+    this._clearLoading();
 
     if (this.frame) {
       if (this._offline) this.frame.removeEventListener('error', this._offline);

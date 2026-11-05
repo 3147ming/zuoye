@@ -1474,20 +1474,17 @@
     row.appendChild(nm);
     row.appendChild(ur);
 
-    if (it.pending) {
-      var b = document.createElement('span');
-      b.className = 'lc-pending';
-      b.textContent = '待验证';
-      row.appendChild(b);
-    }
-
-    /* 删除：仅「我的游戏合集 ming-games」锁死不可删，其余预置 + 自建均可删 */
+    /* 删除：仅「我的游戏合集 ming-games」锁死不可删，其余预置 + 自建均可删。
+       共享列表删一次别人也没了，先二次确认。 */
     if (!it.locked) {
       var del = document.createElement('button');
       del.type = 'button';
       del.className = 'lc-del';
       del.textContent = '删除';
-      del.addEventListener('click', function () { LinksStore.remove(it.id).then(render); });
+      del.addEventListener('click', function () {
+        if (!window.confirm('确定删除「' + it.name + '」吗？\n这是共享列表，删掉后其他人也看不到了。')) return;
+        LinksStore.remove(it.id).then(render);
+      });
       row.appendChild(del);
     }
 
@@ -1575,8 +1572,8 @@
     $('err').textContent = err || '';
     if (err) return;
 
-    var pending = !(await reachable(url));
-    var item = { id: uid(), name: name, url: url, desc: '', cat: autoCat(name, url), pending: pending };
+    /* 不再用 no-cors 探活判 pending（只能判网络层，404/500 也算可达，意义不大） */
+    var item = { id: uid(), name: name, url: url, desc: '', cat: autoCat(name, url) };
 
     await LinksStore.add(item);
     $('name').value = '';

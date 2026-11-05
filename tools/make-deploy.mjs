@@ -22,6 +22,11 @@ const OUT = path.join(ROOT, 'deploy');
 const COPY = [
   'index.html',
   'version.json',
+  '404.html',
+  'manifest.webmanifest',
+  'sw.js',
+  '_headers',
+  '_redirects',
   'css/',
   'js/',
   'games/',
@@ -115,7 +120,8 @@ while ((m = re.exec(html))) {
   refs.push(v);
 }
 for (const r of refs) {
-  const abs = path.resolve(OUT, r.split('?')[0]);
+  const rel = r.startsWith('/') ? r.slice(1) : r;          /* 处理绝对路径引用，如 /assets/icon.svg */
+  const abs = path.resolve(OUT, rel.split('?')[0]);
   if (!fs.existsSync(abs)) fail('index.html 引用了包里没有的文件：' + r);
 }
 console.log('  · index.html 引用的 ' + refs.length + ' 个本地资源全部在包内');

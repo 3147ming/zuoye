@@ -388,6 +388,19 @@ HUD 文字全部走 DOM（不画在 canvas 上），任意缩放下都清晰；
   列表用 CSS Grid——手机（<500px）单列、平板（500-900px）双列、桌面（>900px）三列；表单手机竖排、其它横排。
 - **中文化**：界面所有英文文案改中文（标题、画布文本、帮助面板等），专有名词（HTML/CSS/JavaScript/URL/API/KV 等）保留。
 
+### 3.18 优化批次（1.5.0）
+
+按《世界大厅·1.4.4 优化清单》落地的高价值项：
+
+- **移动端可读性**：`@media (max-width:720px)` 下对话正文固定 14px、名字牌 11px，并把对话框抬到触屏方向键上方（`bottom: calc(13cqw+26px)`）；触屏 UI 补 H/O（帮助/设置）按钮。
+- **渲染**：画布后备缓冲改为「舞台 CSS 宽 × DPR」（`_resize` + `ResizeObserver`），手机不再按 2560×1440 空转；浮层（设置/总门选单）打开时主循环冻结、不重绘；`body::before` 去掉全屏 `mix-blend-mode`；夜空星点移回可见天区并加视野裁剪。
+- **网络/部署**：新增 `_headers`（js/css 缓存 1h + 安全响应头）、`404.html`、`manifest.webmanifest` + `sw.js`（离线兜底）、`<head>` 社交/移动端 meta；`index.html` 全部脚本 `defer`，引导脚本外置 `js/boot.js`。
+- **安全/数据**：`/api/links` 写入校验 Origin/Referer 同源 + 按 IP 限速（KV，10 次/分）+ `locked` 服务端判定；跨域 iframe 加 `sandbox` / `referrerpolicy`、`allow` 去掉摄像头麦克风；「重置存档」只清 `worldhub.*`；背景图改存 IndexedDB（内存同步缓存，`bakeBg` 仍同步可读），单张上限放宽。
+- **交互/无障碍**：Iframe 加载骨架 + 8s 超时 + `postMessage` 退出；删网址二次确认；版本静默日检；`aria-activedescendant` 移到 listbox、设置面板焦点陷阱、空格不再误吞按钮、`prefers-reduced-motion` 下星光/尘埃静止；触屏返回键改发到 `document`。
+- **文案**：区块/游戏数量改为从 `ITEMS` 动态计算（16 区块 / 13 款）。
+
+> 说明：§7 的纯结构性重构（`world.js` 拆分、键位表收敛等）属内部整理、对功能无可见影响且风险较高，本批次暂未动，留待单独重构。
+
 ---
 
 ## 四、开源致谢
