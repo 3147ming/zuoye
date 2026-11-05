@@ -863,17 +863,18 @@ async function run() {
       })()`);
       check('2.12 仿真可求解且有结果', sim.solved === true && sim.last === true, JSON.stringify(sim));
 
-      // 快捷键入口：Ctrl+Y / Shift+Ctrl+Z 与 __labBoard.interact.redo 等价
+      // 快捷键入口：Ctrl+Y 与 __labBoard.interact.redo 等价
       await evalJs(cdp, '__P.reset()');
       await evalJs(cdp, `__P.place('resistor', 2, 2)`);
       await evalJs(cdp, '__P.undo()');
       await evalJs(cdp, `__P.key('y', { ctrlKey: true })`);
       const st = await evalJs(cdp, '__P.state()');
       check('2.12 Ctrl+Y 重做生效', st.comps.length === 1, JSON.stringify(st.comps));
+      // 指令包 16：Ctrl+Shift+Z 分支已按规格删除，Shift 组合不得产生任何功能
       await evalJs(cdp, '__P.undo()');
       await evalJs(cdp, `__P.key('z', { ctrlKey: true, shiftKey: true })`);
       const st2 = await evalJs(cdp, '__P.state()');
-      check('2.12 Shift+Ctrl+Z 重做生效', st2.comps.length === 1, JSON.stringify(st2.comps));
+      check('2.12 Ctrl+Shift+Z 不再重做（Shift 组合已移除）', st2.comps.length === 0, JSON.stringify(st2.comps));
     }
 
     /* ============ console 0 ============ */
