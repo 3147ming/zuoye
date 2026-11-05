@@ -370,15 +370,15 @@
   };
 
   mk.controllers.keys.p1 = {
-    RIGHT: 74,
-    LEFT : 71,
-    UP   : 89,
-    DOWN : 72,
-    BLOCK: 16,
-    HP   : 65,
-    LP   : 83,
-    LK   : 68,
-    HK   : 70
+    RIGHT: 68,   // D
+    LEFT : 65,   // A
+    UP   : 87,   // W
+    DOWN : 83,   // S
+    BLOCK: 16,   // Shift
+    HP   : 74,   // J（高拳）
+    LP   : 75,   // K（低拳）
+    LK   : 76,   // L（低踢）
+    HK   : 76    // L（高踢，复用 L 键）
   };
 
   mk.controllers.keys.p2 = {
@@ -1783,8 +1783,16 @@
     var m = mk.moves.types,
       currentMove = this._currentMove;
 
-    if (!(move in this.moves))
-      throw 'This player does not has the move - ' + move;
+    /* 防崩溃：任何键位组合若产出不在本角色招式表中的 move，直接忽略而非抛错，
+       避免「按一下就卡死」。仅在控制台告警一次，便于后续排查。 */
+    if (!(move in this.moves)) {
+      if (!mk.__warnedMove) { mk.__warnedMove = {}; }
+      if (!mk.__warnedMove[move]) {
+        mk.__warnedMove[move] = true;
+        if (global.console && console.warn) console.warn('[mk] 未知招式，已忽略：' + move);
+      }
+      return;
+    }
 
     if (this._currentMove && this._currentMove.type === move)
       return;

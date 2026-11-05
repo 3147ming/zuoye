@@ -13,7 +13,7 @@
   'use strict';
 
   var CONFIG = {
-    version: '1.3.0',
+    version: '1.3.1',
     build: '2026-11-04',
     stage: '第七批 · 中文化 + 屏幕自适应 + 仓库行动',
 

@@ -298,8 +298,9 @@ HUD 文字全部走 DOM（不画在 canvas 上），任意缩放下都清晰；
 - 虚拟按键按场景切换：大厅给 `◀ ▶ 跳 E`，各游戏按 `data-scene`（= `iframe-<游戏名>`）反查键位表；
 - 按键「按下 = `keydown` / 抬起 = `keyup`」派发合成 `KeyboardEvent`，`keyCode` 用各游戏源码实测值
   （俄方块读 `keyCode`，打砖块 `Space=32`，格斗按本体 `mk.js` 的 `controllers.keys` 映射——
-  标签 `A/D/W/S/J/K/L/SHIFT` 分别派发 `71/74/89/72/65/68/70/16`——注意前四键映射到 P1(Sub-Zero) 的
-  移动键 `G/J/Y/H`，而**不是**箭头键（箭头键是 P2/Kano 的）），`keyCode` 通过
+  标签 `A/D/W/S/J/K/L/SHIFT` 分别派发 `65/68/87/83/74/75/76/16`——本体 `mk.js` 的 P1(Sub-Zero) 键位
+  已改为 `WASD` 移动、`JKL` 攻击、`Shift` 防御（移动键就是 `A/D/W/S`，而**不是**箭头键，
+  箭头键是 P2/Kano 的），`keyCode` 通过
   `Object.defineProperty` 强制覆盖以确保游戏读到正确值；
 - iframe 游戏把事件派发到 `iframe.contentDocument`（需同源，见上方「手机端触屏操作」的 `file://` 说明）；
 - 打砖块单独走「左右半屏滑动」模式：手指落点 `x < 屏宽/2` 发 `←`、否则发 `→`，`开球` 单独一个按钮；
@@ -450,16 +451,29 @@ HUD 文字全部走 DOM（不画在 canvas 上），任意缩放下都清晰；
 | 双返回：回上一级回原屏原位置、回大厅回广场、Backspace/Esc | `world.js` `enterDoor` 传 `from/px/pf` + `init` 优先 `opts.sceneId` + `iframeScene.js` 双按钮 |
 | 跨域街机不派发按键、提示自带触屏；同源仍正常 | `touch.js` `cross:true` 分支 |
 | 断网提示「需要网络连接」、返回可用 | `iframeScene.js` iframe `error` 事件 → `.iframe-offline` |
-| 格斗触屏键位 ADWS JKL SHIFT 映射到本体键 | `touch.js` 格斗配置（`71/74/89/72/65/68/70/16`，移动映射 P1 的 G/J/Y/H） |
+| 格斗本体 P1 键位改为 WASD JKL + 触屏同步 + 防崩溃 | `games/fight/src/mk.js` `controllers.keys.p1`（`65/68/87/83/74/75/76/16`）、`js/touch.js` 格斗配置同、`setMove` 抛错改忽略 |
 | 网址推荐：预置/自检/黑名单/去重/伪协议/XSS 安全 | `tools/links/index.html` + `functions/api/links.js` |
 | 全界面中文化（英文文案→中文，专有名词保留） | `index.html` / `js/world.js` 画布文本 |
 | 屏幕自适应：竖屏触屏按钮移到舞台下方、links 页 1/2/3 列响应式 | `css/main.css` 竖屏媒体查询 + `tools/links/index.html` 断点 |
 | 仓库行动门（跨域 FPS 直达） | `js/world.js` ITEMS + `js/touch.js` cross |
 
-**本轮实测**：桌面启动 + 总门分组 + 双返回 + 仓库行动门 14/14、手机模拟（格斗 8 键派发 + 移动键映射 P1 的 G/J/Y/H +
+**本轮实测**：桌面启动 + 总门分组 + 双返回 + 仓库行动门 14/14、手机模拟（格斗 8 键派发 + 移动键映射 P1 的 WASD +
 跨域街机不派发）9/9、网址推荐自检 7/8（唯一「失败」是本地静态服务器没有 `/api/links` Function 而返回 404
 的**预期降级路径**，线上绑 KV 后即 200）、脑力训练场 `?game=` 直达 7/7、三种尺寸截图检查布局无溢出；
 全程 0 报错（除上述预期降级 404）。
+
+### 3.17 格斗本体键位改 WASD JKL + 防崩溃（第七批⑦）
+
+- `games/fight/src/mk.js` 的 `mk.controllers.keys.p1` 改为 **WASD 移动 + JKL 攻击 + Shift 防御**：
+  `RIGHT:68(D) / LEFT:65(A) / UP:87(W) / DOWN:83(S) / BLOCK:16(Shift) / HP:74(J) / LP:75(K) / LK:76(L) / HK:76(L)`。
+  P2（Kano）保持箭头键 + `P/[ / ]` 不变，双人对战互不影响。
+- `js/touch.js` 格斗配置同步：标签 `A/D/W/S/J/K/L/SHIFT` 派发 `65/68/87/83/74/75/76/16`，移动键就是 P1 的 `WASD`，
+  不再映射到旧的 `G/J/Y/H`；触屏 4 键一组 2×2 网格布局。
+- **防崩溃**：`Fighter.prototype.setMove` 原有一处 `throw 'This player does not has the move'`——任何键位组合若产出
+  不在招式表中的 move 会直接抛错卡死游戏；改为「打印一次告警并忽略」，使「按一下键就崩溃」不再发生。
+  （经 CDP 无头实测：单键 / 组合键 / 持续按键 / 28 个招式逐一 `setMove` 均不抛错，崩溃为真实浏览器特定焦点/边界场景，
+  已通过消除唯一抛错点兜底。）
+- 验证：无头浏览器确认 P1 按 `D` 右移、`A` 左移、`W` 起跳、`J/K/L` 出招均生效、0 报错；P2 箭头键不受影响。
 
 ---
 

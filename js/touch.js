@@ -33,13 +33,14 @@
       K('↻', 'ArrowUp', 'ArrowUp', 38, 'R'), K('▼', 'ArrowDown', 'ArrowDown', 40, 'R')
     ] },
     'iframe-格斗': { keys: [
-      /* 左组：移动 + 跳跃/下蹲（标签 A/D/W/S，映射到本体 P1 的 G/J/Y/H）
-         P1 = Sub-Zero，其移动键是 G(71)/J(74)/Y(89)/H(72)；箭头键是 P2(Kano) 的，别派发错。 */
-      K('A', 'KeyG', 'g', 71, 'L'), K('D', 'KeyJ', 'j', 74, 'L'),
-      K('W', 'KeyY', 'y', 89, 'L'), K('S', 'KeyH', 'h', 72, 'L'),
-      /* 右组：攻击 + 防御（标签 J/K/L/SHIFT，映射到本体 P1 的 A/D/F/Shift） */
-      K('J', 'KeyA', 'a', 65, 'R'), K('K', 'KeyD', 'd', 68, 'R'),
-      K('L', 'KeyF', 'f', 70, 'R'), K('SHIFT', 'ShiftLeft', 'Shift', 16, 'R')
+      /* 左组：移动（标签 A/D/W/S，映射到本体 P1 的 WASD：A=65/D=68/W=87/S=83）
+         P1 = Sub-Zero，本体键位已改为 WASD 移动；箭头键是 P2(Kano) 的，别派发错。 */
+      K('A', 'KeyA', 'a', 65, 'L'), K('D', 'KeyD', 'd', 68, 'L'),
+      K('W', 'KeyW', 'w', 87, 'L'), K('S', 'KeyS', 's', 83, 'L'),
+      /* 右组：攻击 + 防御（标签 J/K/L/SHIFT，映射到本体 P1 的 J/K/L/Shift）
+         J=74 高拳 / K=75 低拳 / L=76 踢 / Shift=16 防御 */
+      K('J', 'KeyJ', 'j', 74, 'R'), K('K', 'KeyK', 'k', 75, 'R'),
+      K('L', 'KeyL', 'l', 76, 'R'), K('SHIFT', 'ShiftLeft', 'Shift', 16, 'R')
     ], note: '双人对战建议电脑端' },
     'iframe-打砖块': { swipe: true, keys: [ K('开球', 'Space', ' ', 32, 'R') ] }
     /* 其余（2048 / 五子棋 / 扫雷 / 白噪音 / 番茄钟）：原生触摸即可，只保留返回键 */
