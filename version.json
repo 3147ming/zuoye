@@ -1,5 +1,5 @@
 {
-  "version": "1.3.1",
+  "version": "1.4.0",
   "build": "2026-11-05",
-  "notes": "第七批⑦：格斗本体 P1 键位改 WASD JKL（移动 WASD / 攻击 JKL / 防御 Shift），触屏同步，setMove 防崩溃（未知招式忽略而非抛错）"
+  "notes": "第七批⑥：网址推荐区预置 124 个精选网址（11 大分类、分类折叠、卡片含简介、ming-games 锁死不可删其余可删）；第七批⑦：格斗本体 P1 键位改 WASD JKL + 触屏同步 + setMove 防崩溃"
 }
