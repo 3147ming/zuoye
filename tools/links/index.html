@@ -94,7 +94,7 @@
 
     <div class="list" id="list"></div>
 
-    <div class="foot">添加即自动检查 · 通过直接上墙 · 点名称在新标签打开</div>
+    <div class="foot">添加即自动检查 · 自动归类到对应分组 · 点名称在新标签打开</div>
   </div>
 
 <script>
@@ -1245,7 +1245,9 @@
         var r = await fetch(API, { headers: { 'Accept': 'application/json' } });
         if (!r.ok) throw new Error('api ' + r.status);
         var data = await r.json();
-        list = Array.isArray(data && data.items) ? data.items : [];
+        var items = Array.isArray(data && data.items) ? data.items : [];
+        // 服务端返回空（KV 为空或旧版函数）时回退到内嵌预置，保证基础条目始终可见
+        list = items.length ? items : clonePreset();
         mode = 'shared';
       } catch (e) {
       list = loadLocal();
@@ -1412,6 +1414,40 @@
     });
   }
 
+  /* 自动归类：① 域名命中已有预置 → 直接沿用其分类（最准）；② 否则按关键词规则分到 11 类之一 */
+  var AUTO_RULES = [
+    ['📺 视频与音乐', ['youtube','bilibili','哔哩','b站','netflix','spotify','网易云','movie','电影','番剧','anime','tiktok','douyin','抖音','直播','听歌','剧集','影视','hbo','disney','爱奇艺','优酷','腾讯视频']],
+    ['🎵 音视频处理', ['剪辑','剪','降噪','混音','配音','录音','音频','音效','母带','audacity','剪映','capcut','premiere','达芬奇','davinci','vocal','修音','混剪','音频编辑','播客','podcast']],
+    ['🎮 游戏与娱乐', ['steam','游戏','game','主机','掌机','桌游','boardgame','手游','电玩','nintendo','playstation','xbox','攻略']],
+    ['📚 学术与研究', ['arxiv','scholar','知网','cnki','论文','学术','academic','paper','research','研究','期刊','journal','文献','pubmed','科研','semantic','学位','引用']],
+    ['📊 数据与可视化', ['可视化','visualization','tableau','powerbi','图表','chart','数据','excel','表格','spreadsheet','数据库','database','sql','统计','statistics','分析','analytics','仪表盘','dashboard','大数据']],
+    ['🎨 设计与素材', ['figma','sketch','canva','dribbble','behance','设计','design','ui','ux','icon','图标','素材','图片','字体','font','插画','illustration','配色','color','渐变','gradient','unsplash','pexels','摄影','logo','海报','poster','矢量','vector']],
+    ['💻 开发与调试工具', ['github','gitlab','postman','docker','kubernetes','linux','nginx','运维','debug','调试','开发','sdk','mdn','stackoverflow','w3schools','文档','docs','cli','terminal','正则','regex','接口','api','服务器','server','部署','deploy','前端','后端','devops']],
+    ['🎨 AI 创作与编程', ['midjourney','stable diffusion','绘画','文生图','创作','draw','image','图像生成','suno','音乐生成','写作','代码','编程','code','cursor','replit','v0','bolt','vercel','codesandbox','stackblitz','leetcode','大模型','llm']],
+    ['🤖 AI 对话与搜索', ['chatgpt','openai','claude','anthropic','gemini','google ai','bard','gpt','perplexity','kimi','deepseek','元宝','文心','通义','copilot','llama','mistral','poe','character','chat','对话','问答','搜索','search','bing','baidu','duckduckgo','搜','引擎']],
+    ['🛠️ 效率与工具', ['效率','productivity','工具','tool','笔记','note','待办','todo','日历','calendar','任务','密码','password','翻译','translate','截图','压缩','转换','convert','网盘','云盘','整理','自动化','automation','书签','bookmark','收藏','备忘录','思维导图','mindmap','流程图']],
+    ['🔍 导航与聚合', ['导航','聚合','导航站','首页','合集','大全','directory','awesome','资源','resource','网站导航','hao123','论坛','forum','社区','community','群组','购物','电商','淘宝','京东','亚马逊','地图','map']]
+  ];
+  function autoCat(name, url) {
+    var s = (name + ' ' + url).toLowerCase();
+    try {
+      var host = new URL(url).hostname.replace(/^www\./, '');
+      for (var i = 0; i < PRESETS.length; i++) {
+        try {
+          var ph = new URL(PRESETS[i].url).hostname.replace(/^www\./, '');
+          if (ph && (host === ph || host.endsWith('.' + ph) || ph.endsWith('.' + host))) return PRESETS[i].cat;
+        } catch (e) {}
+      }
+    } catch (e) {}
+    for (var j = 0; j < AUTO_RULES.length; j++) {
+      var ks = AUTO_RULES[j][1];
+      for (var k = 0; k < ks.length; k++) {
+        if (s.indexOf(ks[k].toLowerCase()) >= 0) return AUTO_RULES[j][0];
+      }
+    }
+    return '未分类';
+  }
+
   async function onAdd() {
     var name = $('name').value.trim();
     var url = $('url').value.trim();
@@ -1420,12 +1456,18 @@
     if (err) return;
 
     var pending = !(await reachable(url));
-    var item = { id: uid(), name: name, url: url, desc: '', pending: pending };
+    var item = { id: uid(), name: name, url: url, desc: '', cat: autoCat(name, url), pending: pending };
 
     await LinksStore.add(item);
     $('name').value = '';
     $('url').value = '';
     render();
+    /* 自动展开新网址所属分类，让用户看到归类结果 */
+    var blocks = document.querySelectorAll('.cat');
+    for (var b = 0; b < blocks.length; b++) {
+      var sp = blocks[b].querySelector('.cat-h span');
+      if (sp && sp.textContent === item.cat) { blocks[b].classList.add('open'); break; }
+    }
   }
 
   $('add').addEventListener('click', onAdd);
