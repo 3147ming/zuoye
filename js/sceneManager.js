@@ -167,20 +167,24 @@
       var scene = this.current;
       if (!scene) return;
 
-      /* 浮层（设置 / 总门选单）打开时冻结：不 update 也不重绘，保留上一帧。
-         canvas 是 alpha:false，不会回黑；关面板后下一帧自动恢复。 */
-      if (scene._frozen === true) return;
-
-      var ctx = this.ctx;
-      ctx.setTransform(this._dpr, 0, 0, this._dpr, 0, 0);
-      ctx.clearRect(0, 0, this.width, this.height);
-
+      /* update() 必须每帧照常调用：场景内部会自己判断浮层开合
+         （浮层开着时 update 早退、只置 _frozen；关掉后由 update 复位 _frozen）。
+         若在这里跳过 update，_frozen 一旦为 true 就再没人复位 → 关面板后画面永久卡死
+         （1.5.0 的死锁就是这么来的）。 */
       scene.update(dt);
 
       /* update() 里可能切换了场景（例如角色走进传送门）：
          旧场景此时已被 destroy()，绝不能拿旧引用继续渲染，必须重读 current */
       scene = this.current;
       if (!scene) return;
+
+      /* 浮层（设置 / 总门选单）打开时跳过重绘，保留上一帧。
+         canvas 是 alpha:false，清屏会回黑，所以必须先判断再 clearRect。 */
+      if (scene._frozen === true) return;
+
+      var ctx = this.ctx;
+      ctx.setTransform(this._dpr, 0, 0, this._dpr, 0, 0);
+      ctx.clearRect(0, 0, this.width, this.height);
       scene.render(ctx);
     }
   };

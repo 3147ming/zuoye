@@ -1,11 +1,12 @@
 /* 世界大厅 Service Worker —— 离线兜底 + 二次访问加速
  * 策略：
  *   - 导航请求：network-first，失败回退缓存的 index.html
- *   - /js /css /games /tools /assets：stale-while-revalidate（先给缓存，后台更新）
+ *   - /js /css /contrib /games /tools /assets：network-first（在线必取新，断网回缓存）
+ *     1.5.0 用 stale-while-revalidate：坏 JS 会被反复命中、修复要多刷一次才生效 → 改 network-first。
  *   - /api：放行，不缓存
  * 缓存以版本号命名，发新版本时旧缓存自动失效。
  */
-const VERSION = 'worldhub-v1.5.0';
+const VERSION = 'worldhub-v1.5.1';
 const CORE = [
   '/',
   '/index.html',
@@ -29,8 +30,15 @@ const CORE = [
 ];
 
 self.addEventListener('install', function (e) {
+  /* 逐个缓存：任何一个文件失败不至于让整个 install 挂掉（addAll 是全或无） */
   e.waitUntil(
-    caches.open(VERSION).then(function (c) { return c.addAll(CORE); }).then(function () { return self.skipWaiting(); })
+    caches.open(VERSION).then(function (c) {
+      return Promise.all(CORE.map(function (u) {
+        return fetch(u).then(function (r) {
+          return r && r.ok ? c.put(u, r) : null;
+        }).catch(function () { return null; });
+      }));
+    }).then(function () { return self.skipWaiting(); })
   );
 });
 
@@ -44,7 +52,7 @@ self.addEventListener('activate', function (e) {
 
 function assetPath(url) {
   var p = url.pathname;
-  return /^\/(js|css|games|tools|assets)\//.test(p);
+  return /^\/(js|css|contrib|games|tools|assets)\//.test(p);
 }
 
 self.addEventListener('fetch', function (e) {
@@ -64,15 +72,16 @@ self.addEventListener('fetch', function (e) {
   }
 
   if (assetPath(url)) {
+    /* network-first：在线永远拿新文件；断网才回缓存。拿到响应后顺手更新缓存。 */
     e.respondWith(
-      caches.open(VERSION).then(function (cache) {
-        return cache.match(req).then(function (hit) {
-          var net = fetch(req).then(function (r) {
-            if (r && r.status === 200) cache.put(req, r.clone());
-            return r;
-          }).catch(function () { return hit; });
-          return hit || net;
-        });
+      fetch(req).then(function (r) {
+        if (r && r.status === 200) {
+          var copy = r.clone();
+          caches.open(VERSION).then(function (c) { c.put(req, copy); }).catch(function () {});
+        }
+        return r;
+      }).catch(function () {
+        return caches.match(req).then(function (hit) { return hit || Response.error(); });
       })
     );
   }

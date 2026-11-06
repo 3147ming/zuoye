@@ -3,10 +3,24 @@
   Referrer-Policy: strict-origin-when-cross-origin
   Permissions-Policy: camera=(), microphone=(), geolocation=()
 
+/sw.js
+  Cache-Control: no-cache
+
+/index.html
+  Cache-Control: no-cache
+
+/version.json
+  Cache-Control: public, max-age=60
+
 /js/*
-  Cache-Control: public, max-age=3600, stale-while-revalidate=86400
+  Cache-Control: no-cache
 /css/*
-  Cache-Control: public, max-age=3600, stale-while-revalidate=86400
+  Cache-Control: no-cache
+/contrib/*
+  Cache-Control: no-cache
+
+/assets/*
+  Cache-Control: public, max-age=86400
 
 /games/*
   Cache-Control: public, max-age=86400

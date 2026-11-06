@@ -1,5 +1,5 @@
 {
-  "version": "1.5.0",
-  "build": "2026-11-07",
-  "notes": "优化批次 1.5.0（按《世界大厅·1.4.4 优化清单》落地）：①移动端对话正文改 14px 并抬到触屏方向键上方，补 H/O 触屏入口；②画布后备缓冲对齐舞台实际像素（手机不再 5–12 倍空转）+ 浮层打开冻结渲染；③_headers 缓存/安全头、404.html、脚本 defer 化、manifest+Service Worker、社交/移动端 meta；④/api/links 同源校验+IP 限速+锁死服务端判定，iframe 跨域 sandbox/权限收敛，重置存档只清 worldhub.*，背景存 IndexedDB；⑤无障碍与交互（aria、焦点陷阱、空格不误吞、reduced-motion、触屏返回、Iframe 加载骨架/超时/postMessage 退出）；⑥文案数字动态化（16 区块 / 13 款游戏）。"
+  "version": "1.5.1",
+  "build": "2026-11-13",
+  "notes": "修复 1.5.0 回归：①主循环在浮层（设置/总门选单）关闭后永久冻结——sceneManager._frame 在 _frozen 时直接 return，而 _frozen 只在 update() 里复位，形成死锁；改为每帧照常 update、仅跳过重绘，关闭面板立即恢复。②Service Worker 资源策略由 stale-while-revalidate 改为 network-first（在线必取新文件，断网回缓存），js/css/_headers 改 no-cache，避免用户反复命中旧的坏脚本；install 改逐文件缓存，单个失败不再拖垮整个 SW。"
 }
