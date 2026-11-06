@@ -146,6 +146,12 @@
       color: '#f6c177', glyph: 'links', desc: '大家分享的好网站', seed: 1117 },
     { id: 'board', cat: 'tools', name: '留言板', src: 'tools/board/index.html',
       color: '#c8a5ff', glyph: 'links', desc: '给路过的人留句话', seed: 1121 },
+    { id: 'timer', cat: 'tools', name: '计时器', src: 'tools/timer/index.html',
+      color: '#8fd0ff', glyph: 'pomodoro', desc: '秒表 · 倒计时', seed: 1122 },
+    { id: 'unit', cat: 'tools', name: '单位换算', src: 'tools/unit/index.html',
+      color: '#a5e0c0', glyph: 'links', desc: '长度 · 重量 · 温度 · 数据', seed: 1123 },
+    { id: 'color', cat: 'tools', name: '色卡', src: 'tools/color/index.html',
+      color: '#f0a0c0', glyph: 'cards', desc: '和谐配色 · 一键复制', seed: 1124 },
     /* ---- 🎮 脑力街机（brain 直达，需联网；手机直接触屏玩，WorldHub 不派发按键） ---- */
     { id: 'snake', cat: 'games', group: '🎮 脑力街机', name: '贪吃蛇',
       src: 'https://ming-games.pages.dev/brain-gym/?game=snake',
@@ -407,6 +413,36 @@
         '平均 180 毫秒以内，就算得上是闪电了。'
       ]
     },
+    timer: {
+      name: '更夫',
+      line1: '打更的，一分一秒都不差。',
+      lines: [
+        '更漏在这儿不好使，我给你换了个电子的。',
+        '计时器：正计时、归零，也能倒计时，到点会响。',
+        '空格键开始或暂停，R 键归零。',
+        '写作业、泡面、发呆都能用。'
+      ]
+    },
+    unit: {
+      name: '掌秤人',
+      line1: '几斤几两，你说个数。',
+      lines: [
+        '换了台新秤，什么单位都认得。',
+        '单位换算：长度、重量、温度、数据、时间、速度。',
+        '左边填数选单位，右边立刻出结果。',
+        '温度那栏有摄氏度、华氏度、开尔文三种。'
+      ]
+    },
+    color: {
+      name: '染匠',
+      line1: '配色这活儿，讲究个和谐。',
+      lines: [
+        '染坊的色卡这回搬到屏上了。',
+        '色卡：随机生成一组和谐配色，点色块就复制 HEX。',
+        '做网页、画图、挑衣服都能用。',
+        '「全部复制」能一次抄走一整组。'
+      ]
+    },
     mathdash: {
       name: '算盘先生',
       line1: '心里打算盘，别怕。',
@@ -593,6 +629,7 @@
     ['传送', '选完直接落到那个区块中央，先听 NPC 讲，再按 E 进门'],
     ['区块', '任意一侧边缘走出去，就回中心广场'],
     ['告示牌', '广场正中那块牌：按 E 答今天的每日一题'],
+    ['跑酷', '广场按 P 进入 / 退出：跳到最右终点台，掉下去重来'],
     ['游戏 / 工具', '左上「← 回上一级」回到进门前那屏，右上「← 回大厅」回广场'],
     ['设置', '顶栏齿轮或 O 键：场景背景 / 音量 / 全屏 / 重置存档'],
     ['通用', 'Esc 关闭面板 · H 关掉这块面板']
@@ -1015,6 +1052,8 @@
     this._photoFail = '';
     this.staticLayer = null;
     this.staticCanvas = null;
+    this.platforms = null;
+    this.parkourOn = false;
 
     /* 镜头：横向跟随玩家，纵向固定在 CAM_Y（地面贴屏幕底边） */
     this.cam = global.Camera ? new global.Camera(CAM_W, CAM_H, VIEW_W, VIEW_H) : null;
@@ -1477,6 +1516,12 @@
       return;
     }
 
+    if (e.code === 'KeyP') {
+      e.preventDefault();
+      if (global.Parkour) global.Parkour.toggle(this);
+      return;
+    }
+
     if (e.code === 'Escape') {
       if (this.help) { e.preventDefault(); this.help = false; sfx('ui'); return; }
       if (npc && npc.state === 'talking') { e.preventDefault(); npc.closeDialog(); sfx('ui'); }
@@ -1492,6 +1537,7 @@
     }
 
     if (e.code !== 'KeyE') return;
+    if (this.parkourOn) return;
     e.preventDefault();
 
     /* E 的优先级写死：对话 > 总门 > 进门 */
@@ -1510,7 +1556,7 @@
 
   /* ---------------- 门 / 总门 ---------------- */
   WorldScene.prototype.useDoor = function (d) {
-    if (!d) return;
+    if (!d || this.parkourOn) return;
     if (d.isGate) { this.openGate(d.cat); return; }
     if (d.isNotice) {
       if (global.Riddle && global.Riddle.Panel) {
@@ -1632,6 +1678,7 @@
    * 方向锁防止「按住方向键 → 每帧都触发」的提示与音效风暴，回走 60px 解锁。
    */
   WorldScene.prototype.tryEdge = function (dir) {
+    if (this.parkourOn) return;
     if (this.scene.kind === 'zone') {
       this.enterPlaza();
       return;
@@ -1702,6 +1749,9 @@
 
     if (global.Stats && global.Stats.seeTime) global.Stats.seeTime(dt);
 
+    /* 跑酷模式：计时 / 掉落判定 / 终点判定 */
+    if (this.parkourOn && global.Parkour) global.Parkour.update(dt, this);
+
     var prevGround = this.prevGround;
 
     this.player.update(dt, this);
@@ -1721,10 +1771,12 @@
     if (this.edgeLockL && this.player.x > EDGE_L + 60) this.edgeLockL = false;
     if (this.edgeLockR && this.player.x < EDGE_R - 60) this.edgeLockR = false;
 
-    if (!this.edgeLockL && this.player.x <= EDGE_L && this.player.facing < 0) {
-      this.tryEdge(-1);
-    } else if (!this.edgeLockR && this.player.x >= EDGE_R && this.player.facing > 0) {
-      this.tryEdge(1);
+    if (!this.parkourOn) {
+      if (!this.edgeLockL && this.player.x <= EDGE_L && this.player.facing < 0) {
+        this.tryEdge(-1);
+      } else if (!this.edgeLockR && this.player.x >= EDGE_R && this.player.facing > 0) {
+        this.tryEdge(1);
+      }
     }
 
     /* 尘埃漂浮 */
@@ -1843,6 +1895,9 @@
     /* 静态层：路标牌 / 走道口 / 名录板（换屏时一次性烘焙） */
     if (this.staticLayer) ctx.drawImage(this.staticLayer, 0, 0, VIEW_W, VIEW_H);
 
+    /* 跑酷平台 */
+    if (this.platforms) this.drawPlatforms(ctx);
+
     /* 告示牌（每日一题，微微呼吸） */
     if (this.scene.door && this.scene.door.isNotice) this.drawNotice(ctx);
 
@@ -1852,6 +1907,9 @@
     /* NPC + 角色 */
     if (this.npc) this.npc.render(ctx);
     if (this.player) this.player.render(ctx);
+
+    /* 跑酷 HUD */
+    if (this.parkourOn && global.Parkour) this.drawParkourHUD(ctx);
 
     /* 尘埃（减少动态时整层不画，省一次 lighter 合成） */
     if (!this.reduceMotion) {
@@ -1896,6 +1954,11 @@
       ctx.restore();
     }
 
+    /* 天气（雨 / 雪 / 雾），盖在昼夜色调之上 */
+    if (global.Weather && global.Weather.render) {
+      global.Weather.render(ctx, this.t, VIEW_W, VIEW_H);
+    }
+
     /* 切换时的一层暖光 */
     if (this.veil > 0) {
       ctx.save();
@@ -1908,6 +1971,53 @@
     /* 覆盖层 */
     if (this.intro > 0) this.drawIntro(ctx);
     if (this.help) this.drawHelp(ctx);
+  };
+
+  /* ---------------- 跑酷：平台与 HUD ---------------- */
+  WorldScene.prototype.drawPlatforms = function (ctx) {
+    var P = this.platforms;
+    for (var i = 0; i < P.length; i++) {
+      var pf = P[i];
+      var last = i === P.length - 1;
+      ctx.save();
+      ctx.fillStyle = last ? 'rgba(127, 216, 200, 0.22)' : 'rgba(246, 193, 119, 0.15)';
+      roundRect(ctx, pf.x, pf.y, pf.w, 14, 7);
+      ctx.fill();
+      ctx.strokeStyle = last ? 'rgba(127, 216, 200, 0.9)' : 'rgba(246, 193, 119, 0.75)';
+      ctx.lineWidth = 2;
+      ctx.stroke();
+      /* 台面下的一点光 */
+      var g = ctx.createLinearGradient(0, pf.y + 14, 0, pf.y + 34);
+      g.addColorStop(0, last ? 'rgba(127,216,200,0.16)' : 'rgba(246,193,119,0.12)');
+      g.addColorStop(1, 'rgba(0,0,0,0)');
+      ctx.fillStyle = g;
+      ctx.fillRect(pf.x + 4, pf.y + 14, pf.w - 8, 20);
+      if (last) {
+        ctx.fillStyle = 'rgba(127, 216, 200, 0.95)';
+        ctx.font = '600 12px ' + SANS;
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText('终 点', pf.x + pf.w / 2, pf.y + 7);
+      }
+      ctx.restore();
+    }
+  };
+
+  WorldScene.prototype.drawParkourHUD = function (ctx) {
+    var st = global.Parkour ? global.Parkour.state : null;
+    if (!st) return;
+    var cx = (this.cam ? this.cam.x : 0) + CAM_W / 2;
+    var b = global.Parkour.best();
+    ctx.save();
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.font = '600 18px ' + SANS;
+    ctx.fillStyle = 'rgba(255, 233, 200, 0.95)';
+    ctx.fillText('跑酷 ' + st.t.toFixed(2) + 's', cx, 244);
+    ctx.font = '400 13px ' + SANS;
+    ctx.fillStyle = 'rgba(255, 233, 200, 0.6)';
+    ctx.fillText('最佳 ' + (b ? b.toFixed(2) + 's' : '—') + ' · 掉下去重来 · P 退出', cx, 268);
+    ctx.restore();
   };
 
   /* ---------------- 静态层烘焙 ---------------- */

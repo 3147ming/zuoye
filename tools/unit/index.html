@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>单位换算</title>
+<style>
+  :root{--sans:"PingFang SC","Microsoft YaHei",system-ui,sans-serif}
+  *{box-sizing:border-box}
+  html,body{height:100%;margin:0}
+  body{background:#0b0914;color:#f3e9da;font-family:var(--sans);display:flex;justify-content:center;overflow:auto}
+  .wrap{width:min(640px,100%);padding:26px 20px 40px;display:flex;flex-direction:column;gap:16px}
+  h1{margin:0;font-size:18px;font-weight:600;letter-spacing:.16em;color:#ffd9a8}
+  .cat{display:flex;gap:6px;flex-wrap:wrap}
+  .cat button{font:inherit;font-size:13px;padding:7px 14px;border-radius:999px;cursor:pointer;
+    border:1px solid rgba(246,193,119,.25);background:transparent;color:rgba(243,233,218,.7)}
+  .cat button.on{background:rgba(246,193,119,.15);color:#f6c177;border-color:rgba(246,193,119,.6)}
+  .panel{display:flex;flex-direction:column;gap:10px;background:rgba(255,255,255,.03);
+    border:1px solid rgba(255,220,180,.12);border-radius:14px;padding:16px}
+  .line{display:flex;gap:8px;align-items:center}
+  input[type=text]{flex:1;font:inherit;font-size:18px;padding:10px 12px;border-radius:10px;
+    border:1px solid rgba(246,193,119,.3);background:rgba(0,0,0,.2);color:#f3e9da;min-width:0}
+  select{font:inherit;font-size:14px;padding:10px 10px;border-radius:10px;border:1px solid rgba(246,193,119,.3);
+    background:#151020;color:#f3e9da}
+  input:focus,select:focus{outline:none;border-color:rgba(246,193,119,.7)}
+  .out{font-size:28px;font-weight:300;color:#7fd8c8;word-break:break-all;text-align:right}
+  .hint{font-size:12px;color:rgba(243,233,218,.4)}
+  .tip{font-size:12px;color:rgba(243,233,218,.45);line-height:1.6}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>单 位 换 算</h1>
+  <div class="cat" id="cat"></div>
+  <div class="panel">
+    <div class="line">
+      <input type="text" id="num" value="1" inputmode="decimal" aria-label="数值">
+      <select id="from"></select>
+    </div>
+    <div class="line">
+      <span style="color:rgba(243,233,218,.45)">=</span>
+      <div class="out" id="out">—</div>
+      <select id="to"></select>
+    </div>
+  </div>
+  <p class="tip">输入数值后即时换算；温度按摄氏度/华氏度/开尔文换算，数据按 1024 进制。</p>
+  <p class="hint">键盘直接输入数字即可</p>
+</div>
+<script>
+(function(){
+  var UNITS={
+    长度:{base:'米',u:{米:1,千米:1000,厘米:0.01,毫米:0.001,英寸:0.0254,英尺:0.3048,英里:1609.344,海里:1852,市里:500}},
+    重量:{base:'千克',u:{千克:1,克:0.001,吨:1000,市斤:0.5,两:0.05,磅:0.45359237,盎司:0.028349523125}},
+    温度:{special:true,u:{摄氏度:1,华氏度:1,开尔文:1}},
+    数据:{base:'字节',u:{字节:1,KB:1024,MB:1048576,GB:1073741824,TB:1099511627776}},
+    时间:{base:'秒',u:{秒:1,分钟:60,小时:3600,天:86400,周:604800}},
+    速度:{base:'米/秒',u:{'米/秒':1,'千米/时':1/3.6,'英里/时':0.44704,节:0.514444}}
+  };
+  var cats=Object.keys(UNITS), cat=cats[0];
+  var catBox=document.getElementById('cat'), fromSel=document.getElementById('from'),
+      toSel=document.getElementById('to'), num=document.getElementById('num'), out=document.getElementById('out');
+
+  function buildCat(){
+    catBox.innerHTML='';
+    cats.forEach(function(c){
+      var b=document.createElement('button'); b.type='button'; b.textContent=c;
+      if(c===cat) b.className='on';
+      b.onclick=function(){ cat=c; buildCat(); buildUnits(); };
+      catBox.appendChild(b);
+    });
+  }
+  function buildUnits(){
+    var u=UNITS[cat].u, keys=Object.keys(u);
+    fromSel.innerHTML=''; toSel.innerHTML='';
+    keys.forEach(function(k){
+      fromSel.appendChild(new Option(k,k));
+      toSel.appendChild(new Option(k,k));
+    });
+    toSel.selectedIndex=keys.length>1?1:0;
+    calc();
+  }
+  function calc(){
+    var raw=num.value.trim(), x=parseFloat(raw);
+    if(!raw || isNaN(x)){ out.textContent='—'; return; }
+    var r;
+    if(UNITS[cat].special){
+      var f=fromSel.value, t=toSel.value;
+      var c = f==='摄氏度'?x : f==='华氏度'?(x-32)*5/9 : x-273.15;
+      r = t==='摄氏度'?c : t==='华氏度'?c*9/5+32 : c+273.15;
+    } else {
+      var a=UNITS[cat].u[fromSel.value], b=UNITS[cat].u[toSel.value];
+      r = x*a/b;
+    }
+    var s = Math.abs(r)>=1e9 ? r.toExponential(6) : (Math.round(r*1e10)/1e10).toString();
+    out.textContent = s;
+  }
+  fromSel.onchange=calc; toSel.onchange=calc; num.oninput=calc;
+  buildCat(); buildUnits(); num.focus();
+})();
+</script>
+</body>
+</html>

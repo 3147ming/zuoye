@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>色卡</title>
+<style>
+  :root{--sans:"PingFang SC","Microsoft YaHei",system-ui,sans-serif}
+  *{box-sizing:border-box}
+  html,body{height:100%;margin:0}
+  body{background:#0b0914;color:#f3e9da;font-family:var(--sans);display:flex;justify-content:center;overflow:auto}
+  .wrap{width:min(760px,100%);padding:24px 20px 40px;display:flex;flex-direction:column;gap:18px}
+  h1{margin:0;font-size:18px;font-weight:600;letter-spacing:.16em;color:#ffd9a8}
+  .bar{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+  button{font:inherit;font-size:14px;padding:9px 18px;border-radius:10px;cursor:pointer;
+    border:1px solid rgba(246,193,119,.35);background:rgba(246,193,119,.1);color:#f6c177}
+  button:hover{background:rgba(246,193,119,.2)}
+  button.pri{background:#f6c177;color:#1a120a;border-color:#f6c177}
+  .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(120px,1fr));gap:12px}
+  .sw{border-radius:14px;overflow:hidden;cursor:pointer;border:1px solid rgba(255,255,255,.08);
+    transition:transform .12s ease}
+  .sw:hover{transform:translateY(-3px)}
+  .chip{height:104px}
+  .meta{padding:8px 10px;background:rgba(255,255,255,.04);font-size:12px;line-height:1.5}
+  .meta b{display:block;font-size:13px;letter-spacing:.06em;color:#f3e9da}
+  .meta i{font-style:normal;color:rgba(243,233,218,.5)}
+  .hint{font-size:12px;color:rgba(243,233,218,.4)}
+  .toast{position:fixed;left:50%;bottom:28px;transform:translateX(-50%) translateY(20px);
+    background:#f6c177;color:#1a120a;font-size:13px;font-weight:600;padding:9px 18px;border-radius:999px;
+    opacity:0;pointer-events:none;transition:all .2s ease}
+  .toast.on{opacity:1;transform:translateX(-50%) translateY(0)}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>色 卡</h1>
+  <div class="bar">
+    <button class="pri" id="gen">随机一组</button>
+    <button id="copyAll">全部复制</button>
+    <span class="hint" id="mode">和谐配色 · 点色块复制 HEX</span>
+  </div>
+  <div class="grid" id="grid"></div>
+</div>
+<div class="toast" id="toast"></div>
+<script>
+(function(){
+  var grid=document.getElementById('grid'), toastEl=document.getElementById('toast');
+  var current=[];
+
+  function hsl2hex(h,s,l){
+    s/=100; l/=100;
+    var c=(1-Math.abs(2*l-1))*s, x=c*(1-Math.abs((h/60)%2-1)), m=l-c/2;
+    var r=0,g=0,b=0;
+    if(h<60){r=c;g=x;} else if(h<120){r=x;g=c;} else if(h<180){g=c;b=x;}
+    else if(h<240){g=x;b=c;} else if(h<300){r=x;b=c;} else {r=c;b=x;}
+    function to(v){return Math.round((v+m)*255).toString(16).padStart(2,'0');}
+    return '#'+to(r)+to(g)+to(b);
+  }
+  function toast(msg){
+    toastEl.textContent=msg; toastEl.classList.add('on');
+    clearTimeout(toast._t); toast._t=setTimeout(function(){toastEl.classList.remove('on');},1200);
+  }
+  function copy(text){
+    if(navigator.clipboard && navigator.clipboard.writeText){
+      navigator.clipboard.writeText(text).then(function(){toast('已复制 '+text);},function(){toast(text);});
+    } else {
+      var ta=document.createElement('textarea'); ta.value=text; document.body.appendChild(ta);
+      ta.select(); try{document.execCommand('copy');toast('已复制 '+text);}catch(e){toast(text);}
+      document.body.removeChild(ta);
+    }
+  }
+  function gen(){
+    var hBase=Math.floor(Math.random()*360);
+    var schemes=[
+      [0,30,60,120,180,240,300],            // 随机
+      [0,30,60,90,120,150,180].map(function(d){return hBase+d;}),  // 邻近
+      [0,180,60,240,120,300,30].map(function(d){return hBase+d;}), // 对比
+      [0,120,240,60,180,300,30].map(function(d){return hBase+d;})  // 三角
+    ];
+    var hues=schemes[Math.floor(Math.random()*schemes.length)];
+    current=[];
+    grid.innerHTML='';
+    hues.forEach(function(h,i){
+      h=((h%360)+360)%360;
+      var s=62+Math.floor(Math.random()*20), l=42+Math.floor(Math.random()*26);
+      var hex=hsl2hex(h,s,l);
+      current.push(hex);
+      var sw=document.createElement('div'); sw.className='sw';
+      sw.innerHTML='<div class="chip" style="background:'+hex+'"></div>'+
+        '<div class="meta"><b>'+hex.toUpperCase()+'</b><i>hsl('+Math.round(h)+', '+s+'%, '+l+'%)</i></div>';
+      sw.onclick=function(){ copy(hex.toUpperCase()); };
+      grid.appendChild(sw);
+    });
+    document.getElementById('mode').textContent='和谐配色 · 点色块复制 HEX';
+  }
+  document.getElementById('gen').onclick=gen;
+  document.getElementById('copyAll').onclick=function(){ copy(current.map(function(c){return c.toUpperCase();}).join('  ')); };
+  gen();
+})();
+</script>
+</body>
+</html>

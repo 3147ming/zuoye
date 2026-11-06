@@ -59,6 +59,7 @@
       this.bindSound();
       this.bindMisc();
       this.bindAtmos();
+      this.bindWeather();
       this.bindVersion();
 
       return true;
@@ -372,6 +373,23 @@
       }
     },
 
+    /* ---------------- 天气 ---------------- */
+    bindWeather: function () {
+      var self = this;
+      var sel = el('wxMode');
+      if (sel) sel.addEventListener('change', function () {
+        if (global.Weather) global.Weather.setMode(sel.value);
+        self.renderWeather();
+      });
+    },
+
+    renderWeather: function () {
+      var sel = el('wxMode');
+      var now = el('wxNow');
+      if (sel) sel.value = (global.Weather && global.Weather.mode()) || 'auto';
+      if (now) now.textContent = global.Weather ? global.Weather.describe() : '模块未加载';
+    },
+
     /* ---------------- 开关 ---------------- */
     /* 焦点陷阱：Tab / Shift+Tab 只在面板内循环，不跑到背后的 canvas */
     _trapTab: function (e) {
@@ -417,6 +435,7 @@
       this.hint(stored ? '这一屏已经有自定义背景' : '这一屏用的是默认剪纸背景');
       this.renderContrib();
       this.renderAtmos();
+      this.renderWeather();
       this.renderStats();
 
       this.root.classList.add('on');

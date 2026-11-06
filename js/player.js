@@ -198,20 +198,40 @@
     if (this.vy > MAX_FALL) this.vy = MAX_FALL;
 
     /* --- 积分 --- */
+    var wasAirborne = !this.onGround;
+    var prevY = this.y;
     this.x += this.vx * dt;
     this.y += this.vy * dt;
 
-    /* --- 地面碰撞 --- */
-    var wasAirborne = !this.onGround;
-    if (this.y >= groundY) {
-      if (wasAirborne && this.vy > 240) {
-        this.squash = Math.min(1, this.vy / 1250);
+    /* --- 平台碰撞（跑酷：单向，只从上方落得住） --- */
+    var landedPlat = false;
+    var plats = world && world.platforms;
+    if (plats && plats.length && this.vy >= 0) {
+      for (var pi = 0; pi < plats.length; pi++) {
+        var pf = plats[pi];
+        if (this.x > pf.x - 18 && this.x < pf.x + pf.w + 18 &&
+            this.y >= pf.y && prevY <= pf.y + 8) {
+          this.y = pf.y;
+          this.vy = 0;
+          this.onGround = true;
+          landedPlat = true;
+          break;
+        }
       }
-      this.y = groundY;
-      this.vy = 0;
-      this.onGround = true;
-    } else {
-      this.onGround = false;
+    }
+
+    /* --- 地面碰撞 --- */
+    if (!landedPlat) {
+      if (this.y >= groundY) {
+        if (wasAirborne && this.vy > 240) {
+          this.squash = Math.min(1, this.vy / 1250);
+        }
+        this.y = groundY;
+        this.vy = 0;
+        this.onGround = true;
+      } else {
+        this.onGround = false;
+      }
     }
 
     /* --- 地图边界：角色不能跑出去 --- */

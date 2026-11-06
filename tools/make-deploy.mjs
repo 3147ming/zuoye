@@ -33,6 +33,9 @@ const COPY = [
   'tools/noise/',
   'tools/pomodoro/',
   'tools/board/',
+  'tools/timer/',
+  'tools/unit/',
+  'tools/color/',
   'contrib/',
   'assets/'
 ];

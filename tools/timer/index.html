@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>计时器</title>
+<style>
+  :root{--sans:"PingFang SC","Microsoft YaHei",system-ui,sans-serif}
+  *{box-sizing:border-box}
+  html,body{height:100%;margin:0}
+  body{background:#0b0914;color:#f3e9da;font-family:var(--sans);display:flex;justify-content:center;overflow:hidden}
+  .wrap{width:min(680px,100%);height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:22px;padding:24px}
+  h1{margin:0;font-size:18px;font-weight:600;letter-spacing:.16em;color:#ffd9a8}
+  .time{font-variant-numeric:tabular-nums;font-size:clamp(52px,16vw,104px);font-weight:200;letter-spacing:.04em;line-height:1}
+  .time small{font-size:.32em;color:rgba(243,233,218,.5)}
+  .btns{display:flex;gap:10px;flex-wrap:wrap;justify-content:center}
+  button{font:inherit;font-size:14px;letter-spacing:.08em;padding:10px 20px;border-radius:10px;cursor:pointer;
+    border:1px solid rgba(246,193,119,.35);background:rgba(246,193,119,.1);color:#f6c177}
+  button:hover{background:rgba(246,193,119,.2)}
+  button.pri{background:#f6c177;color:#1a120a;border-color:#f6c177}
+  button.pri:hover{background:#ffd79a}
+  .cd{display:flex;align-items:center;gap:8px;font-size:14px;color:rgba(243,233,218,.7)}
+  .cd input{width:4.4em;text-align:center;font:inherit;font-size:16px;padding:7px 6px;border-radius:8px;
+    border:1px solid rgba(246,193,119,.3);background:rgba(255,255,255,.04);color:#f3e9da}
+  input:focus{outline:none;border-color:rgba(246,193,119,.7)}
+  .hint{font-size:12px;color:rgba(243,233,218,.4)}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>计 时 器</h1>
+  <div class="time" id="disp">00:00<small>.00</small></div>
+  <div class="btns">
+    <button class="pri" id="toggle">开始</button>
+    <button id="reset">归零</button>
+  </div>
+  <div class="cd">
+    <span>倒计时</span>
+    <input id="mm" type="number" min="0" max="599" placeholder="分">
+    <span>:</span>
+    <input id="ss" type="number" min="0" max="59" placeholder="秒">
+    <button id="cdStart">开始</button>
+  </div>
+  <p class="hint">空格 开始/暂停 · R 归零</p>
+</div>
+<script>
+(function(){
+  var disp=document.getElementById('disp'),
+      toggle=document.getElementById('toggle'),
+      reset=document.getElementById('reset'),
+      mm=document.getElementById('mm'), ss=document.getElementById('ss'),
+      cdStart=document.getElementById('cdStart');
+
+  var mode='up', running=false, base=0, acc=0, left=0, cdTotal=0, last=0, raf=0;
+
+  function fmt(ms){
+    if(ms<0) ms=0;
+    var t=ms/1000, m=Math.floor(t/60), s=Math.floor(t%60), cs=Math.floor((ms%1000)/10);
+    function p2(n){return (n<10?'0':'')+n;}
+    return p2(m)+':'+p2(s)+'<small>.'+p2(cs)+'</small>';
+  }
+  function render(){
+    if(mode==='up') disp.innerHTML=fmt(running?acc+(performance.now()-base):acc);
+    else disp.innerHTML=fmt(left);
+  }
+  function tick(){
+    if(!running) return;
+    if(mode==='up'){ render(); raf=requestAnimationFrame(tick); }
+    else {
+      left=cdTotal-(performance.now()-base-acc);
+      render();
+      if(left<=0){ left=0; render(); done(); return; }
+      raf=requestAnimationFrame(tick);
+    }
+  }
+  function beep(){
+    try{
+      var C=window.AudioContext||window.webkitAudioContext; if(!C) return;
+      var ctx=new C(), o=ctx.createOscillator(), g=ctx.createGain();
+      o.type='sine'; o.frequency.value=880; g.gain.value=.12;
+      o.connect(g); g.connect(ctx.destination);
+      o.start(); o.stop(ctx.currentTime+.6);
+      o.onended=function(){ try{ctx.close();}catch(e){} };
+    }catch(e){}
+  }
+  function done(){
+    running=false; toggle.textContent='开始'; mode='up'; acc=0;
+    beep(); setTimeout(beep,220);
+    disp.innerHTML='<span style="color:#7fd8c8">到 点</span>';
+  }
+  function startUp(){
+    if(running){ acc+=(performance.now()-base); running=false; cancelAnimationFrame(raf); toggle.textContent='开始'; }
+    else { base=performance.now(); running=true; tick(); toggle.textContent='暂停'; }
+  }
+  function startCd(){
+    var m=Math.max(0,Math.min(599,parseInt(mm.value||'0',10)||0)),
+        s=Math.max(0,Math.min(59,parseInt(ss.value||'0',10)||0));
+    cdTotal=(m*60+s)*1000;
+    if(cdTotal<=0){ cdTotal=60000; }
+    mode='down'; left=cdTotal; acc=0; base=performance.now(); running=true;
+    toggle.textContent='暂停'; tick();
+  }
+  toggle.addEventListener('click',function(){
+    if(mode==='up') startUp(); else {
+      if(running){ acc+=(performance.now()-base); running=false; cancelAnimationFrame(raf); toggle.textContent='继续'; }
+      else { base=performance.now(); running=true; tick(); toggle.textContent='暂停'; }
+    }
+  });
+  reset.addEventListener('click',function(){
+    running=false; cancelAnimationFrame(raf); mode='up'; acc=0; left=0; toggle.textContent='开始'; disp.innerHTML=fmt(0);
+  });
+  cdStart.addEventListener('click',startCd);
+  document.addEventListener('keydown',function(e){
+    if(e.target && /INPUT|TEXTAREA/.test(e.target.tagName)) return;
+    if(e.code==='Space'){ e.preventDefault(); toggle.click(); }
+    if(e.code==='KeyR'){ reset.click(); }
+  });
+  render();
+})();
+</script>
+</body>
+</html>

@@ -243,5 +243,58 @@
   }
   updateRotate();
 
+  /* ---- 大厅手势：上滑跳 · 双击 E · 左右拖动移动（仅大厅，iframe 内不接管） ---- */
+  function bindHallGestures() {
+    var stageEl = document.querySelector('.stage') || document.body;
+    var sx = 0, sy = 0, st = 0, dragging = false, dir = 0, lastTap = 0;
+    function inHall() { return sceneName().indexOf('iframe-') !== 0; }
+    function skipTarget(t) {
+      return !!(t && t.closest && t.closest('.tbtn,.touch-ui,.hud,.gear,.settings,.gater,.dialogue,.riddle'));
+    }
+    function setDir(d) {
+      if (d === dir) return;
+      if (dir === 37) fire(global, 'ArrowLeft', 'ArrowLeft', 37, 'keyup');
+      if (dir === 39) fire(global, 'ArrowRight', 'ArrowRight', 39, 'keyup');
+      dir = d;
+      if (d === 37) fire(global, 'ArrowLeft', 'ArrowLeft', 37, 'keydown');
+      if (d === 39) fire(global, 'ArrowRight', 'ArrowRight', 39, 'keydown');
+    }
+    stageEl.addEventListener('pointerdown', function (e) {
+      if (!inHall() || skipTarget(e.target)) return;
+      sx = e.clientX; sy = e.clientY; st = Date.now(); dragging = true;
+    });
+    stageEl.addEventListener('pointermove', function (e) {
+      if (!dragging || !inHall()) return;
+      var dx = e.clientX - sx, dy = e.clientY - sy;
+      if (Math.abs(dx) > 26 && Math.abs(dx) > Math.abs(dy)) setDir(dx < 0 ? 37 : 39);
+    });
+    stageEl.addEventListener('pointerup', function (e) {
+      if (!dragging) return;
+      dragging = false;
+      if (!inHall()) { setDir(0); return; }
+      var dx = e.clientX - sx, dy = e.clientY - sy, dt = Date.now() - st;
+      setDir(0);
+      /* 上滑 → 跳 */
+      if (dy < -46 && Math.abs(dx) < 46 && dt < 700) {
+        fire(global, 'Space', ' ', 32, 'keydown');
+        fire(global, 'Space', ' ', 32, 'keyup');
+        return;
+      }
+      /* 原地轻点两次 → E（交互 / 对话推进） */
+      if (Math.abs(dx) < 22 && Math.abs(dy) < 22 && dt < 280) {
+        var now = Date.now();
+        if (now - lastTap < 340) {
+          fire(global, 'KeyE', 'e', 69, 'keydown');
+          fire(global, 'KeyE', 'e', 69, 'keyup');
+          lastTap = 0;
+        } else {
+          lastTap = now;
+        }
+      }
+    });
+    stageEl.addEventListener('pointercancel', function () { dragging = false; setDir(0); });
+  }
+  bindHallGestures();
+
   global.WorldTouch = { rebuild: rebuild, releaseAll: releaseAll };
 })(window);

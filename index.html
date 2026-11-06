@@ -148,6 +148,17 @@
                   <option value="dusk">琥珀暮色</option>
                 </select>
               </div>
+              <div class="set-row" style="margin-top:8px">
+                <select class="set-sel" id="wxMode" aria-label="天气">
+                  <option value="auto">跟随季节</option>
+                  <option value="sunny">晴</option>
+                  <option value="rain">雨</option>
+                  <option value="fog">雾</option>
+                  <option value="snow">雪</option>
+                  <option value="off">关</option>
+                </select>
+                <span class="set-tip" id="wxNow">天气：跟随季节</span>
+              </div>
               <p class="set-note" id="dnNow">昼夜：跟随时间</p>
               <p class="set-tip">昼夜按你的本地时间自动走（黎明/白昼/黄昏/夜），夜里路灯亮、星星多；也可以固定成白天或夜晚。皮肤只改色相与饱和度，不动布局。</p>
             </section>
@@ -199,10 +210,12 @@
   <script src="js/sceneManager.js" defer></script>
   <script src="js/player.js" defer></script>
   <script src="js/gamepad.js" defer></script>
+  <script src="js/parkour.js" defer></script>
   <script src="js/npc.js" defer></script>
   <script src="js/save.js" defer></script>
   <script src="js/config.js" defer></script>
   <script src="js/daynight.js" defer></script>
+  <script src="js/weather.js" defer></script>
   <script src="js/stats.js" defer></script>
   <script src="js/riddle.js" defer></script>
   <script src="js/contrib.js" defer></script>
