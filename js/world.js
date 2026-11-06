@@ -1512,8 +1512,32 @@
       var x = document.getElementById('runnerPickClose');
       if (x) x.addEventListener('click', function () { self.closeRunnerPick(); });
     }
+    this.fillRunnerWall();
     if (global.Input && global.Input.reset) global.Input.reset();
     sfx('ui');
+  };
+
+  WorldScene.prototype.fillRunnerWall = function () {
+    var meta = global.RunnerMeta;
+    if (!meta) return;
+    var modes = ['side', 'temple'];
+    for (var i = 0; i < modes.length; i++) {
+      var m = modes[i];
+      var rec = meta.record(m);
+      var recEl = document.getElementById('rec-' + m);
+      if (recEl) {
+        recEl.textContent = rec.score
+          ? '最佳 ' + rec.score + ' 分 · 距离 ' + rec.dist + ' · 金币 ' + rec.coins
+          : '还没有纪录，去跑一趟';
+      }
+      var chEl = document.getElementById('ch-' + m);
+      if (chEl) {
+        var g = meta.goal(m);
+        var ok = meta.done(m);
+        chEl.textContent = (ok ? '今日目标 ✓ ' : '今日目标：') + g.label;
+        chEl.className = 'pick-ch' + (ok ? ' ok' : '');
+      }
+    }
   };
 
   WorldScene.prototype.closeRunnerPick = function () {
