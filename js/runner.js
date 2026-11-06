@@ -17,6 +17,15 @@
 
   var MAGNET_T = 6.5;      /* 磁铁持续秒数 */
   var SHIELD_T = 5.0;      /* 护盾持续秒数 */
+  var DASH_T = 2.6;        /* 冲刺持续秒数 */
+  var GLIDE_T = 4.5;       /* 滑翔持续秒数 */
+
+  /* 神庙主题：每次岔路选对后轮换 */
+  var THEMES = [
+    { name: '沙漠神庙', sky: ['#d9d4ff', '#ffdfe9', '#ffe9d2'], road: ['#f6dcc0', '#eec79c'], far: 'rgba(150,120,190,0.28)', lamp: '#ffd9a0', pillar: '#c9a2e0' },
+    { name: '雪 庙', sky: ['#cfe3ff', '#e8f4ff', '#ffffff'], road: ['#eaf3ff', '#cfe0f2'], far: 'rgba(120,150,200,0.30)', lamp: '#bfe4ff', pillar: '#9fc4e8' },
+    { name: '竹 林', sky: ['#d7f0dd', '#eafbe6', '#f3ffe9'], road: ['#e8f3d8', '#cfe4b8'], far: 'rgba(110,160,120,0.30)', lamp: '#d8ffb0', pillar: '#7fbf8c' }
+  ];
 
   function clamp(v, a, b) { return v < a ? a : (v > b ? b : v); }
   function lerp(a, b, t) { return a + (b - a) * t; }
@@ -73,11 +82,51 @@
   }
   function markGoal(mode) { try { global.localStorage.setItem(goalKey(mode), '1'); } catch (e) {} }
 
+  /* ---------------- 本机 Top5 ---------------- */
+  function loadTop(mode) {
+    try {
+      var a = JSON.parse(global.localStorage.getItem(keyOf(mode, 'top')) || '[]');
+      return Array.isArray(a) ? a.slice(0, 5) : [];
+    } catch (e) { return []; }
+  }
+  function addRun(mode, rec) {
+    var a = loadTop(mode);
+    a.push(rec);
+    a.sort(function (x, y) { return y.s - x.s; });
+    a = a.slice(0, 5);
+    try { global.localStorage.setItem(keyOf(mode, 'top'), JSON.stringify(a)); } catch (e) {}
+    return a;
+  }
+
+  /* ---------------- 连签 ---------------- */
+  var STREAK_KEY = 'worldhub.runner.streak.v1';
+  function streakData() {
+    try {
+      var o = JSON.parse(global.localStorage.getItem(STREAK_KEY) || '{}');
+      return (o && typeof o === 'object') ? o : {};
+    } catch (e) { return {}; }
+  }
+  function streakCount() { return streakData().count || 0; }
+  function bumpStreak() {
+    var o = streakData();
+    var today = todayStr();
+    if (o.last === today) return o.count || 1;
+    var y = new Date();
+    y.setDate(y.getDate() - 1);
+    var ystr = y.getFullYear() + '-' + (y.getMonth() + 1) + '-' + y.getDate();
+    o.count = (o.last === ystr) ? (o.count || 0) + 1 : 1;
+    o.last = today;
+    try { global.localStorage.setItem(STREAK_KEY, JSON.stringify(o)); } catch (e) {}
+    return o.count;
+  }
+
   /* 大厅「荣誉墙」取用 */
   global.RunnerMeta = {
     record: function (mode) {
       return { score: bestScore(mode), dist: bestDist(mode), coins: bestCoins(mode) };
     },
+    top: loadTop,
+    streak: streakCount,
     goal: goalOf,
     done: goalDone
   };
@@ -149,7 +198,9 @@
   function drawPower(ctx, x, y, r, pkind, t) {
     ctx.save();
     ctx.translate(x, y + Math.sin(t * 3) * 3);
-    var glow = pkind === 'magnet' ? '#ff8fb0' : '#8fd0ff';
+    var glow = pkind === 'magnet' ? '#ff8fb0'
+      : pkind === 'dash' ? '#ffd45e'
+      : pkind === 'glide' ? '#9fe0a8' : '#8fd0ff';
     ctx.globalAlpha = 0.22;
     ctx.fillStyle = glow;
     ctx.beginPath(); ctx.arc(0, 0, r * 1.7, 0, Math.PI * 2); ctx.fill();
@@ -164,6 +215,32 @@
       ctx.fillStyle = '#8fd0ff';
       ctx.fillRect(-r * 0.9, r * 0.5, r * 0.34, r * 0.26);
       ctx.fillRect(r * 0.56, r * 0.5, r * 0.34, r * 0.26);
+    } else if (pkind === 'dash') {
+      /* 闪电 */
+      ctx.fillStyle = '#ffd45e';
+      ctx.strokeStyle = '#e6a92e';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(r * 0.22, -r);
+      ctx.lineTo(-r * 0.36, r * 0.06);
+      ctx.lineTo(r * 0.04, r * 0.06);
+      ctx.lineTo(-r * 0.2, r);
+      ctx.lineTo(r * 0.42, -r * 0.1);
+      ctx.lineTo(r * 0.02, -r * 0.1);
+      ctx.closePath();
+      ctx.fill();
+      ctx.stroke();
+    } else if (pkind === 'glide') {
+      /* 叶子 */
+      ctx.fillStyle = '#9fe0a8';
+      ctx.strokeStyle = '#5fb573';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(-r * 0.7, r * 0.6);
+      ctx.quadraticCurveTo(-r * 0.1, -r, r * 0.75, -r * 0.5);
+      ctx.quadraticCurveTo(r * 0.2, r * 0.2, -r * 0.7, r * 0.6);
+      ctx.fill();
+      ctx.stroke();
     } else {
       ctx.fillStyle = '#8fd0ff';
       ctx.beginPath();
@@ -209,6 +286,13 @@
     this.speed = this.mode === 'side' ? 340 : 520;
     this.magnetT = 0;
     this.shieldT = 0;
+    this.dashT = 0;
+    this.glideT = 0;
+    this.themeIdx = 0;
+    this.top = loadTop(this.mode);
+    this.runRank = 0;
+    /* 连签 ≥3 天：开局自带 3 秒护盾 */
+    if (streakCount() >= 3) this.shieldT = 3;
     this.challengeDone = this.goalAlready;
     this.fork = null;
     this.forkCd = 10 + Math.random() * 4;
@@ -247,6 +331,8 @@
           this.fork.sel = (e.code === 'ArrowLeft') ? -1 : 1;
           this.fork.t = 0.75;
           this.dist += 120;
+          this.themeIdx = (this.themeIdx + 1) % THEMES.length;
+          this.forkMsg = { text: '进入' + THEMES[this.themeIdx].name, t: 1.6 };
           this.play('win');
           return;
         }
@@ -274,10 +360,13 @@
   };
 
   Runner.prototype.activatePower = function (pkind) {
-    if (pkind === 'magnet') this.magnetT = MAGNET_T;
-    else this.shieldT = SHIELD_T;
+    var msg;
+    if (pkind === 'magnet') { this.magnetT = MAGNET_T; msg = '磁铁！金币自动飞来'; }
+    else if (pkind === 'shield') { this.shieldT = SHIELD_T; msg = '护盾！短暂无敌'; }
+    else if (pkind === 'dash') { this.dashT = DASH_T; msg = '冲刺！加速前进'; }
+    else { this.glideT = GLIDE_T; msg = '滑翔！下落变慢'; }
     this.play('win');
-    this.forkMsg = { text: pkind === 'magnet' ? '磁铁！金币自动飞来' : '护盾！短暂无敌', t: 1.4 };
+    this.forkMsg = { text: msg, t: 1.4 };
   };
 
   Runner.prototype.die = function () {
@@ -289,6 +378,12 @@
     saveNum(keyOf(this.mode, 'best'), Math.max(sc, bestScore(this.mode)));
     saveNum(keyOf(this.mode, 'bestdist'), Math.max(d, bestDist(this.mode)));
     saveNum(keyOf(this.mode, 'bestcoins'), Math.max(this.coins, bestCoins(this.mode)));
+    var rec = { s: sc, d: d, c: this.coins, t: Date.now() };
+    this.top = addRun(this.mode, rec);
+    this.runRank = 0;
+    for (var i = 0; i < this.top.length; i++) {
+      if (this.top[i].t === rec.t) { this.runRank = i + 1; break; }
+    }
     this.play('miss');
   };
 
@@ -297,7 +392,8 @@
     if (this.goalProgress() >= this.goal.target) {
       this.challengeDone = true;
       markGoal(this.mode);
-      this.forkMsg = { text: '今日目标完成 ✓', t: 2.0 };
+      var n = bumpStreak();
+      this.forkMsg = { text: '今日目标完成 ✓  已连签 ' + n + ' 天', t: 2.4 };
       this.play('win');
     }
   };
@@ -312,6 +408,8 @@
     this.t += dt;
     if (this.magnetT > 0) this.magnetT = Math.max(0, this.magnetT - dt);
     if (this.shieldT > 0) this.shieldT = Math.max(0, this.shieldT - dt);
+    if (this.dashT > 0) this.dashT = Math.max(0, this.dashT - dt);
+    if (this.glideT > 0) this.glideT = Math.max(0, this.glideT - dt);
     if (this.forkMsg) { this.forkMsg.t -= dt; if (this.forkMsg.t <= 0) this.forkMsg = null; }
     if (this.over) return;
     if (this.mode === 'side') this.updateSide(dt);
@@ -321,9 +419,11 @@
   Runner.prototype.updateSide = function (dt) {
     var p = this.p;
     this.speed = 340 + Math.min(430, this.dist * 0.018);
-    this.dist += this.speed * dt;
+    var eff = this.speed * (this.dashT > 0 ? 1.65 : 1);
+    this.dist += eff * dt;
 
-    p.vy += 2400 * dt;
+    var grav = (this.glideT > 0 && p.vy > 0) ? 900 : 2400;
+    p.vy += grav * dt;
     p.y += p.vy * dt;
     if (p.y >= GROUND) { p.y = GROUND; p.vy = 0; p.onGround = true; p.jumps = 0; }
     else p.onGround = false;
@@ -342,7 +442,7 @@
     for (i = 0; i < this.objects.length; i++) {
       o = this.objects[i];
       if (o.dead) continue;
-      o.x -= this.speed * dt;
+      o.x -= eff * dt;
       if (o.x < -200) { o.dead = true; continue; }
       var ox = o.x - o.w / 2, oy = o.y - o.h;
       if (o.kind === 'coin') {
@@ -364,9 +464,10 @@
 
   Runner.prototype.spawnSide = function () {
     var r = Math.random();
-    if (r < 0.10) {
+    if (r < 0.12) {
+      var kinds = ['magnet', 'shield', 'dash', 'glide'];
       this.objects.push({
-        kind: 'power', pkind: Math.random() < 0.5 ? 'magnet' : 'shield',
+        kind: 'power', pkind: kinds[Math.floor(Math.random() * kinds.length)],
         x: W + 120, y: GROUND - 150, w: 34, h: 34
       });
       return;
@@ -568,14 +669,37 @@
     } else {
       drawBlob(ctx, p.x, p.y, 56, '#ffb3c7', squash, this.shieldVisual());
     }
+
+    /* 冲刺残影 */
+    if (this.dashT > 0) {
+      ctx.save();
+      ctx.strokeStyle = 'rgba(255, 212, 94, 0.62)';
+      ctx.lineWidth = 3;
+      ctx.lineCap = 'round';
+      for (i = 0; i < 5; i++) {
+        var ly = p.y - 12 - i * 9;
+        var lx = p.x - 46 - ((this.t * 900 + i * 47) % 130);
+        ctx.beginPath(); ctx.moveTo(lx, ly); ctx.lineTo(lx + 36, ly); ctx.stroke();
+      }
+      ctx.restore();
+    }
+    /* 滑翔风痕 */
+    if (this.glideT > 0 && !p.onGround) {
+      ctx.save();
+      ctx.strokeStyle = 'rgba(159, 224, 168, 0.75)';
+      ctx.lineWidth = 3;
+      ctx.beginPath(); ctx.arc(p.x, p.y - 18, 32, 0.12 * Math.PI, 0.88 * Math.PI); ctx.stroke();
+      ctx.restore();
+    }
   };
 
   Runner.prototype.renderTemple = function (ctx) {
     var t = this.t, i;
+    var th = THEMES[this.themeIdx % THEMES.length];
     var sky = ctx.createLinearGradient(0, 0, 0, HORIZON + 120);
-    sky.addColorStop(0, '#d9d4ff');
-    sky.addColorStop(0.55, '#ffdfe9');
-    sky.addColorStop(1, '#ffe9d2');
+    sky.addColorStop(0, th.sky[0]);
+    sky.addColorStop(0.55, th.sky[1]);
+    sky.addColorStop(1, th.sky[2]);
     ctx.fillStyle = sky;
     ctx.fillRect(0, 0, W, H);
 
@@ -589,7 +713,7 @@
     }
     ctx.globalAlpha = 1;
 
-    ctx.fillStyle = 'rgba(150, 120, 190, 0.28)';
+    ctx.fillStyle = th.far;
     for (i = 0; i < 7; i++) {
       var bx = i * 200 - 60;
       ctx.beginPath();
@@ -602,8 +726,8 @@
 
     var roadTopW = 190, roadBotW = 960;
     var g1 = ctx.createLinearGradient(0, HORIZON, 0, H);
-    g1.addColorStop(0, '#f6dcc0');
-    g1.addColorStop(1, '#eec79c');
+    g1.addColorStop(0, th.road[0]);
+    g1.addColorStop(1, th.road[1]);
     ctx.fillStyle = g1;
     ctx.beginPath();
     ctx.moveTo(W / 2 - roadTopW / 2, HORIZON);
@@ -654,9 +778,9 @@
       var ww = lerp(roadTopW, roadBotW, kk);
       var lx = W / 2 - ww / 2 - lerp(10, 60, kk);
       var sc = lerp(0.25, 1.15, kk);
-      ctx.fillStyle = '#c9a2e0';
+      ctx.fillStyle = th.pillar;
       ctx.fillRect(lx - 3 * sc, yy - 70 * sc, 6 * sc, 70 * sc);
-      ctx.fillStyle = '#ffd9a0';
+      ctx.fillStyle = th.lamp;
       ctx.beginPath(); ctx.arc(lx, yy - 74 * sc, 9 * sc, 0, Math.PI * 2); ctx.fill();
       ctx.fillStyle = 'rgba(255, 217, 160, 0.25)';
       ctx.beginPath(); ctx.arc(lx, yy - 74 * sc, 22 * sc, 0, Math.PI * 2); ctx.fill();
@@ -746,7 +870,8 @@
     ctx.textBaseline = 'middle';
     ctx.font = '700 26px ' + SANS;
     ctx.fillStyle = 'rgba(60, 46, 74, 0.85)';
-    ctx.fillText(this.mode === 'side' ? '横版跑酷' : '神庙逃亡', 40, 54);
+    var title = this.mode === 'side' ? '横版跑酷' : ('神庙逃亡 · ' + THEMES[this.themeIdx % THEMES.length].name);
+    ctx.fillText(title, 40, 54);
 
     ctx.font = '600 20px ' + SANS;
     ctx.fillStyle = 'rgba(60, 46, 74, 0.7)';
@@ -763,20 +888,14 @@
     }
 
     /* 道具计时 */
-    if (this.magnetT > 0 || this.shieldT > 0) {
+    if (this.magnetT > 0 || this.shieldT > 0 || this.dashT > 0 || this.glideT > 0) {
       ctx.textAlign = 'left';
       var tx = 40, ty = 150;
-      if (this.magnetT > 0) {
-        ctx.font = '600 16px ' + SANS;
-        ctx.fillStyle = '#e0568a';
-        ctx.fillText('磁铁 ' + this.magnetT.toFixed(1) + 's', tx, ty);
-        tx += 130;
-      }
-      if (this.shieldT > 0) {
-        ctx.font = '600 16px ' + SANS;
-        ctx.fillStyle = '#3d8ec9';
-        ctx.fillText('护盾 ' + this.shieldT.toFixed(1) + 's', tx, ty);
-      }
+      ctx.font = '600 16px ' + SANS;
+      if (this.magnetT > 0) { ctx.fillStyle = '#e0568a'; ctx.fillText('磁铁 ' + this.magnetT.toFixed(1) + 's', tx, ty); tx += 118; }
+      if (this.shieldT > 0) { ctx.fillStyle = '#3d8ec9'; ctx.fillText('护盾 ' + this.shieldT.toFixed(1) + 's', tx, ty); tx += 118; }
+      if (this.dashT > 0) { ctx.fillStyle = '#c08a00'; ctx.fillText('冲刺 ' + this.dashT.toFixed(1) + 's', tx, ty); tx += 118; }
+      if (this.glideT > 0) { ctx.fillStyle = '#2f8a4a'; ctx.fillText('滑翔 ' + this.glideT.toFixed(1) + 's', tx, ty); }
     }
 
     /* 提示消息（吃道具 / 岔路结果 / 目标完成） */
@@ -807,7 +926,7 @@
     ctx.fillStyle = 'rgba(40, 30, 56, 0.55)';
     ctx.fillRect(0, 0, W, H);
 
-    var cardW = 560, cardH = 330;
+    var cardW = 600, cardH = 456;
     var cx = W / 2 - cardW / 2, cy = H / 2 - cardH / 2;
     ctx.fillStyle = 'rgba(255, 250, 244, 0.97)';
     rr(ctx, cx, cy, cardW, cardH, 22); ctx.fill();
@@ -818,37 +937,55 @@
     ctx.textAlign = 'center';
     ctx.fillStyle = '#5a4568';
     ctx.font = '700 30px ' + SANS;
-    ctx.fillText('这趟跑到头啦', W / 2, cy + 66);
+    ctx.fillText('这趟跑到头啦', W / 2, cy + 54);
 
     ctx.font = '600 21px ' + SANS;
     ctx.fillStyle = '#7a5f8a';
-    ctx.fillText('分数 ' + this.score() + '  ·  金币 ' + this.coins + '  ·  距离 ' + Math.round(this.dist / 10), W / 2, cy + 112);
+    ctx.fillText('分数 ' + this.score() + '  ·  金币 ' + this.coins + '  ·  距离 ' + Math.round(this.dist / 10), W / 2, cy + 92);
 
-    if (this.newBest) {
-      ctx.fillStyle = '#e0803c';
-      ctx.font = '700 20px ' + SANS;
-      ctx.fillText('★ 新纪录！', W / 2, cy + 150);
-    } else {
-      ctx.fillStyle = '#9a8aa8';
-      ctx.font = '500 18px ' + SANS;
-      ctx.fillText('最佳 ' + this.best, W / 2, cy + 150);
-    }
+    ctx.font = '600 18px ' + SANS;
+    ctx.fillStyle = this.newBest ? '#e0803c' : '#9a8aa8';
+    ctx.fillText(this.newBest ? '★ 新纪录！' : '最佳 ' + this.best, W / 2, cy + 124);
 
     if (this.goal) {
       ctx.font = '500 16px ' + SANS;
       ctx.fillStyle = this.challengeDone ? '#3f9c62' : '#9a8aa8';
-      ctx.fillText(this.challengeDone
-        ? '今日目标已达成 ✓'
+      ctx.fillText(this.challengeDone ? '今日目标已达成 ✓'
         : '今日目标：' + this.goal.label + '（' + Math.min(this.goalProgress(), this.goal.target) + '/' + this.goal.target + '）',
-        W / 2, cy + 190);
+        W / 2, cy + 152);
+    }
+
+    /* 本机 Top5 */
+    ctx.font = '600 15px ' + SANS;
+    ctx.fillStyle = '#9a8aa8';
+    ctx.fillText('本机 Top 5', W / 2, cy + 188);
+
+    var list = this.top || [];
+    if (!list.length) {
+      ctx.font = '400 15px ' + SANS;
+      ctx.fillStyle = '#b0a2bc';
+      ctx.fillText('还没有记录', W / 2, cy + 214);
+    } else {
+      for (var k = 0; k < list.length; k++) {
+        var r = list[k];
+        var hi = (k + 1) === this.runRank;
+        ctx.font = (hi ? '700 ' : '400 ') + '15px ' + SANS;
+        ctx.fillStyle = hi ? '#e0803c' : '#7a6a88';
+        ctx.fillText((k + 1) + '   ' + r.s + ' 分 · 距离 ' + r.d + ' · 金币 ' + r.c, W / 2, cy + 214 + k * 26);
+      }
+      if (!this.runRank) {
+        ctx.font = '400 13px ' + SANS;
+        ctx.fillStyle = '#b0a2bc';
+        ctx.fillText('本次未进前五', W / 2, cy + 214 + list.length * 26 + 4);
+      }
     }
 
     ctx.fillStyle = '#5a4568';
     ctx.font = '600 20px ' + SANS;
-    ctx.fillText('空格 再来一次', W / 2, cy + 246);
+    ctx.fillText('空格 再来一次', W / 2, cy + cardH - 74);
     ctx.font = '400 16px ' + SANS;
     ctx.fillStyle = '#9a8aa8';
-    ctx.fillText('Esc / P 回大厅', W / 2, cy + 282);
+    ctx.fillText('Esc / P 回大厅', W / 2, cy + cardH - 40);
     ctx.restore();
   };
 

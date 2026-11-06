@@ -1061,3 +1061,5 @@ body[data-scene]:not([data-scene="world"]) .gear {
 .pick-w-rec{flex:1;color:#7a6a88;min-width:0}
 .pick-ch{flex:0 0 auto;font-size:12px;color:#9a8aa8;white-space:nowrap}
 .pick-ch.ok{color:#3f9c62}
+.pick-streak{margin:8px 0 0;font-size:12px;color:#9a8aa8;text-align:center}
+.pick-streak b{color:#e0803c}

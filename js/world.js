@@ -1538,6 +1538,11 @@
         chEl.className = 'pick-ch' + (ok ? ' ok' : '');
       }
     }
+    var sEl = document.getElementById('rec-streak');
+    if (sEl) {
+      var n = meta.streak ? meta.streak() : 0;
+      sEl.textContent = '连续达成 ' + n + ' 天' + (n >= 3 ? '（开局自带 3 秒护盾）' : '（≥3 天开局送护盾）');
+    }
   };
 
   WorldScene.prototype.closeRunnerPick = function () {
