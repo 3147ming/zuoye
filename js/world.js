@@ -1487,6 +1487,42 @@
     if (global.HUD) global.HUD.toast('');
   };
 
+  /* ---------------- 跑酷选择 ---------------- */
+  WorldScene.prototype.openRunner = function () {
+    var el = document.getElementById('runnerPick');
+    if (!el) return;
+    var self = this;
+    el.classList.add('on');
+    el.setAttribute('aria-hidden', 'false');
+    this.pickerOpen = true;
+    if (!el._bound) {
+      el._bound = true;
+      el.addEventListener('click', function (ev) {
+        var b = ev.target && ev.target.closest ? ev.target.closest('.pick-item') : null;
+        if (b) {
+          var mode = b.getAttribute('data-mode');
+          el.classList.remove('on');
+          el.setAttribute('aria-hidden', 'true');
+          self.pickerOpen = false;
+          if (global.SceneManager) global.SceneManager.change('runner', { mode: mode });
+          return;
+        }
+        if (ev.target === el) self.closeRunnerPick();
+      });
+      var x = document.getElementById('runnerPickClose');
+      if (x) x.addEventListener('click', function () { self.closeRunnerPick(); });
+    }
+    if (global.Input && global.Input.reset) global.Input.reset();
+    sfx('ui');
+  };
+
+  WorldScene.prototype.closeRunnerPick = function () {
+    var el = document.getElementById('runnerPick');
+    if (el) { el.classList.remove('on'); el.setAttribute('aria-hidden', 'true'); }
+    this.pickerOpen = false;
+    if (global.Input && global.Input.reset) global.Input.reset();
+  };
+
   WorldScene.prototype.openSettings = function () {
     if (!global.Settings) return;
     global.Settings.open(this.scene.id, this.scene.title);
@@ -1518,11 +1554,12 @@
 
     if (e.code === 'KeyP') {
       e.preventDefault();
-      if (global.Parkour) global.Parkour.toggle(this);
+      this.openRunner();
       return;
     }
 
     if (e.code === 'Escape') {
+      if (this.pickerOpen) { e.preventDefault(); this.closeRunnerPick(); sfx('ui'); return; }
       if (this.help) { e.preventDefault(); this.help = false; sfx('ui'); return; }
       if (npc && npc.state === 'talking') { e.preventDefault(); npc.closeDialog(); sfx('ui'); }
       return;
@@ -1733,7 +1770,8 @@
     /* 浮层打开：角色冻结，提示条清空，只留动画时间在走 */
     var frozen = (global.GatePanel && global.GatePanel.isOpen()) ||
                  (global.Settings && global.Settings.isOpen()) ||
-                 (global.Riddle && global.Riddle.Panel && global.Riddle.Panel.isOpen());
+                 (global.Riddle && global.Riddle.Panel && global.Riddle.Panel.isOpen()) ||
+                 this.pickerOpen === true;
     if (frozen) {
       if (!this._frozen) {
         this._frozen = true;

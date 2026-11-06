@@ -1032,3 +1032,24 @@ body[data-scene]:not([data-scene="world"]) .gear {
 
 /* ---------------- 足迹统计 ---------------- */
 .set-stats{margin:2px 0 8px;font-size:14px;color:#ffe0b0;line-height:1.6}
+
+
+/* ---------------- 跑酷选择面板 ---------------- */
+.pick{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
+  background:rgba(8,7,16,0.62);z-index:75;opacity:0;visibility:hidden;transition:opacity .18s ease}
+.pick.on{opacity:1;visibility:visible}
+.pick-card{width:min(640px,94%);background:rgba(255,250,244,0.98);border:1px solid rgba(230,190,150,0.7);
+  border-radius:20px;padding:24px 24px 18px;box-shadow:0 20px 70px rgba(0,0,0,0.5);color:#5a4568;text-align:center}
+.pick-card h2{margin:0;font-size:22px;color:#5a4568}
+.pick-sub{margin:6px 0 18px;font-size:13px;color:#9a8aa8}
+.pick-row{display:flex;gap:14px}
+.pick-item{flex:1;display:flex;flex-direction:column;align-items:center;gap:6px;cursor:pointer;
+  background:rgba(255,255,255,0.9);border:2px solid rgba(230,190,150,0.6);border-radius:16px;
+  padding:18px 12px;font:inherit;color:#5a4568;transition:transform .12s ease,border-color .12s ease}
+.pick-item:hover{transform:translateY(-3px);border-color:#f0a76e}
+.pick-emoji{font-size:34px;line-height:1}
+.pick-item b{font-size:16px;letter-spacing:.08em}
+.pick-item i{font-style:normal;font-size:12px;color:#9a8aa8;line-height:1.4}
+.pick-x{margin-top:14px;background:none;border:none;color:#9a8aa8;font:inherit;font-size:13px;cursor:pointer;padding:6px 14px}
+.pick-x:hover{color:#5a4568}
+@media (max-width:520px){.pick-row{flex-direction:column}}

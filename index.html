@@ -203,6 +203,27 @@
       </div>
     </div>
 
+    <!-- 跑酷选择：广场按 P 弹出 -->
+    <div class="pick" id="runnerPick" role="dialog" aria-modal="true" aria-labelledby="pickTitle" aria-hidden="true">
+      <div class="pick-card">
+        <h2 id="pickTitle">选一种跑酷</h2>
+        <p class="pick-sub">画风可爱版 · 掉下去就重来</p>
+        <div class="pick-row">
+          <button class="pick-item" data-mode="side" type="button">
+            <span class="pick-emoji">🏃</span>
+            <b>横版跑酷</b>
+            <i>自动向右跑 · 跳 / 二段跳 / 下滑</i>
+          </button>
+          <button class="pick-item" data-mode="temple" type="button">
+            <span class="pick-emoji">🏛</span>
+            <b>神庙逃亡</b>
+            <i>三车道 · 换道 / 跳 / 滑铲</i>
+          </button>
+        </div>
+        <button class="pick-x" id="runnerPickClose" type="button">取消</button>
+      </div>
+    </div>
+
     <p class="caption">世界大厅 · 画布 1280 × 720 · 原生 HTML / CSS / JavaScript</p>
   </div>
 
@@ -211,6 +232,7 @@
   <script src="js/player.js" defer></script>
   <script src="js/gamepad.js" defer></script>
   <script src="js/parkour.js" defer></script>
+  <script src="js/runner.js" defer></script>
   <script src="js/npc.js" defer></script>
   <script src="js/save.js" defer></script>
   <script src="js/config.js" defer></script>

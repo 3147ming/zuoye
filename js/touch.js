@@ -191,6 +191,15 @@
     swipeDir = 0;
     crossHint.style.display = 'none';
 
+    if (sc === 'runner') {
+      /* 两种跑酷：换道 / 跳 / 滑 */
+      buildKeys([
+        K('◀', 'ArrowLeft', 'ArrowLeft', 37, 'L'), K('▶', 'ArrowRight', 'ArrowRight', 39, 'L'),
+        K('跳', 'Space', ' ', 32, 'R'), K('滑', 'ArrowDown', 'ArrowDown', 40, 'R')
+      ], function () { return global; });
+      pad.style.display = '';
+      return;
+    }
     if (sc.indexOf('iframe-') !== 0) {
       buildKeys(HALL, function () { return global; });
       pad.style.display = '';

@@ -24,6 +24,7 @@ const CORE = [
   '/js/riddle.js',
   '/js/gamepad.js',
   '/js/parkour.js',
+  '/js/runner.js',
   '/js/contrib.js',
   '/contrib/manifest.js',
   '/js/bgm.js',
