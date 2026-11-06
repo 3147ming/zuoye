@@ -1,0 +1,247 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>留言板</title>
+<style>
+  :root { --sans: "PingFang SC", "Microsoft YaHei", system-ui, sans-serif; }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; margin: 0; }
+  body {
+    background: #0b0914; color: #f3e9da; font-family: var(--sans);
+    display: flex; justify-content: center; overflow: hidden;
+  }
+  .wrap {
+    width: min(720px, 100%); height: 100%;
+    display: flex; flex-direction: column; gap: 14px;
+    padding: 20px 18px 12px;
+  }
+  .head { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; }
+  h1 { margin: 0; font-size: 22px; font-weight: 600; letter-spacing: .14em; }
+  .mode {
+    font-size: 12px; letter-spacing: .1em; white-space: nowrap;
+    padding: 3px 12px; border-radius: 999px; border: 1px solid transparent;
+  }
+  .mode.on { color: #7fd8c8; border-color: rgba(127,216,200,.45); background: rgba(127,216,200,.08); }
+  .mode.off { color: #f6c177; border-color: rgba(246,193,119,.45); background: rgba(246,193,119,.08); }
+
+  form { display: flex; flex-direction: column; gap: 8px; }
+  .row1 { display: flex; gap: 8px; }
+  input, textarea {
+    font: inherit; color: #f3e9da; background: rgba(255,255,255,.04);
+    border: 1px solid rgba(255,220,180,.2); border-radius: 10px;
+  }
+  #alias { width: 10em; padding: 8px 12px; font-size: 14px; }
+  #alias:focus, #text:focus { outline: none; border-color: rgba(246,193,119,.7); }
+  #text { width: 100%; padding: 10px 12px; font-size: 14px; resize: none; min-height: 64px; line-height: 1.5; }
+  .row2 { display: flex; align-items: center; gap: 12px; }
+  #send {
+    font: inherit; font-size: 14px; letter-spacing: .1em;
+    color: #ffe3bd; background: rgba(246,193,119,.14);
+    border: 1px solid rgba(246,193,119,.5); border-radius: 999px;
+    padding: 7px 24px; cursor: pointer;
+  }
+  #send:hover:not(:disabled) { background: rgba(246,193,119,.26); }
+  #send:disabled { opacity: .45; cursor: wait; }
+  #hint { font-size: 12px; color: rgba(243,233,218,.55); letter-spacing: .04em; }
+  #hint.err { color: #ff9f9f; }
+
+  .listhead { display: flex; align-items: center; justify-content: space-between; font-size: 13px; color: rgba(243,233,218,.6); letter-spacing: .08em; }
+  .listhead button {
+    font: inherit; font-size: 12px; color: rgba(243,233,218,.75);
+    background: none; border: 1px solid rgba(244,232,214,.2); border-radius: 999px;
+    padding: 3px 14px; cursor: pointer;
+  }
+  .listhead button:hover { border-color: rgba(246,193,119,.5); color: #ffe3bd; }
+
+  #list { flex: 1; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; gap: 10px; padding-right: 4px; }
+  .item {
+    background: #17132a; border: 1px solid rgba(244,232,214,.14); border-radius: 14px;
+    padding: 12px 16px; display: flex; flex-direction: column; gap: 6px;
+    box-shadow: 0 10px 24px -18px rgba(0,0,0,.9);
+  }
+  .meta { display: flex; align-items: baseline; gap: 10px; font-size: 12px; }
+  .who { color: #f6c177; letter-spacing: .06em; }
+  .when { color: #9a8f80; font-variant-numeric: tabular-nums; }
+  .txt { font-size: 14px; line-height: 1.55; word-break: break-word; white-space: pre-wrap; color: rgba(243,233,218,.92); }
+  .empty { text-align: center; color: rgba(243,233,218,.4); font-size: 13px; letter-spacing: .1em; padding: 40px 0; }
+
+  .foot { text-align: center; font-size: 11px; color: rgba(243,233,218,.4); letter-spacing: .08em; padding-bottom: 2px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="head">
+    <h1>留言板</h1>
+    <span class="mode off" id="mode">…</span>
+  </div>
+
+  <form id="form" autocomplete="off">
+    <div class="row1">
+      <input id="alias" maxlength="10" placeholder="署名（≤10 字，可空）">
+    </div>
+    <textarea id="text" maxlength="120" placeholder="想对路过的人说什么？（≤120 字）"></textarea>
+    <div class="row2">
+      <button id="send" type="submit">留 言</button>
+      <span id="hint"></span>
+    </div>
+  </form>
+
+  <div class="listhead">
+    <span id="count">共 0 条留言</span>
+    <button id="refresh" type="button">刷新 ↻</button>
+  </div>
+
+  <div id="list"><div class="empty">还没有留言 — 留下第一条吧</div></div>
+
+  <div class="foot">留言会公开给所有访客 · 请勿填写隐私内容</div>
+</div>
+
+<script>
+(function () {
+  'use strict';
+  var API = '/api/board';
+  var LS_KEY = 'worldhub.board.local.v1';
+  var mode = 'local';
+
+  var listEl = document.getElementById('list');
+  var countEl = document.getElementById('count');
+  var modeEl = document.getElementById('mode');
+  var hintEl = document.getElementById('hint');
+  var sendBtn = document.getElementById('send');
+  var aliasEl = document.getElementById('alias');
+  var textEl = document.getElementById('text');
+
+  var items = [];
+
+  function setMode(m) {
+    mode = m;
+    modeEl.textContent = m === 'shared' ? '云端共享' : '本地模式';
+    modeEl.className = 'mode ' + (m === 'shared' ? 'on' : 'off');
+  }
+
+  function loadLocal() {
+    try {
+      var v = JSON.parse(localStorage.getItem(LS_KEY) || '[]');
+      return Array.isArray(v) ? v : [];
+    } catch (e) { return []; }
+  }
+  function saveLocal(arr) {
+    try { localStorage.setItem(LS_KEY, JSON.stringify(arr)); } catch (e) {}
+  }
+
+  function fetchJSON(url, opt) {
+    var ctrl = typeof AbortController !== 'undefined' ? new AbortController() : null;
+    var to = ctrl ? setTimeout(function () { ctrl.abort(); }, 6000) : 0;
+    opt = opt || {};
+    if (ctrl) opt.signal = ctrl.signal;
+    return fetch(url, opt).then(function (r) {
+      if (to) clearTimeout(to);
+      if (!r.ok) throw new Error('HTTP ' + r.status);
+      return r.json();
+    });
+  }
+
+  function relTime(ts) {
+    var d = Date.now() - ts;
+    if (d < 60000) return '刚刚';
+    if (d < 3600000) return Math.floor(d / 60000) + ' 分钟前';
+    if (d < 86400000) return Math.floor(d / 3600000) + ' 小时前';
+    if (d < 7 * 86400000) return Math.floor(d / 86400000) + ' 天前';
+    var dt = new Date(ts);
+    return (dt.getMonth() + 1) + '月' + dt.getDate() + '日';
+  }
+
+  function render() {
+    listEl.innerHTML = '';
+    if (!items.length) {
+      var e = document.createElement('div');
+      e.className = 'empty';
+      e.textContent = '还没有留言 — 留下第一条吧';
+      listEl.appendChild(e);
+    }
+    var sorted = items.slice().sort(function (a, b) { return (b.ts || 0) - (a.ts || 0); });
+    for (var i = 0; i < sorted.length; i++) {
+      var it = sorted[i];
+      var card = document.createElement('div'); card.className = 'item';
+      var meta = document.createElement('div'); meta.className = 'meta';
+      var who = document.createElement('span'); who.className = 'who';
+      who.textContent = it.alias || '匿名旅客';
+      var when = document.createElement('span'); when.className = 'when';
+      when.textContent = relTime(it.ts || Date.now());
+      meta.appendChild(who); meta.appendChild(when);
+      var txt = document.createElement('div'); txt.className = 'txt';
+      txt.textContent = String(it.text || '');   /* 一律 textContent，防 XSS */
+      card.appendChild(meta); card.appendChild(txt);
+      listEl.appendChild(card);
+    }
+    countEl.textContent = '共 ' + items.length + ' 条留言';
+  }
+
+  function hint(msg, bad) {
+    hintEl.textContent = msg || '';
+    hintEl.className = bad ? 'err' : '';
+  }
+
+  function refresh(silent) {
+    return fetchJSON(API, { headers: { 'Accept': 'application/json' } })
+      .then(function (data) {
+        items = Array.isArray(data && data.items) ? data.items : [];
+        setMode('shared');
+        render();
+      })
+      .catch(function () {
+        items = loadLocal();
+        setMode('local');
+        render();
+        if (!silent) hint('云端没连上，显示的是本机留言');
+      });
+  }
+
+  document.getElementById('form').addEventListener('submit', function (e) {
+    e.preventDefault();
+    var alias = (aliasEl.value || '').trim().slice(0, 10);
+    var text = (textEl.value || '').trim().slice(0, 120);
+    if (!text) { hint('先写点内容吧', true); return; }
+
+    sendBtn.disabled = true;
+    hint('发送中…');
+
+    var localItem = {
+      id: 'b' + Date.now().toString(36) + Math.random().toString(36).slice(2, 7),
+      alias: alias || '匿名旅客', text: text, ts: Date.now()
+    };
+
+    fetchJSON(API, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ alias: localItem.alias, text: text })
+    }).then(function (data) {
+      if (data && Array.isArray(data.items)) items = data.items;
+      setMode('shared');
+      textEl.value = '';
+      hint('已写上石板 ✓');
+      render();
+    }).catch(function () {
+      /* 降级：存本机 */
+      var arr = loadLocal();
+      arr.push(localItem);
+      if (arr.length > 200) arr = arr.slice(arr.length - 200);
+      saveLocal(arr);
+      items = arr;
+      setMode('local');
+      textEl.value = '';
+      hint('没存上云端，先记在本机');
+      render();
+    }).then(function () { sendBtn.disabled = false; });
+  });
+
+  document.getElementById('refresh').addEventListener('click', function () { refresh(false); });
+
+  setMode('local');
+  refresh(true);
+})();
+</script>
+</body>
+</html>

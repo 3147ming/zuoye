@@ -135,6 +135,30 @@
             </section>
 
             <section class="set-sec">
+              <h3>氛围</h3>
+              <div class="set-row">
+                <select class="set-sel" id="dnMode" aria-label="昼夜模式">
+                  <option value="auto">跟随时间</option>
+                  <option value="day">固定白昼</option>
+                  <option value="night">固定夜</option>
+                </select>
+                <select class="set-sel" id="skinSel" aria-label="大厅皮肤">
+                  <option value="paper">剪纸（默认）</option>
+                  <option value="ink">水墨</option>
+                  <option value="dusk">琥珀暮色</option>
+                </select>
+              </div>
+              <p class="set-note" id="dnNow">昼夜：跟随时间</p>
+              <p class="set-tip">昼夜按你的本地时间自动走（黎明/白昼/黄昏/夜），夜里路灯亮、星星多；也可以固定成白天或夜晚。皮肤只改色相与饱和度，不动布局。</p>
+            </section>
+
+            <section class="set-sec">
+              <h3>足迹</h3>
+              <p class="set-stats" id="statLine">这趟还没留下足迹。</p>
+              <p class="set-tip">只记在这台电脑上，不上云。</p>
+            </section>
+
+            <section class="set-sec">
               <h3>自建内容</h3>
               <p class="set-note" id="contribEmpty">还没有东西注册进来。把做好的页面放进 <code>contrib/</code>，在 <code>contrib/manifest.js</code> 里调一次 <code>WorldHub.register()</code>，它就会出现在上面的总门选单里。</p>
               <ul class="set-contribs" id="contribList"></ul>
@@ -150,15 +174,37 @@
       </div>
     </div>
 
+    <!-- 每日一题面板：广场告示牌按 E 弹出 -->
+    <div class="riddle" id="riddle" role="dialog" aria-modal="true" aria-labelledby="riddleTitle" aria-hidden="true">
+      <div class="riddle-card">
+        <header class="riddle-head">
+          <h2 id="riddleTitle">每日一题</h2>
+          <button class="riddle-x" id="riddleClose" type="button" aria-label="关闭">×</button>
+        </header>
+        <p class="riddle-date" id="riddleDate"></p>
+        <p class="riddle-q" id="riddleQ"></p>
+        <div class="riddle-row">
+          <input class="riddle-in" id="riddleInput" type="text" maxlength="60" autocomplete="off" aria-label="答案">
+          <button class="riddle-btn" id="riddleSend" type="button">作答</button>
+        </div>
+        <p class="riddle-state" id="riddleState" aria-live="polite"></p>
+        <p class="riddle-try" id="riddleTry"></p>
+      </div>
+    </div>
+
     <p class="caption">世界大厅 · 画布 1280 × 720 · 原生 HTML / CSS / JavaScript</p>
   </div>
 
   <script src="js/audio.js" defer></script>
   <script src="js/sceneManager.js" defer></script>
   <script src="js/player.js" defer></script>
+  <script src="js/gamepad.js" defer></script>
   <script src="js/npc.js" defer></script>
   <script src="js/save.js" defer></script>
   <script src="js/config.js" defer></script>
+  <script src="js/daynight.js" defer></script>
+  <script src="js/stats.js" defer></script>
+  <script src="js/riddle.js" defer></script>
   <script src="js/contrib.js" defer></script>
   <script src="contrib/manifest.js" defer></script>
   <script src="js/bgm.js" defer></script>

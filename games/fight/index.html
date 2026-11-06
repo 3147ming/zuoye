@@ -11,8 +11,8 @@
          上游 demo 页只有联机入口，multiplayer 是 mk.js 自带的本地双人控制器。
       3) 去掉「是否做房主 / 房间名」两个 prompt 与摄像头列、长说明，
          改成 1280×720 里放得下的单屏版式（纯排版，不含逻辑）。
-      按键沿用 upstream：P1 G/J/Y/H 移动跳跃 · S 低拳 · D 低踢 · F 高拳 · Shift 防御
-                          P2 ←/→/↑/↓ 移动跳跃 · [ 低拳 · ] 低踢 · \ 高拳 · Ctrl 防御
+      按键（实际键位以 mk.js 的 keys.p1 / keys.p2 为准）：1P W/A/S/D 移动跳跃 · J 高拳 · K 低拳 · L 踢 · Shift 防御
+                          2P ←/→/↑/↓ 移动跳跃 · [ 低拳 · ] 低踢 · \ 高拳 · Ctrl 防御
     -->
     <script src="src/movement.js"></script>
     <script src="src/mk.js"></script>
@@ -44,22 +44,22 @@
 <body>
     <table>
         <thead>
-            <th>Arena</th>
+            <th>擂台</th>
         </thead>
         <tbody>
             <tr>
                 <td>
                     <div id="parent">
                         <div id="utils">
-                            <div id="player1Name" class="playerName">Sub-Zero</div>
+                            <div id="player1Name" class="playerName">绝对零度</div>
                             <div id="player1LifeBar" class="lifebar"><div class="life" id="player1Life"></div></div>
-                            <div id="player2Name" class="playerName">Kano</div>
+                            <div id="player2Name" class="playerName">卡诺</div>
                             <div id="player2LifeBar" class="lifebar"><div class="life" id="player2Life"></div></div>
                         </div>
                         <div id="arena">
                         </div>
                         <div id="loading">
-                            <span class="loadingLabel">Loading...</span>
+                            <span class="loadingLabel">加载中…</span>
                         </div>
                     </div>
                 </td>
@@ -68,8 +68,8 @@
     </table>
 
     <div class="keys">
-        <span>P1 <b>G J Y H</b> 移动跳跃 · <b>S</b> 低拳 · <b>D</b> 低踢 · <b>F</b> 高拳 · <b>Shift</b> 防御</span>
-        <span>P2 <b>← → ↑ ↓</b> 移动跳跃 · <b>[</b> 低拳 · <b>]</b> 低踢 · <b>\</b> 高拳 · <b>Ctrl</b> 防御</span>
+        <span>1P <b>W A S D</b> 移动跳跃 · <b>J</b> 高拳 · <b>K</b> 低拳 · <b>L</b> 踢 · <b>Shift</b> 防御</span>
+        <span>2P <b>← → ↑ ↓</b> 移动跳跃 · <b>[</b> 低拳 · <b>]</b> 低踢 · <b>\</b> 高拳 · <b>Ctrl</b> 防御</span>
         <span><b>空格</b> 重开</span>
     </div>
 

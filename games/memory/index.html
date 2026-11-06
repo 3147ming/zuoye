@@ -1,0 +1,258 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>记忆翻牌</title>
+<style>
+  :root { --sans: "PingFang SC", "Microsoft YaHei", system-ui, sans-serif; }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; margin: 0; }
+  body {
+    background: #0b0914; color: #f3e9da; font-family: var(--sans);
+    display: flex; flex-direction: column; align-items: center;
+    gap: 1.4vmin; padding: 2vmin; overflow: hidden;
+    user-select: none; -webkit-user-select: none;
+    -webkit-tap-highlight-color: transparent;
+  }
+  h1 { margin: 0; font-size: clamp(20px, 3.4vmin, 34px); font-weight: 600; letter-spacing: .12em; }
+  .bar { display: flex; gap: clamp(12px, 2.4vmin, 28px); align-items: center;
+         font-size: clamp(12px, 1.7vmin, 16px); color: rgba(243,233,218,.7); letter-spacing: .06em; }
+  .bar b { color: #f6c177; font-weight: 600; font-variant-numeric: tabular-nums; }
+  .tabs { display: flex; gap: 8px; }
+  .tabs button, .bar button {
+    font: inherit; font-size: clamp(11px, 1.5vmin, 14px); letter-spacing: .08em;
+    color: rgba(243,233,218,.75); background: rgba(255,255,255,.03);
+    border: 1px solid rgba(255,220,180,.18); border-radius: 999px; padding: .35em 1.1em; cursor: pointer;
+  }
+  .tabs button.active { color: #ffe3bd; background: rgba(246,193,119,.16); border-color: rgba(246,193,119,.7); font-weight: 600; }
+  #board {
+    flex: 1 1 auto; min-height: 0; width: 100%;
+    display: grid; gap: 1.4vmin; place-content: center;
+  }
+  .card {
+    aspect-ratio: 1; width: min(15vmin, 22vw);
+    perspective: 600px; cursor: pointer; background: none; border: none; padding: 0;
+  }
+  .inner { position: relative; width: 100%; height: 100%;
+           transition: transform 300ms ease; transform-style: preserve-3d; }
+  .card.open .inner, .card.match .inner { transform: rotateY(180deg); }
+  .face { position: absolute; inset: 0; border-radius: 14%; backface-visibility: hidden;
+          display: flex; align-items: center; justify-content: center;
+          box-shadow: inset 0 1px 0 rgba(255,255,255,.06), 0 10px 24px -14px rgba(0,0,0,.9); }
+  .back { background: #1a1634; border: 1px solid rgba(244,232,214,.14); }
+  .back::after { content: "🏮"; font-size: 40%; opacity: .35; }
+  .front { background: #241d3f; border: 1px solid rgba(127,216,200,.35); transform: rotateY(180deg); font-size: 58%; }
+  .card.match .front { background: #1c1a2e; opacity: .55; border-color: rgba(244,232,214,.12); }
+  .card.flash .front { background: #2e5b50; border-color: #7fd8c8; }
+  .card.wrong .front { background: #4a2530; border-color: #ff9f9f; }
+  #over {
+    position: fixed; inset: 0; display: none; align-items: center; justify-content: center;
+    background: rgba(5,4,12,.72); backdrop-filter: blur(3px);
+  }
+  #over.on { display: flex; }
+  .win {
+    background: #17132a; border: 1px solid rgba(246,193,119,.4); border-radius: 20px;
+    padding: 4vmin 6vmin; display: flex; flex-direction: column; align-items: center; gap: 1.6vmin;
+    box-shadow: 0 30px 80px -30px rgba(0,0,0,.95);
+  }
+  .win h2 { margin: 0; font-size: clamp(18px, 3vmin, 28px); letter-spacing: .14em; color: #fdf3e4; }
+  .win .line { font-size: clamp(13px, 2vmin, 17px); color: rgba(243,233,218,.8); }
+  .win .line b { color: #f6c177; }
+  #newrec { color: #7fd8c8; font-size: clamp(13px, 2vmin, 17px); letter-spacing: .08em; min-height: 1.3em; }
+  .win button {
+    font: inherit; font-size: clamp(13px, 1.9vmin, 17px); letter-spacing: .1em;
+    color: #ffe3bd; background: rgba(246,193,119,.14);
+    border: 1px solid rgba(246,193,119,.5); border-radius: 999px; padding: .6em 2em; cursor: pointer;
+  }
+  .row { display: flex; gap: 12px; }
+</style>
+</head>
+<body>
+  <h1>记忆翻牌</h1>
+  <div class="tabs" id="tabs">
+    <button type="button" data-size="4x4" class="active">4 × 4</button>
+    <button type="button" data-size="4x5">4 × 5</button>
+    <button type="button" data-size="6x4">6 × 4</button>
+  </div>
+  <div class="bar">
+    <span>步数 <b id="steps">0</b></span>
+    <span>用时 <b id="time">0:00</b></span>
+    <span>本难度最佳 <b id="best">—</b></span>
+    <button type="button" id="reset">重开 ↺</button>
+  </div>
+  <div id="board" aria-label="翻牌棋盘"></div>
+
+  <div id="over">
+    <div class="win">
+      <h2>全部配对完成!</h2>
+      <div class="line">用时 <b id="wtime">—</b> · 步数 <b id="wsteps">—</b></div>
+      <div id="newrec"></div>
+      <div class="row">
+        <button type="button" id="again">再来一局</button>
+        <button type="button" id="switch">换难度</button>
+      </div>
+    </div>
+  </div>
+
+<script>
+(function () {
+  'use strict';
+  var EMOJIS = ['🐶','🐱','🦊','🐼','🐸','🐵','🦁','🐰','🐷','🐨','🐯','🐮','🦄','🐙','🦋','🐢','🐬','🦉','🍒','🍋','🍉','🌻','🌙','⭐','🍄','🌈','⚡','🔔','🎈','🍭'];
+  var SIZES = { '4x4': {c:4,r:4}, '4x5': {c:4,r:5}, '6x4': {c:6,r:4} };
+  var board = document.getElementById('board');
+  var stepsEl = document.getElementById('steps');
+  var timeEl = document.getElementById('time');
+  var bestEl = document.getElementById('best');
+  var overEl = document.getElementById('over');
+
+  var sizeKey = '4x4';
+  var deck = [], first = null, lock = false;
+  var steps = 0, matched = 0, totalPairs = 0;
+  var t0 = 0, tick = 0, running = false;
+
+  function bestKey() { return 'worldhub.memory.best.' + sizeKey; }
+  function loadBest() {
+    try {
+      var raw = localStorage.getItem(bestKey());
+      if (!raw) return null;
+      var o = JSON.parse(raw);
+      if (o && typeof o.steps === 'number' && typeof o.time === 'number') return o;
+      return null;
+    } catch (e) { return null; }
+  }
+  function saveBest(o) { try { localStorage.setItem(bestKey(), JSON.stringify(o)); } catch (e) {} }
+
+  function fmtTime(s) {
+    var m = Math.floor(s / 60);
+    var r = Math.floor(s % 60);
+    return m + ':' + (r < 10 ? '0' : '') + r;
+  }
+
+  function refreshBestLabel() {
+    var b = loadBest();
+    bestEl.textContent = b ? fmtTime(b.time) + ' · ' + b.steps + '步' : '—';
+  }
+
+  function shuffle(a) {
+    for (var i = a.length - 1; i > 0; i--) {
+      var j = Math.floor(Math.random() * (i + 1));
+      var t = a[i]; a[i] = a[j]; a[j] = t;
+    }
+    return a;
+  }
+
+  function startClock() {
+    if (running) return;
+    running = true;
+    t0 = Date.now();
+    tick = setInterval(function () {
+      timeEl.textContent = fmtTime((Date.now() - t0) / 1000);
+    }, 250);
+  }
+  function stopClock() { running = false; clearInterval(tick); }
+  function elapsed() { return running ? (Date.now() - t0) / 1000 : 0; }
+
+  function newGame() {
+    var s = SIZES[sizeKey];
+    totalPairs = s.c * s.r / 2;
+    var pool = shuffle(EMOJIS.slice()).slice(0, totalPairs);
+    deck = shuffle(pool.concat(pool));
+    first = null; lock = false; steps = 0; matched = 0;
+    stepsEl.textContent = '0';
+    timeEl.textContent = '0:00';
+    stopClock();
+    overEl.classList.remove('on');
+
+    board.style.gridTemplateColumns = 'repeat(' + s.c + ', min(15vmin, 22vw))';
+    board.innerHTML = '';
+    for (var i = 0; i < deck.length; i++) {
+      var b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'card';
+      b.setAttribute('data-i', String(i));
+      b.setAttribute('aria-label', '背面牌');
+      b.innerHTML =
+        '<span class="inner">' +
+        '<span class="face back"></span>' +
+        '<span class="face front">' + deck[i] + '</span>' +
+        '</span>';
+      board.appendChild(b);
+    }
+    refreshBestLabel();
+  }
+
+  function onCard(ev) {
+    var el = ev.target.closest ? ev.target.closest('.card') : null;
+    if (!el || lock) return;
+    var i = parseInt(el.getAttribute('data-i'), 10);
+    if (isNaN(i) || el.classList.contains('open') || el.classList.contains('match')) return;
+
+    startClock();
+    el.classList.add('open');
+    el.setAttribute('aria-label', deck[i]);
+
+    if (!first) { first = el; return; }
+
+    steps++;
+    stepsEl.textContent = String(steps);
+
+    if (deck[i] === deck[first.getAttribute('data-i')]) {
+      el.classList.add('match'); first.classList.add('match');
+      el.classList.add('flash'); first.classList.add('flash');
+      matched++;
+      first = null;
+      if (matched === totalPairs) setTimeout(win, 600);
+    } else {
+      lock = true;
+      var a = first, bb = el;
+      a.classList.add('wrong'); bb.classList.add('wrong');
+      first = null;
+      setTimeout(function () {
+        a.classList.remove('open', 'wrong');
+        bb.classList.remove('open', 'wrong');
+        lock = false;
+      }, 700);
+    }
+  }
+
+  function win() {
+    stopClock();
+    var time = elapsed();
+    var prev = loadBest();
+    var isRec = !prev || time < prev.time || (time === prev.time && steps < prev.steps);
+    if (isRec) saveBest({ time: Math.round(time), steps: steps });
+    document.getElementById('wtime').textContent = fmtTime(time);
+    document.getElementById('wsteps').textContent = String(steps);
+    document.getElementById('newrec').textContent = isRec ? '🎉 新纪录!' : '最佳 ' + (prev ? fmtTime(prev.time) + ' · ' + prev.steps + '步' : '—');
+    overEl.classList.add('on');
+    refreshBestLabel();
+  }
+
+  board.addEventListener('pointerdown', onCard);
+
+  document.getElementById('tabs').addEventListener('click', function (e) {
+    var b = e.target.closest && e.target.closest('button[data-size]');
+    if (!b) return;
+    var bs = document.querySelectorAll('#tabs button');
+    for (var i = 0; i < bs.length; i++) bs[i].classList.remove('active');
+    b.classList.add('active');
+    sizeKey = b.getAttribute('data-size');
+    newGame();
+  });
+  document.getElementById('reset').addEventListener('click', newGame);
+  document.getElementById('again').addEventListener('click', newGame);
+  document.getElementById('switch').addEventListener('click', function () {
+    overEl.classList.remove('on');
+    var keys = ['4x4', '4x5', '6x4'];
+    sizeKey = keys[(keys.indexOf(sizeKey) + 1) % keys.length];
+    var bs = document.querySelectorAll('#tabs button');
+    for (var i = 0; i < bs.length; i++) bs[i].classList.toggle('active', bs[i].getAttribute('data-size') === sizeKey);
+    newGame();
+  });
+
+  newGame();
+})();
+</script>
+</body>
+</html>

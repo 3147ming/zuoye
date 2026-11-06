@@ -1,0 +1,216 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>反应速度</title>
+<style>
+  :root { --sans: "PingFang SC", "Microsoft YaHei", system-ui, sans-serif; }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; margin: 0; }
+  body {
+    background: #0b0914; color: #f3e9da; font-family: var(--sans);
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    gap: 2.2vmin; overflow: hidden; user-select: none; -webkit-user-select: none;
+    -webkit-tap-highlight-color: transparent; touch-action: manipulation;
+  }
+  h1 { margin: 0; font-size: clamp(22px, 4vmin, 40px); font-weight: 600; letter-spacing: .12em; }
+  .sub { color: rgba(243,233,218,.55); font-size: clamp(12px, 1.8vmin, 16px); letter-spacing: .08em; }
+  #zone {
+    width: min(72vmin, 88%); aspect-ratio: 1; border-radius: 50%;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    gap: 1.5vmin; cursor: pointer; transition: background 120ms linear;
+    background: #d84b4b; box-shadow: 0 0 0 2px rgba(255,255,255,.08), 0 24px 60px -24px rgba(0,0,0,.9);
+  }
+  #zone.go { background: #4fd08a; }
+  #zone.waitclick { background: #b0484f; }
+  #big { font-size: clamp(28px, 6vmin, 64px); font-weight: 700; letter-spacing: .1em; }
+  #small { font-size: clamp(14px, 2.4vmin, 22px); opacity: .85; }
+  .stats { display: flex; gap: clamp(14px, 3vmin, 34px); font-size: clamp(12px, 1.8vmin, 16px); color: rgba(243,233,218,.72); letter-spacing: .06em; }
+  .stats b { color: #f6c177; font-weight: 600; }
+  #rounds { display: flex; gap: 8px; min-height: 14px; }
+  .dot { width: 10px; height: 10px; border-radius: 50%; background: rgba(243,233,218,.18); }
+  .dot.done { background: #7fd8c8; }
+  #result {
+    display: none; flex-direction: column; align-items: center; gap: 1.4vmin;
+    background: #17132a; border: 1px solid rgba(244,232,214,.14); border-radius: 18px;
+    padding: clamp(18px, 3vmin, 34px) clamp(26px, 5vmin, 56px);
+  }
+  #result.on { display: flex; }
+  #grade { font-size: clamp(18px, 3vmin, 30px); color: #7fd8c8; font-weight: 700; letter-spacing: .1em; }
+  #newrec { color: #f6c177; font-size: clamp(14px, 2.2vmin, 20px); letter-spacing: .1em; min-height: 1.4em; }
+  button {
+    font: inherit; font-size: clamp(14px, 2vmin, 18px); letter-spacing: .1em;
+    color: #ffe3bd; background: rgba(246,193,119,.14);
+    border: 1px solid rgba(246,193,119,.5); border-radius: 999px;
+    padding: .7em 2em; cursor: pointer;
+  }
+  button:hover { background: rgba(246,193,119,.26); }
+</style>
+</head>
+<body>
+  <h1>反应速度</h1>
+  <div class="sub">变绿就点 · 共 5 轮 · 抢跑作废</div>
+
+  <div id="zone" role="button" tabindex="0" aria-label="点击区域">
+    <span id="big">准备</span>
+    <span id="small">按下方「开始」</span>
+  </div>
+
+  <div id="rounds"></div>
+  <div class="stats">
+    <span>本轮 <b id="last">—</b></span>
+    <span>个人最佳 <b id="best">—</b></span>
+  </div>
+
+  <div id="result" class="on">
+    <div id="grade">规则：红圆保持等待，变绿的瞬间尽快点它</div>
+    <div class="stats">
+      <span>平均 <b id="avg">—</b></span>
+      <span>最快 <b id="fast">—</b></span>
+    </div>
+    <div id="newrec"></div>
+    <button id="go" type="button">开始测反应</button>
+  </div>
+
+<script>
+(function () {
+  'use strict';
+  var TOTAL = 5;
+  var BEST_KEY = 'worldhub.reaction.best';
+
+  var zone = document.getElementById('zone');
+  var big = document.getElementById('big');
+  var small = document.getElementById('small');
+  var lastEl = document.getElementById('last');
+  var bestEl = document.getElementById('best');
+  var roundsEl = document.getElementById('rounds');
+  var resultEl = document.getElementById('result');
+  var avgEl = document.getElementById('avg');
+  var fastEl = document.getElementById('fast');
+  var gradeEl = document.getElementById('grade');
+  var newrecEl = document.getElementById('newrec');
+  var goBtn = document.getElementById('go');
+
+  var state = 'idle';   // idle | waiting | go | foul | busy | done
+  var times = [];
+  var t0 = 0;
+  var timer = 0;
+
+  function fmt(ms) { return (ms == null || !isFinite(ms)) ? '—' : Math.round(ms) + ' ms'; }
+
+  function loadBest() {
+    try {
+      var v = Number(localStorage.getItem(BEST_KEY));
+      return isFinite(v) && v > 0 && v < 10000 ? v : null;
+    } catch (e) { return null; }
+  }
+  function saveBest(v) { try { localStorage.setItem(BEST_KEY, String(Math.round(v))); } catch (e) {} }
+
+  function renderDots() {
+    while (roundsEl.children.length < TOTAL) {
+      var d = document.createElement('span');
+      d.className = 'dot';
+      roundsEl.appendChild(d);
+    }
+    var dots = roundsEl.children;
+    for (var i = 0; i < TOTAL; i++) dots[i].className = 'dot' + (i < times.length ? ' done' : '');
+  }
+
+  function armRound() {
+    if (state !== 'busy') return;
+    state = 'waiting';
+    zone.className = '';
+    big.textContent = '等待…';
+    small.textContent = '第 ' + (times.length + 1) + ' / ' + TOTAL + ' 轮 · 变绿再点';
+    timer = setTimeout(fireGo, 1500 + Math.random() * 3500);
+  }
+
+  function fireGo() {
+    state = 'go';
+    zone.className = 'go';
+    big.textContent = '点！';
+    small.textContent = '';
+    t0 = performance.now();
+  }
+
+  function endGroup() {
+    state = 'done';
+    var sum = 0, fast = Infinity;
+    for (var i = 0; i < times.length; i++) { sum += times[i]; if (times[i] < fast) fast = times[i]; }
+    var avg = sum / times.length;
+    var prev = loadBest();
+    var grade;
+    if (avg < 180) grade = '⚡ 闪电';
+    else if (avg < 250) grade = '优秀';
+    else if (avg < 350) grade = '良好';
+    else if (avg < 500) grade = '一般';
+    else grade = '☕ 需要咖啡';
+    gradeEl.textContent = '平均评级：' + grade;
+    avgEl.textContent = fmt(avg);
+    fastEl.textContent = fmt(fast);
+    if (!prev || avg < prev) {
+      saveBest(avg);
+      bestEl.textContent = fmt(avg);
+      newrecEl.textContent = '🎉 新纪录!';
+    } else {
+      newrecEl.textContent = '个人最佳 ' + fmt(prev);
+    }
+    resultEl.classList.add('on');
+    goBtn.textContent = '再来一组';
+    zone.className = '';
+    big.textContent = '完成';
+    small.textContent = '';
+  }
+
+  function onClick() {
+    if (state === 'waiting') {                        // 抢跑：该轮作废重来
+      clearTimeout(timer);
+      state = 'foul';
+      zone.className = 'waitclick';
+      big.textContent = '抢跑!';
+      small.textContent = '别急，这一轮重来…';
+      setTimeout(armRound2, 900);
+      return;
+    }
+    if (state === 'go') {
+      var dt = performance.now() - t0;
+      times.push(dt);
+      lastEl.textContent = fmt(dt);
+      renderDots();
+      state = 'busy';
+      zone.className = '';
+      big.textContent = fmt(dt);
+      small.textContent = '';
+      if (times.length >= TOTAL) endGroup();
+      else setTimeout(armRound, 800);
+    }
+    // 其余状态（idle / foul / busy / done）点击忽略，防连点
+  }
+
+  function armRound2() { if (state === 'foul') { state = 'busy'; armRound(); } }
+
+  function startGroup() {
+    clearTimeout(timer);
+    times = [];
+    lastEl.textContent = '—';
+    renderDots();
+    resultEl.classList.remove('on');
+    newrecEl.textContent = '';
+    state = 'busy';
+    zone.className = '';
+    armRound();
+  }
+
+  zone.addEventListener('pointerdown', onClick);
+  zone.addEventListener('keydown', function (e) {
+    if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onClick(); }
+  });
+  goBtn.addEventListener('click', function (e) { e.stopPropagation(); startGroup(); });
+
+  bestEl.textContent = fmt(loadBest());
+  renderDots();
+})();
+</script>
+</body>
+</html>

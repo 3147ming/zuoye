@@ -58,6 +58,7 @@
       this.bindBg();
       this.bindSound();
       this.bindMisc();
+      this.bindAtmos();
       this.bindVersion();
 
       return true;
@@ -319,6 +320,58 @@
       };
     },
 
+    /* ---------------- 氛围（昼夜 / 皮肤） ---------------- */
+    bindAtmos: function () {
+      var self = this;
+      var mode = el('dnMode');
+      var skin = el('skinSel');
+      if (mode) mode.addEventListener('change', function () {
+        if (global.DayNight) global.DayNight.setMode(mode.value);
+        self.hint('昼夜：' + (global.DayNight ? global.DayNight.modeName() : mode.value));
+        self.rebake();
+      });
+      if (skin) skin.addEventListener('change', function () {
+        try { global.localStorage.setItem('worldhub.skin.v1', skin.value); } catch (e) {}
+        self.hint('皮肤：' + (skin.options[skin.selectedIndex] ? skin.options[skin.selectedIndex].text : skin.value));
+        self.rebake();
+      });
+    },
+
+    renderAtmos: function () {
+      var mode = el('dnMode');
+      var skin = el('skinSel');
+      var now = el('dnNow');
+      if (mode) mode.value = (global.DayNight && global.DayNight.mode()) || 'auto';
+      if (skin) {
+        skin.value = 'paper';
+        try {
+          var v = global.localStorage.getItem('worldhub.skin.v1');
+          if (v && skin.querySelector('option[value="' + v + '"]')) skin.value = v;
+        } catch (e) {}
+      }
+      if (now) now.textContent = global.DayNight ? global.DayNight.describe() : '模块未加载';
+    },
+
+    renderStats: function () {
+      var line = el('statLine');
+      if (!line) return;
+      if (!global.Stats) { line.textContent = '模块未加载'; return; }
+      var r = global.Stats.report();
+      var t = r.minutes < 1 ? '不到 1 分钟' : r.minutes + ' 分钟';
+      line.textContent = '累计到访 ' + r.visits + ' 次 · 游玩 ' + t +
+        ' · 逛过 ' + r.zones + ' 个区块 · 传送 ' + (r.actions.teleport || 0) +
+        ' 次 · 进门 ' + (r.actions.door || 0) + ' 次 · 跳跃 ' + (r.actions.jump || 0) + ' 次';
+    },
+
+    /* 改昼夜 / 皮肤后立即重烘当前场景 */
+    rebake: function () {
+      var sm = global.SceneManager;
+      if (sm && sm.current) {
+        if (sm.current.bakeBg) sm.current.bakeBg();
+        if (sm.current.bakeStatic) sm.current.bakeStatic();
+      }
+    },
+
     /* ---------------- 开关 ---------------- */
     /* 焦点陷阱：Tab / Shift+Tab 只在面板内循环，不跑到背后的 canvas */
     _trapTab: function (e) {
@@ -363,6 +416,8 @@
 
       this.hint(stored ? '这一屏已经有自定义背景' : '这一屏用的是默认剪纸背景');
       this.renderContrib();
+      this.renderAtmos();
+      this.renderStats();
 
       this.root.classList.add('on');
       this.root.setAttribute('aria-hidden', 'false');

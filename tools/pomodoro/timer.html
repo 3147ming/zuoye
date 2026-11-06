@@ -1,396 +1,167 @@
 <!DOCTYPE html>
-<!--
-  <!DOCTYPE html> tells the browser:
-  "Hey, this is a modern HTML5 page."
-  Always put this on line 1. Without it, the browser may display things wrong.
--->
-
-<html lang="en">
-<!--
-  <html> is the ROOT element — everything lives inside it.
-  lang="en" tells screen readers and search engines this page is in English.
--->
-
+<html lang="zh-CN">
 <head>
-  <!--
-    <head> is the INVISIBLE section.
-    It holds settings, the page title, and links to CSS files.
-    Users NEVER see the <head> content directly.
-  -->
+  <meta charset="utf-8">
+  <title>番茄钟 🍅</title>
 
-  <meta charset="UTF-8">
-  <!--
-    charset="UTF-8" means "support all characters" — English, Chinese, emoji, etc.
-    Without this, special characters may show as weird symbols like â€˜.
-  -->
-
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <!--
-    This line makes the page look correct on mobile phones.
-    "width=device-width" = match the screen width
-    "initial-scale=1.0" = don't zoom in or out when first opened
-  -->
-
-  <title>Pomodoro Timer 🍅</title>
-  <!--
-    <title> sets the text shown on the browser TAB.
-    It does NOT appear on the page itself.
-  -->
-
-  <!-- 接入适配（WorldHub）：上游从 Google Fonts 拉 Quicksand，离线必然 ERR_CONNECTION_RESET。
-       去掉外链，字体回落到 CSS 里本来就写好的系统字体栈。 -->
   <style>/* Quicksand 缺席时的兜底，与 timer.css 的 font-family 顺序一致 */
     body { font-family: "Quicksand", "PingFang SC", "Microsoft YaHei", system-ui, sans-serif; }</style>
   <link rel="stylesheet" href="timer.css">
-  <!--
-    <link> connects this HTML file to our CSS file.
-    rel="stylesheet" = "this link is a stylesheet"
-    href="timer.css" = "the file is called timer.css, in the same folder"
-  -->
-
-  <!-- ── PWA: Progressive Web App support ── -->
-  <!-- 接入适配（WorldHub）：本工具始终嵌在 iframe 里，PWA 安装无意义；
-       且 file:// 直开时浏览器拉 manifest.json 会被 CORS 拦下（origin 'null'），
-       控制台必然留一条 error。故整行注释掉，manifest.json 文件保留以备将来上线用。
-  <link rel="manifest" href="manifest.json">
-  -->
-  <!--
-    manifest.json tells the browser how to "install" this app:
-    - App name, icon, and colors shown on the home screen / taskbar
-    - display: "standalone" = no browser chrome when installed (feels native)
-  -->
 
   <meta name="theme-color" content="#e0a0a8">
-  <!--
-    theme-color tints the browser's address bar and task switcher
-    to match the app's accent color. On Android Chrome it turns
-    the status bar pink — a small but polished detail.
-  -->
 
   <link rel="apple-touch-icon" href="icon.png">
-  <!--
-    apple-touch-icon: the icon shown on iOS home screens when the user
-    clicks "Add to Home Screen" in Safari.
-  -->
-
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-  <!--
-    These three meta tags tell mobile browsers:
-    "This app is meant to run in fullscreen / standalone mode."
-    The status bar becomes translucent so our dark background shows through.
-  -->
-
-
 </head>
-
 <body>
-  <!--
-    <body> is the VISIBLE section.
-    Everything the user sees and clicks goes here.
-  -->
-
-  <!-- ===================== MAIN CARD ===================== -->
+  <!-- 主卡片 -->
   <div class="card">
 
-    <!-- ---- NOTIFICATION BELL (top-left corner) ---- -->
+    <!-- 通知铃铛（左上角） -->
     <button class="btn-bell" id="btnNotification" onclick="requestNotificationPermission()">🔕</button>
 
-    <!-- ---- CAT COMPANION LINK (top-left, next to bell 🔕) ---- -->
-    <a class="btn-cat" href="pet.html" title="Cat Companion 🐱">🐱</a>
-    <!--
-      Opens the Cat Companion mini-game page in the same tab.
-      猫咪伴侣入口 — 点击跳转 pet.html 宠物小游戏页面。
-      Styled to match the other corner icon-buttons (bell / fullscreen / settings).
-    -->
+    <!-- 猫咪伴侣入口（左上角，铃铛旁） -->
+    <a class="btn-cat" href="pet.html" title="猫咪伴侣 🐱">🐱</a>
 
-    <!-- ---- FULLSCREEN BUTTON (top-right, left of ⚙) ---- -->
-    <button class="btn-fullscreen" id="btnFullscreen" onclick="toggleFullscreen()" title="Fullscreen focus">
-      <!--
-        SVG icon: four corner arrows pointing OUTWARD = "expand / go fullscreen"
-        The icon path swaps in JS when fullscreen state changes.
-        stroke="currentColor" = inherits whatever color CSS sets on the button.
-      -->
+    <!-- 全屏按钮（右上角，⚙ 左侧） -->
+    <button class="btn-fullscreen" id="btnFullscreen" onclick="toggleFullscreen()" title="全屏专注">
       <svg id="iconFullscreen" width="14" height="14" viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg">
         <path d="M1 5V1H5M9 1H13V5M13 9V13H9M5 13H1V9" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
       </svg>
     </button>
-    <!--
-      🔕 = notifications OFF (default)
-      🔔 = notifications ON (after user grants permission)
 
-      onclick="requestNotificationPermission()" → asks browser for permission.
-      The browser will show a pop-up: "Allow timer.html to show notifications?"
-      Once granted, JavaScript swaps the emoji to 🔔.
-
-      WHY position: absolute?
-      Like the ⚙ button, this is pinned to a corner of the card.
-      position: absolute removes it from the normal flow and lets us
-      place it exactly using top/left coordinates.
-      (The card has position: relative — see CSS — which is the reference point.)
-    -->
-
-    <!-- ---- SETTINGS TOGGLE BUTTON (top-right corner) ---- -->
+    <!-- 设置按钮（右上角） -->
     <button class="btn-settings" id="btnSettings" onclick="toggleSettings()">⚙</button>
-    <!--
-      This small gear button lives inside the card, floated to the top-right corner.
-      onclick="toggleSettings()" → clicking it shows or hides the settings panel below.
 
-      We use a plain <button> element (not a styled .btn) because it has its own
-      look — small, round, icon-only.
-    -->
-
-    <!-- ---- SETTINGS PANEL (hidden by default) ---- -->
+    <!-- 设置面板（默认隐藏） -->
     <div class="settings-panel" id="settingsPanel">
-      <!--
-        This whole panel starts invisible (CSS: display: none).
-        When the user clicks ⚙, JavaScript adds class "settings-open"
-        to this div, which makes it visible.
-
-        It contains two number inputs and an Apply button.
-      -->
 
       <div class="settings-row">
-        <!--
-          <label> is paired with an <input>.
-          for="inputFocus" links this label to the input with id="inputFocus".
-          Clicking the label will focus the input — good for usability.
-        -->
-        <label for="inputFocus">Focus</label>
-        <input
-          type="number"
-          id="inputFocus"
-          value="25"
-          min="1"
-          max="60"
-        />
-        <!--
-          type="number"  → keyboard shows number pad on mobile, arrows on desktop
-          value="25"     → default value shown in the box
-          min="1"        → user can't go below 1 minute
-          max="60"       → user can't go above 60 minutes
-          These limits are just hints; JavaScript will validate too.
-        -->
-        <span>min</span>
+        <label for="inputFocus">专注</label>
+        <input type="number" id="inputFocus" value="25" min="1" max="60" />
+        <span>分钟</span>
       </div>
 
       <div class="settings-row">
-        <label for="inputBreak">Break</label>
-        <input
-          type="number"
-          id="inputBreak"
-          value="5"
-          min="1"
-          max="30"
-        />
-        <span>min</span>
+        <label for="inputBreak">短休息</label>
+        <input type="number" id="inputBreak" value="5" min="1" max="30" />
+        <span>分钟</span>
       </div>
 
       <div class="settings-row">
-        <label for="inputLongBreak">Long</label>
-        <input
-          type="number"
-          id="inputLongBreak"
-          value="15"
-          min="5"
-          max="60"
-        />
-        <span>min</span>
+        <label for="inputLongBreak">长休息</label>
+        <input type="number" id="inputLongBreak" value="15" min="5" max="60" />
+        <span>分钟</span>
       </div>
-      <!--
-        Long break = the reward after completing all 4 rounds.
-        Default is 15 minutes (the official Pomodoro recommendation).
-        min="5" so it's always longer than a regular short break.
-      -->
 
       <div class="settings-row">
-        <label for="inputGoal">Goal</label>
-        <input
-          type="number"
-          id="inputGoal"
-          value="8"
-          min="1"
-          max="20"
-        />
+        <label for="inputGoal">每日目标</label>
+        <input type="number" id="inputGoal" value="8" min="1" max="20" />
         <span>🍅</span>
       </div>
 
-      <!-- Error message area (empty until validation fails) -->
+      <!-- 错误提示区（默认为空，验证失败时填充） -->
       <div class="settings-error" id="settingsError"></div>
-      <!--
-        Starts empty. If user types an invalid number,
-        JavaScript will put an error message here.
-        e.g. "Focus time must be between 1 and 60 minutes."
-      -->
 
-      <button class="btn-apply" onclick="applySettings()">Apply</button>
-      <!--
-        Clicking Apply calls applySettings() in timer.js.
-        That function reads the two inputs, validates them,
-        then updates the timer if everything is valid.
-      -->
+      <button class="btn-apply" onclick="applySettings()">应用</button>
 
     </div><!-- end .settings-panel -->
-    <!--
-      <div> is a generic "box" or container.
-      We give it class="card" so CSS can style it as a white rounded card.
-      Think of a div as an empty cardboard box — it holds things inside it.
-    -->
 
-    <!-- ---- NOTIFICATION PERMISSION PROMPT (shown on first visit) ---- -->
+    <!-- 通知权限提示（首次访问显示） -->
     <div class="notif-prompt" id="notifPrompt">
-      <span class="notif-prompt-text">🔔 Allow notifications so we can alert you when your timer ends?</span>
+      <span class="notif-prompt-text">🔔 允许通知吗？计时结束时会提醒你。</span>
       <div class="notif-prompt-btns">
-        <button class="notif-prompt-skip"  onclick="skipNotifPrompt()">Later</button>
-        <button class="notif-prompt-allow" onclick="allowNotifPrompt()">Allow 🔔</button>
+        <button class="notif-prompt-skip" onclick="skipNotifPrompt()">稍后</button>
+        <button class="notif-prompt-allow" onclick="allowNotifPrompt()">允许 🔔</button>
       </div>
     </div>
 
-    <!-- ---- CAT IMAGE (switches by timer state via CSS body classes) ---- -->
+    <!-- 猫咪图片（按计时器状态通过 CSS 切换） -->
     <div class="cat-wrapper">
-      <img class="cat-image cat-idle"        src="cats/idle-cat.png"        alt="" aria-hidden="true">
-      <img class="cat-image cat-focus"       src="cats/focus-cat.png"       alt="" aria-hidden="true">
-      <img class="cat-image cat-short-break" src="cats/shortbreak-cat.png"  alt="" aria-hidden="true">
-      <img class="cat-image cat-long-break"  src="cats/longbreak-cat.png"   alt="" aria-hidden="true">
-      <img class="cat-image cat-paused"      src="cats/paused-cat.png"      alt="" aria-hidden="true">
-      <img class="cat-image cat-done"        src="cats/done-cat.png"        alt="" aria-hidden="true">
+      <img class="cat-image cat-idle" src="cats/idle-cat.png" alt="" aria-hidden="true">
+      <img class="cat-image cat-focus" src="cats/focus-cat.png" alt="" aria-hidden="true">
+      <img class="cat-image cat-short-break" src="cats/shortbreak-cat.png" alt="" aria-hidden="true">
+      <img class="cat-image cat-long-break" src="cats/longbreak-cat.png" alt="" aria-hidden="true">
+      <img class="cat-image cat-paused" src="cats/paused-cat.png" alt="" aria-hidden="true">
+      <img class="cat-image cat-done" src="cats/done-cat.png" alt="" aria-hidden="true">
     </div>
 
-    <!-- ---- MODE LABEL (shows "Focus" or "Break") ---- -->
-    <div class="mode-label" id="modeLabel">Focus</div>
+    <!-- 模式标签（显示“专注”或“短休息”） -->
+    <div class="mode-label" id="modeLabel">专注</div>
 
-    <!-- ---- ACTIVE TASK DISPLAY (hidden until user pins a task) ---- -->
+    <!-- 当前任务显示（用户钉选任务后显示） -->
     <div class="active-task-display" id="activeTaskDisplay">
       <span>📌</span>
       <span id="activeTaskText"></span>
       <button class="active-task-clear" onclick="clearActiveTask()">✕</button>
     </div>
-    <!--
-      Starts hidden (CSS: display:none).
-      When the user clicks the 📌 pin button on a task in the task list,
-      this bar appears showing: 📌 [task name] ✕
-      It reminds the user what they are currently working on.
-      When the focus session ends, that task is auto-ticked as complete.
-    -->
 
-    <!-- ---- TIMER DISPLAY (shows 25:00 countdown) ---- -->
+    <!-- 计时器显示（如 25:00） -->
     <div class="timer-display" id="timerDisplay">25:00</div>
-    <!--
-      This is the BIG number the user sees.
-      id="timerDisplay" lets JavaScript update it every second:
-        document.getElementById("timerDisplay").textContent = "24:59";
-    -->
 
-    <!-- ---- PROGRESS BAR (visual strip that shrinks) ---- -->
+    <!-- 进度条 -->
     <div class="progress-bar-container">
-      <!--
-        This outer div is the GREY background track of the progress bar.
-        The inner div (below) is the coloured fill that shrinks over time.
-      -->
       <div class="progress-bar" id="progressBar"></div>
-      <!--
-        id="progressBar" lets JavaScript shrink its width:
-          progressBar.style.width = "50%"; // halfway through
-      -->
     </div>
 
-    <!-- ---- ROUND COUNTER (e.g. "Round 1 / 4") ---- -->
-    <div class="round-info" id="roundInfo">Round 1 / 4</div>
+    <!-- 回合计数器（如“第 1 回合 / 共 4”） -->
+    <div class="round-info" id="roundInfo">第 1 回合 / 共 4</div>
 
-    <!-- ---- SESSION STATS ROW: today's count + day streak + daily goal ---- -->
+    <!-- 会话统计行：今日次数 + 连续天数 + 每日目标 -->
     <div class="session-stats-row">
       <div class="pomodoro-count" id="pomodoroCount">🍅 × 0</div>
       <div class="streak-count"   id="streakCount">🔥 × 0</div>
       <div class="goal-count"     id="goalCount">🎯 0 / 8</div>
     </div>
-    <!--
-      🍅 × N = how many focus sessions completed TODAY (resets at midnight)
-      🔥 × N = how many CONSECUTIVE DAYS you've done at least 1 session
-               e.g. 🔥 × 5 = you've studied for 5 days in a row!
-               If you miss a day, the streak goes back to 0.
-      Both are saved in localStorage and loaded when the page opens.
-    -->
 
-    <!-- ---- BUTTONS SECTION ---- -->
+    <!-- 按钮区 -->
     <div class="controls">
-      <!--
-        Another <div> used as a layout box for the three buttons.
-        In CSS we'll use Flexbox to line them up side by side.
-      -->
 
-      <!-- START BUTTON -->
+      <!-- 开始按钮 -->
       <button class="btn btn-start" id="btnStart" onclick="startTimer()">
-        ▶ Start
+        ▶ 开始
       </button>
-      <!--
-        onclick="startTimer()" means:
-        "When this button is clicked, run the startTimer() function in timer.js"
-        This is called an EVENT LISTENER (inline style).
 
-        class="btn btn-start" applies TWO CSS classes:
-          btn       = shared button styles (size, font, border-radius)
-          btn-start = specific green color for this button
-      -->
-
-      <!-- PAUSE BUTTON -->
+      <!-- 暂停按钮（默认禁用） -->
       <button class="btn btn-pause" id="btnPause" onclick="pauseTimer()" disabled>
-        ⏸ Pause
+        ⏸ 暂停
       </button>
-      <!--
-        disabled = this button is GREYED OUT and unclickable by default.
-        You can only pause if the timer is already running.
-        JavaScript will remove "disabled" when the timer starts.
-      -->
 
-      <!-- RESET BUTTON -->
+      <!-- 重置按钮 -->
       <button class="btn btn-reset" onclick="resetTimer()">
-        ↺ Reset
+        ↺ 重置
       </button>
-      <!--
-        Reset always works, so no "disabled" attribute here.
-        It calls resetTimer() which stops everything and goes back to 25:00.
-      -->
 
     </div><!-- end .controls -->
 
-    <!-- ---- STATUS MESSAGE ---- -->
+    <!-- 状态消息 -->
     <div class="status-message" id="statusMessage">
-      Press Start to begin your focus session.
+      点击“开始”开始专注会话。
     </div>
 
-    <!-- ---- AMBIENT SOUND CONTROLS ---- -->
+    <!-- 环境音控制 -->
     <div class="ambient-section">
-      <span class="ambient-label">🎧 Sounds</span>
+      <span class="ambient-label">🎧 环境音</span>
       <div class="ambient-grid">
-        <!--
-          7 buttons in a 4-column grid:
-          Row 1: 🔇  🌊  🌧  🌲
-          Row 2: 🎵  🎷  🎸  (empty)
-
-          Each plays a real YouTube video as background music.
-          The embedded player appears below when a sound is active.
-        -->
-        <button class="btn-ambient active" id="ambientOff"    onclick="setAmbient('off')"    title="Mute">🔇</button>
-        <button class="btn-ambient"        id="ambientOcean"  onclick="setAmbient('ocean')"  title="Ocean waves">🌊</button>
-        <button class="btn-ambient"        id="ambientRain"   onclick="setAmbient('rain')"   title="Piano + rain">🌧</button>
-        <button class="btn-ambient"        id="ambientForest" onclick="setAmbient('forest')" title="Piano + forest">🌲</button>
-        <button class="btn-ambient"        id="ambientLofi"   onclick="setAmbient('lofi')"   title="Lo-fi music">🎵</button>
-        <button class="btn-ambient"        id="ambientJazz1"  onclick="setAmbient('jazz1')"  title="Jazz mix 1">🎷</button>
-        <button class="btn-ambient"        id="ambientJazz2"  onclick="setAmbient('jazz2')"  title="Jazz mix 2">🎸</button>
+        <button class="btn-ambient active" id="ambientOff" onclick="setAmbient('off')" title="静音">🔇</button>
+        <button class="btn-ambient" id="ambientOcean" onclick="setAmbient('ocean')" title="海浪">🌊</button>
+        <button class="btn-ambient" id="ambientRain" onclick="setAmbient('rain')" title="雨声 + 钢琴">🌧</button>
+        <button class="btn-ambient" id="ambientForest" onclick="setAmbient('forest')" title="森林 + 钢琴">🌲</button>
+        <button class="btn-ambient" id="ambientLofi" onclick="setAmbient('lofi')" title="Lo-fi 音乐">🎵</button>
+        <button class="btn-ambient" id="ambientJazz1" onclick="setAmbient('jazz1')" title="爵士混音 1">🎷</button>
+        <button class="btn-ambient" id="ambientJazz2" onclick="setAmbient('jazz2')" title="爵士混音 2">🎸</button>
       </div>
-      <!--
-        Mini audio player — hidden until user picks a sound.
-        setAmbient() adds class "active" to reveal it.
-        Shows track name, a clickable progress bar, and current / total time.
-      -->
+
+      <!-- 音频播放器（选中环境音后显示） -->
       <div class="audio-player" id="audioPlayer">
         <div class="audio-header">
           <span class="audio-emoji" id="audioEmoji"></span>
-          <span class="audio-name"  id="audioName"></span>
-          <button class="audio-playpause-btn" id="audioPauseBtn" onclick="toggleAudioPlayback()" title="Play / Pause">⏸</button>
+          <span class="audio-name" id="audioName"></span>
+          <button class="audio-playpause-btn" id="audioPauseBtn" onclick="toggleAudioPlayback()" title="播放 / 暂停">⏸</button>
         </div>
-        <div class="audio-progress-track" id="audioProgressTrack" onclick="seekAudio(event)" title="Click to seek">
+        <div class="audio-progress-track" id="audioProgressTrack" onclick="seekAudio(event)" title="点击跳转">
           <div class="audio-progress-fill" id="audioProgressBar"></div>
         </div>
         <div class="audio-time-row">
@@ -400,122 +171,40 @@
       </div>
     </div>
 
-    <!-- ---- KEYBOARD HINTS (very faint, bottom of card) ---- -->
+    <!-- 键盘提示（卡片底部，极淡） -->
     <div class="keyboard-hints">
-      <kbd>Space</kbd> start / pause
+      <kbd>空格</kbd> 开始 / 暂停
     </div>
-    <!--
-      <kbd> is a semantic HTML tag meaning "keyboard input".
-      It tells the browser (and screen readers): "this is a key name".
-      We style it in CSS to look like a tiny physical key.
-
-      &nbsp; = non-breaking space (a special HTML character).
-      A regular space can collapse in HTML — &nbsp; never collapses.
-      We use it here to add small padding around the · dot separator.
-    -->
-    <!--
-      This small text below the buttons gives the user friendly hints.
-      JavaScript will update it: "Great work! Take a break 🎉"
-    -->
 
   </div><!-- end .card -->
 
-  <!-- ===================== TASK LIST CARD ===================== -->
+  <!-- 任务列表卡片 -->
   <div class="task-card">
-    <!--
-      This is a SECOND card, sitting below the timer card.
-      It has the same frosted-glass look but is dedicated to tasks.
-      Both cards are children of <body>, which uses Flexbox to stack them vertically.
-    -->
-
-    <!-- ---- HEADER: title on the left, "X / Y done" count on the right ---- -->
     <div class="task-header">
-      <span class="task-title">✏️ Today's Tasks</span>
+      <span class="task-title">✏️ 今天的任务</span>
       <span class="task-count" id="taskCount">0 / 0</span>
-      <!--
-        id="taskCount" lets JS update the count:
-          taskCount.textContent = "2 / 5"  → shows 2 done out of 5 total
-      -->
     </div>
 
-    <!-- ---- INPUT ROW: text box + add button ---- -->
     <div class="task-input-row">
-      <input
-        type="text"
-        class="task-input"
-        id="taskInput"
-        placeholder="What are you working on? ✨"
-        maxlength="60"
-      />
-      <!--
-        type="text"      → normal text input (not number, not password)
-        placeholder="..."  → grey hint text shown when the box is empty
-        maxlength="60"   → user can't type more than 60 characters
-      -->
-
+      <input type="text" class="task-input" id="taskInput" placeholder="你正在处理什么？✨" maxlength="60" />
       <button class="btn-add-task" id="btnAddTask" onclick="addTask()">+</button>
-      <!--
-        This is the circular "+" button.
-        onclick="addTask()" runs the addTask() function in timer.js.
-        User can also press Enter in the input — we handle that in JS.
-      -->
     </div>
 
-    <!-- ---- TASK LIST: JS dynamically fills this with task items ---- -->
     <div class="task-list" id="taskList">
-      <!--
-        Starts empty. When the page loads, loadTasks() runs and calls renderTasks(),
-        which fills this div with task items (or the empty-state message).
-
-        Each task item will look like:
-          [○ check button]  [task text]  [✕ delete button]
-      -->
-      <div class="task-empty">✨ No tasks yet — add one above!</div>
+      <div class="task-empty">✨ 暂无任务 — 点击上方添加！</div>
     </div>
-
   </div><!-- end .task-card -->
 
-  <!-- ===================== WEEKLY STATS CARD ===================== -->
+  <!-- 每周统计卡片 -->
   <div class="stats-card">
     <div class="stats-header">
-      <span class="stats-title">📊 This Week</span>
-      <span class="week-total" id="weekTotal">0 sessions</span>
+      <span class="stats-title">📊 本周</span>
+      <span class="week-total" id="weekTotal">0 次</span>
     </div>
     <canvas id="weeklyChart" width="296" height="110"></canvas>
-    <!--
-      <canvas> is an HTML element that JavaScript can DRAW on — like a whiteboard.
-      We use it to draw the 7-day bar chart.
-
-      width="296" height="110" = size in pixels.
-      JavaScript draws bars and labels using the Canvas 2D API:
-        ctx.fillRect(x, y, width, height) → draws a rectangle
-        ctx.fillText(text, x, y)          → draws text
-        ctx.fillStyle = "color"           → sets the drawing color
-
-      The chart shows the last 7 days. Today's bar is highlighted in pink.
-      Bars are taller when more sessions were completed that day.
-    -->
   </div>
 
-  <!-- ===================== JAVASCRIPT LINK ===================== -->
   <script src="timer.js"></script>
-  <!--
-    <script src="..."> loads our JavaScript file.
-    IMPORTANT: We put this at the BOTTOM of <body>, NOT in <head>.
-
-    WHY? Because HTML loads top-to-bottom. If we put the script in <head>,
-    JavaScript would run BEFORE the buttons and divs exist yet — and would
-    fail trying to find elements that haven't loaded yet.
-
-    Bottom of <body> = all HTML is ready before JS runs. ✓
-  -->
-
-  <!-- ── PWA: service worker 注册已移除（WorldHub 接入适配） ──
-       这里原本是 navigator.serviceWorker.register("./sw.js")，但仓库里从来没有 sw.js：
-       线上会 404，控制台必留一条
-       "A bad HTTP response code (404) was received when fetching the script"。
-       而且本工具始终嵌在大厅的 iframe 里，离线缓存没有意义；
-       SW 一旦控制根作用域还会把整站缓存住，导致大厅更新后仍拿到旧文件。 -->
 
 </body>
 </html>

@@ -1,5 +1,5 @@
 {
-  "version": "1.5.1",
-  "build": "2026-11-13",
-  "notes": "修复 1.5.0 回归：①主循环在浮层（设置/总门选单）关闭后永久冻结——sceneManager._frame 在 _frozen 时直接 return，而 _frozen 只在 update() 里复位，形成死锁；改为每帧照常 update、仅跳过重绘，关闭面板立即恢复。②Service Worker 资源策略由 stale-while-revalidate 改为 network-first（在线必取新文件，断网回缓存），js/css/_headers 改 no-cache，避免用户反复命中旧的坏脚本；install 改逐文件缓存，单个失败不再拖垮整个 SW。"
+  "version": "1.6.0",
+  "build": "2026-11-14",
+  "notes": "第六批·汉化：全部界面改中文；新增昼夜循环与三套大厅皮肤（剪纸/水墨/琥珀暮色）；广场告示牌每日一题；留言板；三款自研小游戏（记忆翻牌/反应速度/算术挑战）；手柄支持；足迹统计；新增区块条目。"
 }

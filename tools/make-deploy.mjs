@@ -32,6 +32,7 @@ const COPY = [
   'games/',
   'tools/noise/',
   'tools/pomodoro/',
+  'tools/board/',
   'contrib/',
   'assets/'
 ];

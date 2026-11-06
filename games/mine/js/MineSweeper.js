@@ -383,27 +383,27 @@ jQuery(function ($) {
       });
 
       $('#bestTimes').on('click', function () {
-        let beginnerTime = localStorage.getItem('best_time_beginner') || 'None';
+        let beginnerTime = localStorage.getItem('best_time_beginner') || '暂无';
         let intermediateTime =
-          localStorage.getItem('best_time_intermediate') || 'None';
-        let expertTime = localStorage.getItem('best_time_expert') || 'None';
+          localStorage.getItem('best_time_intermediate') || '暂无';
+        let expertTime = localStorage.getItem('best_time_expert') || '暂无';
         let beginnerName =
-          localStorage.getItem('beginner_record_holder') || 'None';
+          localStorage.getItem('beginner_record_holder') || '暂无';
         let intermediateName =
-          localStorage.getItem('intermediate_record_holder') || 'None';
-        let expertName = localStorage.getItem('expert_record_holder') || 'None';
+          localStorage.getItem('intermediate_record_holder') || '暂无';
+        let expertName = localStorage.getItem('expert_record_holder') || '暂无';
         alert(
-          'Best times:\nBeginner:     ' +
+          '最佳纪录：\n初级：  ' +
             beginnerName +
             ' : ' +
             beginnerTime +
             '\n' +
-            'Intermediate: ' +
+            '中级：  ' +
             intermediateName +
             ' : ' +
             intermediateTime +
             '\n' +
-            'Expert:       ' +
+            '高级：  ' +
             expertName +
             ' : ' +
             expertTime
@@ -521,7 +521,7 @@ jQuery(function ($) {
       // pause stopwatch
       msObj.stopTimer();
       // toggle button
-      $('.msPause').html('Resume');
+      $('.msPause').html('继续');
       msObj.paused = true;
     };
 
@@ -682,7 +682,7 @@ jQuery(function ($) {
     };
 
     this.resumeTimer = function () {
-      $('.msPause').html('Pause');
+      $('.msPause').html('暂停');
       let timerElement = $('#timer');
       console.log('resuming timer');
       msObj.timer = window.setInterval(function () {
@@ -891,7 +891,7 @@ jQuery(function ($) {
       $('.msPause').hide();
       msObj.running = false;
       let time = $('#timer').val();
-      alert('You win!\nYour time: ' + time);
+      alert('你赢了！\n用时：' + time + ' 秒');
       msObj.checkBestTime(time);
     };
 
@@ -913,10 +913,10 @@ jQuery(function ($) {
           displayName = localStorage.getItem('expert_record_holder');
         }
         if (!displayName) {
-          displayName = 'Your name';
+          displayName = '你的名字';
         }
         let name = window.prompt(
-          'Congrats! You beat the best ' + level + ' time!',
+          '恭喜！你刷新了当前难度的最佳纪录！',
           displayName
         );
 
@@ -928,21 +928,21 @@ jQuery(function ($) {
     this.getTemplate = function (template) {
       let templates = {
         settings:
-          '<div class="game_settings"><select id="level" class="msLevel"><option value="beginner">Beginner</option>' +
-          '<option value="intermediate">Intermediate</option><option value="expert">Expert</option>' +
-          '<option value="custom">Custom</option></select>' +
+          '<div class="game_settings"><select id="level" class="msLevel"><option value="beginner">初级</option>' +
+          '<option value="intermediate">中级</option><option value="expert">高级</option>' +
+          '<option value="custom">自定义</option></select>' +
           '<input type="text" id="dim_x" class="msDimX" placeholder="x" size="5" disabled value="20" />' +
           '<input type="text" id="dim_y" class="msDimY" placeholder="y" size="5" disabled value="20" />' +
-          '<input type="text" id="numMines" class="msNumMines" placeholder="mines" size="5" disabled />' +
+          '<input type="text" id="numMines" class="msNumMines" placeholder="雷数" size="5" disabled />' +
           '</div>',
         actions:
-          '<div class="game_actions"><button class="new-game">New Game</button>' +
-          '<button id="bestTimes">Best times</button></div>' +
-          '<button id="pause" class="msPause">Pause</button></div>',
+          '<div class="game_actions"><button class="new-game">新游戏</button>' +
+          '<button id="bestTimes">最佳纪录</button></div>' +
+          '<button id="pause" class="msPause">暂停</button></div>',
         status:
-          '<div class="game_status"><label>Time:</label>' +
+          '<div class="game_status"><label>用时：</label>' +
           '<input type="text" id="timer" class="msTimer" size="6" value="0" readonly />' +
-          '<label>Mines:</label>' +
+          '<label>雷数：</label>' +
           '<input type="text" id="mine_flag_display" class="msMineFlagDisplay" size="6" value="10" disabled />',
       };
 

@@ -1,39 +1,38 @@
-<!DOCTYPE html> 
-<html>
+<!DOCTYPE html>
+<html lang="zh-CN">
 <head>
-  <title>Javascript Breakout</title>
+  <title>打砖块</title>
   <meta http-equiv="Content-Type" content="text/html; charset=utf-8"/>
-  <meta name="viewport" content="width=device-width", initial-scale=1.0, user-scalable="no"/>
-  <link href="breakout.css" media="screen, print" rel="stylesheet" type="text/css" /> 
-</head> 
- 
-<body> 
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no"/>
+  <link href="breakout.css" media="screen, print" rel="stylesheet" type="text/css" />
+</head>
 
+<body>
 
   <div id="breakout">
     <canvas id="canvas">
       <div class='unsupported'>
-        Sorry, this example cannot be run because your browser does not support the &lt;canvas&gt; element
+        抱歉，你的浏览器不支持 &lt;canvas&gt;，这个游戏跑不起来
       </div>
     </canvas>
     <div id="levels">
-      <img id="next" class="disabled" src="images/up.png"   title="next level">
-      <img id="prev" class="disabled" src="images/down.png" title="previous level">
-      <span id="label">level:</span><span id="level"></span>
+      <img id="next" class="disabled" src="images/up.png"   title="下一关">
+      <img id="prev" class="disabled" src="images/down.png" title="上一关">
+      <span id="label">关卡：</span><span id="level"></span>
     </div>
     <div id="controls">
       <input id='sound' type='checkbox' />
-      <label for='sound'>sound</label>
+      <label for='sound'>音效</label>
     </div>
     <div id="instructions" style='display:none;'>
       <div class='keyboard'>
-        <b>space</b> to start<br>
-        <b>left/right</b> to move paddle<br>
-        <b>up/down</b> to change level
+        <b>空格</b> 开始<br>
+        <b>左右键</b> 移动挡板<br>
+        <b>上下键</b> 切换关卡
       </div>
       <div class='touch'>
-        <b>touch here</b> to start<br>
-        <b>drag</b> paddle to move<br>
+        <b>点击这里</b> 开始<br>
+        <b>拖动</b> 移动挡板<br>
       </div>
     </div>
   </div>
@@ -47,5 +46,5 @@
   });
   </script>
 
-</body> 
+</body>
 </html>

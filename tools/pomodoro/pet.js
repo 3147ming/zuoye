@@ -27,21 +27,21 @@
 // Feed 标签页食物目录，按费用排序；特殊字段：favorite / catnip / minLevel。
 const FOOD_ITEMS = [
   // ── Budget ───────────────────────────────────────────────────────────────
-  { id: "bargain",    label: "Bargain Bits", emoji: "🗑️", cost:   5, hunger: 40, mood:  0, exp:  3, energy:  0 },
-  { id: "tomato",     label: "Tomato",       emoji: "🍅", cost:   8, hunger:  8, mood: 15, exp:  5, energy:  0, favorite: true },
-  { id: "fish",       label: "Dried Fish",   emoji: "🐟", cost:  10, hunger: 15, mood:  5, exp:  8, energy:  0 },
-  { id: "milk",       label: "Milk",         emoji: "🥛", cost:  15, hunger: 10, mood:  5, exp:  5, energy: 15 },
+  { id: "bargain",    label: "边角料", emoji: "🗑️", cost:   5, hunger: 40, mood:  0, exp:  3, energy:  0 },
+  { id: "tomato",     label: "番茄",       emoji: "🍅", cost:   8, hunger:  8, mood: 15, exp:  5, energy:  0, favorite: true },
+  { id: "fish",       label: "小鱼干",   emoji: "🐟", cost:  10, hunger: 15, mood:  5, exp:  8, energy:  0 },
+  { id: "milk",       label: "牛奶",         emoji: "🥛", cost:  15, hunger: 10, mood:  5, exp:  5, energy: 15 },
   // ── Mid-tier ─────────────────────────────────────────────────────────────
-  { id: "churu",      label: "Churu",        emoji: "🐾", cost:  20, hunger: 15, mood: 20, exp: 12, energy:  0 },
-  { id: "can",        label: "Cat Can",      emoji: "🥫", cost:  25, hunger: 35, mood: 10, exp: 20, energy:  0 },
-  { id: "chicken",    label: "Chicken",      emoji: "🍗", cost:  30, hunger: 30, mood:  8, exp: 25, energy:  0 },
-  { id: "catnip_tea", label: "Catnip Tea",   emoji: "🫖", cost:  35, hunger:  0, mood: 20, exp: 10, energy: 25, catnip: true },
-  { id: "cake",       label: "Mini Cake",    emoji: "🎂", cost:  40, hunger: 10, mood: 30, exp: 30, energy:  0 },
-  { id: "shrimp",     label: "Shrimp",       emoji: "🦐", cost:  45, hunger: 35, mood: 18, exp: 35, energy:  0 },
-  { id: "sushi",      label: "Sashimi",      emoji: "🍣", cost:  60, hunger: 50, mood: 25, exp: 50, energy:  0 },
+  { id: "churu",      label: "猫条",        emoji: "🐾", cost:  20, hunger: 15, mood: 20, exp: 12, energy:  0 },
+  { id: "can",        label: "猫罐头",      emoji: "🥫", cost:  25, hunger: 35, mood: 10, exp: 20, energy:  0 },
+  { id: "chicken",    label: "鸡胸肉",      emoji: "🍗", cost:  30, hunger: 30, mood:  8, exp: 25, energy:  0 },
+  { id: "catnip_tea", label: "猫薄荷茶",   emoji: "🫖", cost:  35, hunger:  0, mood: 20, exp: 10, energy: 25, catnip: true },
+  { id: "cake",       label: "小蛋糕",    emoji: "🎂", cost:  40, hunger: 10, mood: 30, exp: 30, energy:  0 },
+  { id: "shrimp",     label: "大虾",       emoji: "🦐", cost:  45, hunger: 35, mood: 18, exp: 35, energy:  0 },
+  { id: "sushi",      label: "刺身",      emoji: "🍣", cost:  60, hunger: 50, mood: 25, exp: 50, energy:  0 },
   // ── Premium (level-gated) ────────────────────────────────────────────────
-  { id: "lobster",    label: "Lobster",      emoji: "🦞", cost:  90, hunger: 55, mood: 30, exp: 70, energy:  0, minLevel: 4 },
-  { id: "wagyu",      label: "Wagyu",        emoji: "🥩", cost: 120, hunger: 60, mood: 35, exp: 90, energy:  0, minLevel: 6 },
+  { id: "lobster",    label: "龙虾",      emoji: "🦞", cost:  90, hunger: 55, mood: 30, exp: 70, energy:  0, minLevel: 4 },
+  { id: "wagyu",      label: "和牛",        emoji: "🥩", cost: 120, hunger: 60, mood: 35, exp: 90, energy:  0, minLevel: 6 },
 ];
 
 const PLAY_ACTION = { cost: 15, mood: 12, energy: -15, exp: 6 };
@@ -53,31 +53,31 @@ const ACCESSORIES = [];
 
 // Backgrounds — CSS gradient applied behind the cat image. / 猫咪背景渐变，显示在图片后方。
 const BACKGROUNDS = [
-  { id: "starry",  label: "Starry Night",   emoji: "🌙", cost:  80, minLevel: 2, bg: "radial-gradient(circle at 50% 40%, #1b1b40, #08081c)" },
-  { id: "sunny",   label: "Sunny Window",   emoji: "🌤️", cost:  80, minLevel: 2, bg: "radial-gradient(circle at 50% 20%, #fff9e0, #ffd566)" },
-  { id: "sakura",  label: "Cherry Blossom", emoji: "🌸", cost: 150, minLevel: 4, bg: "radial-gradient(circle at 50% 40%, #ffe0ea, #f5b8cc)" },
-  { id: "garden",  label: "Garden",         emoji: "🌿", cost: 150, minLevel: 4, bg: "radial-gradient(circle at 50% 40%, #d0f0c0, #9ac878)" },
-  { id: "xmas",    label: "Christmas",      emoji: "🎄", cost: 200, minLevel: 5, bg: "radial-gradient(circle at 50% 40%, #1c4020, #0a1e0a)" },
-  { id: "beach",   label: "Beach",          emoji: "🏖️", cost: 200, minLevel: 5, bg: "linear-gradient(180deg, #87ceeb 50%, #f0e68c 50%)" },
-  { id: "space",   label: "Space",          emoji: "🚀", cost: 300, minLevel: 7, bg: "radial-gradient(circle at 50% 50%, #0a0a30, #000008)" },
-  { id: "castle",  label: "Castle",         emoji: "🏰", cost: 300, minLevel: 7, bg: "radial-gradient(circle at 50% 40%, #c8b090, #a08060)" },
+  { id: "starry",  label: "星空",   emoji: "🌙", cost:  80, minLevel: 2, bg: "radial-gradient(circle at 50% 40%, #1b1b40, #08081c)" },
+  { id: "sunny",   label: "晴窗",   emoji: "🌤️", cost:  80, minLevel: 2, bg: "radial-gradient(circle at 50% 20%, #fff9e0, #ffd566)" },
+  { id: "sakura",  label: "樱花", emoji: "🌸", cost: 150, minLevel: 4, bg: "radial-gradient(circle at 50% 40%, #ffe0ea, #f5b8cc)" },
+  { id: "garden",  label: "花园",         emoji: "🌿", cost: 150, minLevel: 4, bg: "radial-gradient(circle at 50% 40%, #d0f0c0, #9ac878)" },
+  { id: "xmas",    label: "圣诞",      emoji: "🎄", cost: 200, minLevel: 5, bg: "radial-gradient(circle at 50% 40%, #1c4020, #0a1e0a)" },
+  { id: "beach",   label: "海滩",          emoji: "🏖️", cost: 200, minLevel: 5, bg: "linear-gradient(180deg, #87ceeb 50%, #f0e68c 50%)" },
+  { id: "space",   label: "太空",          emoji: "🚀", cost: 300, minLevel: 7, bg: "radial-gradient(circle at 50% 50%, #0a0a30, #000008)" },
+  { id: "castle",  label: "城堡",         emoji: "🏰", cost: 300, minLevel: 7, bg: "radial-gradient(circle at 50% 40%, #c8b090, #a08060)" },
 ];
 
 // Beds — emoji shown below the cat when she sleeps. / 睡眠时显示在猫咪下方的猫窝 emoji。
 const BEDS = [
-  { id: "basket",  label: "Wicker Basket", emoji: "🧺", cost:  60, minLevel: 2 },
-  { id: "softbed", label: "Soft Bed",      emoji: "🛏️", cost: 120, minLevel: 4 },
-  { id: "villa",   label: "Cat Villa",     emoji: "🏠", cost: 250, minLevel: 6 },
+  { id: "basket",  label: "藤编猫篮", emoji: "🧺", cost:  60, minLevel: 2 },
+  { id: "softbed", label: "软猫窝",      emoji: "🛏️", cost: 120, minLevel: 4 },
+  { id: "villa",   label: "猫别墅",     emoji: "🏠", cost: 250, minLevel: 6 },
 ];
 
 // Skins — emoji placeholder; real cat-image art to be swapped in later.
 // 皮肤 emoji 占位，等美术资源到位后替换为真实图片。
 const SKINS = [
-  { id: "default", label: "Natural",      emoji: "🐱", cost:   0, minLevel: 1 },
-  { id: "orange",  label: "Orange Tabby", emoji: "🐱", cost: 100, minLevel: 1 },
-  { id: "tiger",   label: "Tiger Stripe", emoji: "🐯", cost: 180, minLevel: 3 },
-  { id: "cow",     label: "Cow Cat",      emoji: "🐮", cost: 260, minLevel: 5 },
-  { id: "lion",    label: "Lion King",    emoji: "🦁", cost: 400, minLevel: 8 },
+  { id: "default", label: "自然本色",      emoji: "🐱", cost:   0, minLevel: 1 },
+  { id: "orange",  label: "橘猫", emoji: "🐱", cost: 100, minLevel: 1 },
+  { id: "tiger",   label: "虎斑", emoji: "🐯", cost: 180, minLevel: 3 },
+  { id: "cow",     label: "奶牛猫",      emoji: "🐮", cost: 260, minLevel: 5 },
+  { id: "lion",    label: "狮子王",    emoji: "🦁", cost: 400, minLevel: 8 },
 ];
 
 // Bundles removed along with accessories.
@@ -86,8 +86,8 @@ const BUNDLES = [];
 // Milestone gifts — granted automatically when the cat first reaches a level.
 // 等级里程碑：首次到达指定等级时自动赠送背景。
 const MILESTONES = [
-  { level: 6, giftId: "castle", msg: "🎉 Reached Lv.6 — got Castle background!" },
-  { level: 8, giftId: "space",  msg: "🎉 Reached Lv.8 — got Space background!"  },
+  { level: 6, giftId: "castle", msg: "🎉 达到等级 6 — 获得「城堡」背景！" },
+  { level: 8, giftId: "space",  msg: "🎉 达到等级 8 — 获得「太空」背景！"  },
 ];
 
 // All rates are per real-world minute. Awake and asleep are tracked separately.
@@ -114,7 +114,7 @@ function freshState() {
   return {
     level: 1, exp: 0, hunger: 80, mood: 80, energy: 80,
     asleep: false, lastSeen: Date.now(),
-    name: "Luna",
+    name: "露娜",
     owned: [], equipped: freshEquipped(), inventory: {},
   };
 }
@@ -250,14 +250,14 @@ function render() {
   bubbleEl.classList.toggle("visible", bubbleText.length > 0);
 
   // ── Name + Level ─────────────────────────────────────────────
-  document.getElementById("catName").textContent = s.name || "Luna";
-  document.getElementById("catLv").textContent = "Lv. " + s.level;
+  document.getElementById("catName").textContent = s.name || "露娜";
+  document.getElementById("catLv").textContent = "等级 " + s.level;
 
   // ── EXP bar ──────────────────────────────────────────────────
   const needed = expForLevel(s.level);
   const pct    = Math.min(100, (s.exp / needed) * 100);
   document.getElementById("expFill").style.width  = pct + "%";
-  document.getElementById("expLabel").textContent = s.exp + " / " + needed + " EXP";
+  document.getElementById("expLabel").textContent = s.exp + " / " + needed + " 经验";
 
   // ── Stat bars ────────────────────────────────────────────────
   setStat("Fullness", s.hunger);
@@ -265,9 +265,9 @@ function render() {
   setStat("Energy",   s.energy);
 
   // ── Sleep button label ───────────────────────────────────────
-  document.getElementById("btnSleep").textContent = s.asleep ? "☀️ Wake" : "💤 Sleep";
-  document.getElementById("btnPlay").textContent  = "🎾 Play · 🪙" + PLAY_ACTION.cost;
-  document.getElementById("btnFeed").textContent  = "🍖 Feed";
+  document.getElementById("btnSleep").textContent = s.asleep ? "☀️ 起床" : "💤 睡觉";
+  document.getElementById("btnPlay").textContent  = "🎾 玩耍 · 🪙" + PLAY_ACTION.cost;
+  document.getElementById("btnFeed").textContent  = "🍖 喂食";
 
   // ── Disabled states ──────────────────────────────────────────
   document.getElementById("btnFeed").disabled = false; // always opens feed tab
@@ -282,7 +282,7 @@ function render() {
   // ── Sleepy status line / level-up celebration ────────────────
   if (levelUpPending !== null) {
     // Show level-up message briefly, then clear so it doesn't linger
-    document.getElementById("statusLine").textContent = `🎉 Level up! Now Lv.${levelUpPending}!`;
+    document.getElementById("statusLine").textContent = `🎉 升级了！现在是等级 ${levelUpPending}！`;
     const img = document.getElementById("petCatImg");
     img.classList.remove("cat-bounce");
     void img.offsetWidth; // force reflow so animation re-fires
@@ -373,13 +373,13 @@ function trySpendCoins(amount) {
 
 function getSpeechBubbleText(s) {
   if (checkInNotice)            return checkInNotice;
-  if (flashAction === "fed")    return "Yummy! 😋";
-  if (flashAction === "played") return "That was fun! 🎾";
+  if (flashAction === "fed")    return "好吃！😋";
+  if (flashAction === "played") return "真好玩！🎾";
   if (s.asleep)                 return "";
-  if (s.hunger < 25)            return "I'm starving... 🍖";
-  if (s.energy < 20)            return "I need sleep... 😴";
-  if (s.mood < 25)              return "I'm so bored... 😔";
-  if (s.mood > 85 && s.hunger > 70 && s.energy > 50) return "This is the life~ 😻";
+  if (s.hunger < 25)            return "我饿扁了……🍖";
+  if (s.energy < 20)            return "我想睡觉……😴";
+  if (s.mood < 25)              return "好无聊……😔";
+  if (s.mood > 85 && s.hunger > 70 && s.energy > 50) return "这才叫生活～😻";
   return "";
 }
 
@@ -419,7 +419,7 @@ function checkDailyBonus() {
   localStorage.setItem("coins", String(coins + 20));
   localStorage.setItem("lastCheckIn", today);
 
-  checkInNotice = "Daily bonus! +20🪙";
+  checkInNotice = "每日奖励！+20🪙";
   setTimeout(() => { checkInNotice = null; render(); }, 4000);
 }
 
@@ -491,7 +491,7 @@ function doUseFood(itemId) {
 // Rename the cat — prompts user for a new name and persists it.
 // 重命名猫咪，弹出输入框并持久化保存。
 function startRename() {
-  const input   = prompt("Enter your cat's name:", petState.name || "Luna");
+  const input   = prompt("给猫咪起个名字：", petState.name || "露娜");
   if (input === null) return;
   const trimmed = input.trim();
   if (!trimmed) return;
@@ -588,7 +588,7 @@ function renderFeedTab() {
   }
 
   // ── Buy: full catalogue ───────────────────────────────────────
-  html += '<div class="shop-section"><div class="shop-section-title">🛒 Buy Food</div>' +
+  html += '<div class="shop-section"><div class="shop-section-title">🛒 购买食物</div>' +
     '<div class="feed-grid">';
 
   FOOD_ITEMS.forEach(item => {
@@ -597,8 +597,8 @@ function renderFeedTab() {
     const isDim     = !canAfford || isLocked;
 
     const badges =
-      (item.favorite ? '<span class="food-badge food-fav">❤️ Fav ×1.5</span>' : "") +
-      (item.catnip   ? '<span class="food-badge food-catnip">🌿 Catnip</span>'  : "");
+      (item.favorite ? '<span class="food-badge food-fav">❤️ 最爱 ×1.5</span>' : "") +
+      (item.catnip   ? '<span class="food-badge food-catnip">🌿 猫薄荷</span>'  : "");
 
     const hungerCls = item.hunger < 0 ? ' class="stat-neg"' : "";
     const moodCls   = item.mood   < 0 ? ' class="stat-neg"' : "";
@@ -610,7 +610,7 @@ function renderFeedTab() {
       statsHtml += "<span>⚡ " + (item.energy > 0 ? "+" : "") + item.energy + "</span>";
     }
 
-    const btnLabel = isLocked ? "🔒 Lv." + item.minLevel : "Buy 🪙" + item.cost;
+    const btnLabel = isLocked ? "🔒 等级 " + item.minLevel : "购买 🪙" + item.cost;
 
     html +=
       '<div class="food-card' + (isDim ? " food-card-dim" : "") + '">' +
@@ -686,9 +686,9 @@ function makeShopCard(item, coins) {
   const dim       = owned || locked || !canAfford;
 
   let btnLabel, btnDisabled;
-  if (owned)        { btnLabel = "Owned ✓";              btnDisabled = true; }
-  else if (locked)  { btnLabel = "🔒 Lv." + item.minLevel; btnDisabled = true; }
-  else              { btnLabel = "Buy 🪙" + item.cost;    btnDisabled = !canAfford; }
+  if (owned)        { btnLabel = "已拥有 ✓";              btnDisabled = true; }
+  else if (locked)  { btnLabel = "🔒 等级 " + item.minLevel; btnDisabled = true; }
+  else              { btnLabel = "购买 🪙" + item.cost;    btnDisabled = !canAfford; }
 
   return '<div class="acc-card' + (dim ? " acc-card-dim" : "") + '">' +
     '<div class="acc-emoji">' + item.emoji + '</div>' +
@@ -712,8 +712,8 @@ function makeBundleCard(bundle, coins) {
 
   const itemNames = items.map(it => it.emoji + ' ' + it.label).join(', ');
   let btnLabel, btnDisabled;
-  if (allOwned) { btnLabel = "Owned ✓"; btnDisabled = true; }
-  else          { btnLabel = "Buy 🪙" + actualPrice; btnDisabled = !canAfford; }
+  if (allOwned) { btnLabel = "已拥有 ✓"; btnDisabled = true; }
+  else          { btnLabel = "购买 🪙" + actualPrice; btnDisabled = !canAfford; }
 
   return '<div class="acc-card' + (dim ? " acc-card-dim" : "") + '">' +
     '<div class="acc-emoji">' + bundle.emoji + '</div>' +
@@ -739,9 +739,9 @@ function renderShopTab() {
     '</div>';
 
   pane.innerHTML =
-    section("🌄 Backgrounds", BACKGROUNDS,                                    makeShopCard) +
-    section("🛌 Beds",         BEDS,                                           makeShopCard) +
-    section("🐱 Skins (coming soon)", SKINS.filter(s => s.id === "default"),  makeShopCard);
+    section("🌄 背景", BACKGROUNDS,                                    makeShopCard) +
+    section("🛌 猫窝",         BEDS,                                           makeShopCard) +
+    section("🐱 皮肤（即将上架）", SKINS.filter(s => s.id === "default"),  makeShopCard);
 
   pane.querySelectorAll('.btn-acc-buy').forEach(btn => {
     btn.addEventListener('click', () => doBuyAcc(btn.dataset.id));
@@ -760,9 +760,9 @@ function renderClosetTab() {
       return '<div class="acc-card' + (isEquipped ? ' acc-card-equipped' : '') + '">' +
         '<div class="acc-emoji">'  + item.emoji + '</div>' +
         '<div class="acc-name">'   + item.label + '</div>' +
-        (isEquipped ? '<div class="acc-equipped-label">Wearing ✨</div>' : '') +
+        (isEquipped ? '<div class="acc-equipped-label">穿戴中 ✨</div>' : '') +
         '<button class="btn-acc-equip" data-id="' + item.id + '" data-slot="' + slotKey + '">' +
-          (isEquipped ? 'Take Off' : 'Wear') +
+          (isEquipped ? '脱下' : '穿上') +
         '</button>' +
         '</div>';
     }).join('');
@@ -779,14 +779,14 @@ function renderClosetTab() {
   const hasAnything = ownedBg.length > 0 || ownedBeds.length > 0;
 
   if (!hasAnything && ownedSkins.length <= 1) {
-    pane.innerHTML = '<p class="pane-empty">🛍️ Nothing yet — visit the Shop!</p>';
+    pane.innerHTML = '<p class="pane-empty">🛍️ 还没有东西 — 去商店逛逛吧！</p>';
     return;
   }
 
   pane.innerHTML =
-    closetSection("🌄 Background",  ownedBg,    "background") +
+    closetSection("🌄 背景",  ownedBg,    "background") +
     closetSection("🛌 Bed",         ownedBeds,  "bed") +
-    closetSection("🐱 Skin",        ownedSkins, "skin");
+    closetSection("🐱 皮肤",        ownedSkins, "skin");
 
   pane.querySelectorAll('.btn-acc-equip').forEach(btn => {
     btn.addEventListener('click', () => doEquipAcc(btn.dataset.id, btn.dataset.slot));

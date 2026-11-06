@@ -289,7 +289,7 @@ function updateDisplay() {
    ============================================================= */
 
 function updateRoundInfo() {
-  roundInfo.textContent = `Round ${currentRound} / ${MAX_ROUNDS}`;
+  roundInfo.textContent = `第 ${currentRound} 回合 / 共 ${MAX_ROUNDS}`;
   /* Updates the "Round 1 / 4" text using a template literal */
 }
 
@@ -327,7 +327,7 @@ function startTimer(autoStart = false) {
     if (isFocusMode) {
       showQuote(); // Pick a random quote from the QUOTES array (Feature D)
     } else {
-      statusMessage.textContent = "Rest up — you've earned it! ☕";
+      statusMessage.textContent = "歇会儿，你已经很棒了！☕";
     }
   }
   /*
@@ -480,7 +480,7 @@ function sessionComplete() {
           .long-break-mode .progress-bar { background: purple }
           etc.
       */
-      modeLabel.textContent = "Long Break";
+      modeLabel.textContent = "长休息";
       totalSeconds   = longBreakMinutes * 60; // e.g. 15 * 60 = 900 seconds
       sessionSeconds = totalSeconds;
       // Pick a status message — goal/streak milestones take priority over the default
@@ -488,23 +488,23 @@ function sessionComplete() {
       const coinsEarned = focusMinutes * 3;
       let msg;
       if (goalHit && streakMilestone) {
-        msg = `Goal reached + ${streakMilestone} 🎉 Long break earned!`;
+        msg = `目标达成 + ${streakMilestone} 🎉 长休息应得了!`;
       } else if (goalHit) {
-        msg = `Daily goal reached! 🎯 Long break — you earned it!`;
+        msg = `每日目标达成！🎯 长休息 — 你应得的!`;
       } else if (streakMilestone) {
-        msg = `${streakMilestone} — long break starting! 🏆`;
+        msg = `${streakMilestone} — 长休息开始！🏆`;
       } else {
-        msg = `Cycle complete! 🏆 Enjoy your ${longBreakMinutes}-min long break!`;
+        msg = `循环完成！🏆 享受你的 ${longBreakMinutes}-min 长休息!`;
       }
       statusMessage.textContent = msg + ` +${coinsEarned}🪙`;
       streakMilestone = null; // Clear after use so it doesn't bleed into the next session
-      showNotification("Cycle complete! 🏆", `You earned a ${longBreakMinutes}-min long break — great work!`);
+      showNotification("循环完成！🏆", `你赢得了 ${longBreakMinutes}-min 长休息 — 干得好!`);
 
     } else {
       // ── REGULAR ROUND → Short Break ──────────────────────────────────
       isLongBreak = false;
       document.body.classList.add("break-mode");
-      modeLabel.textContent = "Break";
+      modeLabel.textContent = "短休息";
       totalSeconds   = breakMinutes * 60; // e.g. 5 * 60 = 300 seconds
       sessionSeconds = totalSeconds;
       // Pick a status message — goal/streak milestones take priority over the default
@@ -512,17 +512,17 @@ function sessionComplete() {
       const coinsEarned = focusMinutes * 3;
       let msg;
       if (goalHit && streakMilestone) {
-        msg = `Goal reached + ${streakMilestone} — break starting! 🎉`;
+        msg = `目标达成 + ${streakMilestone} — 休息开始！🎉`;
       } else if (goalHit) {
-        msg = `Daily goal reached! 🎯 Break starting — you earned it!`;
+        msg = `每日目标达成！🎯 休息开始 — 你应得的!`;
       } else if (streakMilestone) {
-        msg = `${streakMilestone} — focus session done! Break starting...`;
+        msg = `${streakMilestone} — 专注会话结束！短休息开始...`;
       } else {
-        msg = "Focus session done! Break starting... 🎉";
+        msg = "专注会话结束！短休息开始... 🎉";
       }
       statusMessage.textContent = msg + ` +${coinsEarned}🪙`;
       streakMilestone = null; // Clear after use
-      showNotification("Focus session complete! 🎉", "Great work — your break is starting now ☕");
+      showNotification("专注会话完成！🎉", "干得不错 — 休息开始了 ☕");
     }
 
     startTimer(true); // Auto-start the break; pass true to preserve the completion message
@@ -534,8 +534,8 @@ function sessionComplete() {
       // ── LONG BREAK just ended → reset the whole cycle ────────────────
       document.body.classList.remove("long-break-mode");
       currentRound = 1; // Back to round 1 — fresh cycle starts
-      statusMessage.textContent = "Long break over — ready for a brand new cycle! 🍅";
-      showNotification("Long break over! 💪", "Ready to start a fresh new cycle?");
+      statusMessage.textContent = "长休息结束 — 准备好迎接新一轮了！🍅";
+      showNotification("长休息结束！💪", "准备好开始新的一轮了吗？");
 
     } else {
       // ── SHORT BREAK just ended → advance to next round ───────────────
@@ -547,13 +547,13 @@ function sessionComplete() {
         that if we're here, currentRound was < MAX_ROUNDS, so incrementing
         is safe and won't go past MAX_ROUNDS.
       */
-      statusMessage.textContent = `Round ${currentRound - 1} done! Starting round ${currentRound}... 🍅`;
-      showNotification("Break's over! 💪", "Starting next focus session — you've got this!");
+      statusMessage.textContent = `第 ${currentRound - 1} 回合完成！开始第 ${currentRound} 回合... 🍅`;
+      showNotification("休息结束！💪", "开始下一轮专注 — 你没问题的！");
     }
 
     isLongBreak   = false;
     isFocusMode   = true;
-    modeLabel.textContent = "Focus";
+    modeLabel.textContent = "专注";
     totalSeconds   = focusMinutes * 60;
     sessionSeconds = totalSeconds;
     updateRoundInfo();
@@ -584,7 +584,7 @@ function pauseTimer() {
   btnStart.disabled = false;  // Re-enable Start (so they can resume)
   btnPause.disabled = true;   // Grey out Pause (can't pause what's stopped)
 
-  statusMessage.textContent = "Paused. Press Start to continue.";
+  statusMessage.textContent = "已暂停。点击“开始”继续。";
 }
 
 
@@ -606,14 +606,14 @@ function resetTimer() {
 
   // Remove ALL mode classes — covers all states
   document.body.classList.remove("break-mode", "long-break-mode", "running", "paused", "done");
-  modeLabel.textContent = "Focus";
+  modeLabel.textContent = "专注";
 
   // Reset button states
   btnStart.disabled = false;
   btnPause.disabled = true;
 
   // Reset the display
-  statusMessage.textContent = "Press Start to begin your focus session.";
+  statusMessage.textContent = "点击“开始”开始专注会话。";
   initialise(); // Re-run setup: sets totalSeconds = 1500 and updates display
 }
 
@@ -685,7 +685,7 @@ function applySettings() {
 
       || means OR: if ANY of these conditions is true, show the error.
     */
-    settingsError.textContent = "Focus time must be 1–60 minutes.";
+    settingsError.textContent = "专注时间必须在 1–60 分钟之间。";
     inputFocus.focus(); // Move cursor back to the focus input
     /*
       .focus() = programmatically click on an input,
@@ -695,13 +695,13 @@ function applySettings() {
   }
 
   if (isNaN(newBreak) || newBreak < 1 || newBreak > 30) {
-    settingsError.textContent = "Break time must be 1–30 minutes.";
+    settingsError.textContent = "短休息必须在 1–30 分钟之间。";
     inputBreak.focus();
     return;
   }
 
   if (isNaN(newLongBreak) || newLongBreak < 5 || newLongBreak > 60) {
-    settingsError.textContent = "Long break must be 5–60 minutes.";
+    settingsError.textContent = "长休息必须在 5–60 分钟之间。";
     inputLongBreak.focus();
     return;
   }
@@ -757,7 +757,7 @@ function applySettings() {
     updateGoalDisplay();
   }
 
-  statusMessage.textContent = `Settings saved! Focus: ${focusMinutes}min, Break: ${breakMinutes}min, Long: ${longBreakMinutes}min ✓`;
+  statusMessage.textContent = `设置已保存！专注: ${focusMinutes}min, 短休息: ${breakMinutes}min, 长休息: ${longBreakMinutes}min ✓`;
 }
 
 
@@ -1039,9 +1039,9 @@ async function requestNotificationPermission() {
   if (!("Notification" in window)) {
     const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
     if (isIOS) {
-      statusMessage.textContent = "iOS Safari requires 'Add to Home Screen' to enable notifications 🏠";
+      statusMessage.textContent = "iOS Safari 需要添加到主屏幕才能开启通知 🏠";
     } else {
-      statusMessage.textContent = "This browser doesn't support notifications. Try Chrome or Firefox 😕";
+      statusMessage.textContent = "此浏览器不支持通知。建议使用 Chrome 或 Firefox 😕";
     }
     return;
   }
@@ -1057,7 +1057,7 @@ async function requestNotificationPermission() {
       Once "denied", the browser won't show the permission pop-up again.
       The user must manually unblock in browser settings.
     */
-    statusMessage.textContent = "Notifications blocked. Unblock in browser settings 🔧";
+    statusMessage.textContent = "通知已屏蔽。请在浏览器设置中解除屏蔽 🔧";
     return;
   }
 
@@ -1065,7 +1065,7 @@ async function requestNotificationPermission() {
   if (Notification.permission === "granted" && notificationsEnabled) {
     notificationsEnabled = false;
     updateBellButton();
-    statusMessage.textContent = "Notifications turned off.";
+    statusMessage.textContent = "通知已关闭。";
     return;
     /*
       If notifications were already ON and user clicks the bell again,
@@ -1093,9 +1093,9 @@ async function requestNotificationPermission() {
   updateBellButton();
 
   if (notificationsEnabled) {
-    statusMessage.textContent = "Notifications ON! We'll alert you when sessions end 🔔";
+    statusMessage.textContent = "通知已开启！会话结束时会提醒你 🔔";
   } else {
-    statusMessage.textContent = "Notifications blocked 🔕";
+    statusMessage.textContent = "通知已屏蔽 🔕";
   }
 }
 
@@ -1441,7 +1441,7 @@ function renderTasks() {
       We need to append it to the DOM to make it visible.
     */
     empty.className   = "task-empty";
-    empty.textContent = "✨ No tasks yet — add one above!";
+    empty.textContent = "✨ 暂无任务 — 点击上方添加！";
     taskList.appendChild(empty);
     /*
       appendChild() adds the new element as the LAST CHILD of taskList.
@@ -1637,21 +1637,21 @@ taskInput.addEventListener("keydown", function(event) {
    ============================================================= */
 
 const QUOTES = [
-  "Focus is the bridge between goals and accomplishment.",
-  "One task at a time. One moment at a time.",
-  "Deep work is the superpower of the 21st century.",
-  "The secret of getting ahead is getting started.",
-  "Small progress is still progress. Keep going.",
-  "Concentration is the root of all higher abilities.",
-  "You don't have to be great to start. Start to become great.",
-  "Your future self will thank you for this session.",
-  "Eliminate the noise. Stay with the signal.",
-  "This moment of focus is an investment in who you're becoming.",
-  "Show up. Do the work. Trust the process.",
-  "Every expert was once a beginner who refused to quit.",
-  "Do the hard work, especially when you don't feel like it.",
-  "Distraction is the enemy. Focus is the weapon.",
-  "Not how long, but how well."
+  "专注是连接目标与成就的桥梁。",
+  "一次只做一件事，活在当下。",
+  "深度工作是 21 世纪的超能力。",
+  "取得进步的秘诀，就是开始行动。",
+  "哪怕是小小的进步，也是进步。继续前行。",
+  "专注是一切高级能力的根源。",
+  "你不必伟大才能开始，开始才能变得伟大。",
+  "未来的你会感谢这次专注。",
+  "屏蔽噪音，专注信号。",
+  "此刻的专注，是对未来你的投资。",
+  "出现，做事，相信过程。",
+  "每位专家都曾是拒绝放弃的初学者。",
+  "做难事，尤其是在你不想做的时候。",
+  "分心是敌人，专注是武器。",
+  "不在于时长，而在于质量。"
 ];
 /*
   A plain array of strings — 15 motivational quotes.
@@ -1925,7 +1925,7 @@ function renderWeeklyChart() {
     (sum, d) => sum + d.count starts with sum = 0, then adds each count.
     Result: the total number of sessions across all 7 days.
   */
-  weekTotal.textContent = `${weekSum} session${weekSum !== 1 ? "s" : ""}`;
+  weekTotal.textContent = `本周 ${weekSum} 次`;
   /*
     weekSum !== 1 ? "s" : ""  → "sessions" (plural) or "session" (singular)
     This is a small but polished UX detail.

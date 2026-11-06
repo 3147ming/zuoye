@@ -144,6 +144,8 @@
       color: '#f07167', glyph: 'pomodoro', desc: '专注计时 · 陪伴小猫', seed: 1104 },
     { id: 'links', cat: 'tools', name: '网址推荐', src: 'tools/links/index.html',
       color: '#f6c177', glyph: 'links', desc: '大家分享的好网站', seed: 1117 },
+    { id: 'board', cat: 'tools', name: '留言板', src: 'tools/board/index.html',
+      color: '#c8a5ff', glyph: 'links', desc: '给路过的人留句话', seed: 1121 },
     /* ---- 🎮 脑力街机（brain 直达，需联网；手机直接触屏玩，WorldHub 不派发按键） ---- */
     { id: 'snake', cat: 'games', group: '🎮 脑力街机', name: '贪吃蛇',
       src: 'https://ming-games.pages.dev/brain-gym/?game=snake',
@@ -178,8 +180,15 @@
       color: '#f2a0c0', glyph: 'breakout', desc: '反弹消砖 · 逐关', seed: 1111 },
     { id: 'warehouse', cat: 'games', group: '🕹 开源小游戏', name: '仓库行动',
       src: 'https://warehouse-strike.pages.dev/',
-      color: '#ff6b6b', glyph: 'arcade', desc: '网页 FPS · 仓库枪战',
-      cross: true, seed: 1201 }
+      color: '#ff6b6b', glyph: 'arcade', desc: '第一人称 · 仓库枪战',
+      cross: true, seed: 1201 },
+    /* ---- ✨ 大厅新玩（自研，可离线） ---- */
+    { id: 'memory', cat: 'games', group: '✨ 大厅新玩', name: '记忆翻牌', src: 'games/memory/index.html',
+      color: '#f2a0c0', glyph: 'cards', desc: '配对消除 · 三档棋盘', seed: 1211 },
+    { id: 'reaction', cat: 'games', group: '✨ 大厅新玩', name: '反应速度', src: 'games/reaction/index.html',
+      color: '#5fd39a', glyph: 'arcade', desc: '变绿就点 · 五轮定级', seed: 1212 },
+    { id: 'mathdash', cat: 'games', group: '✨ 大厅新玩', name: '算术挑战', src: 'games/mathdash/index.html',
+      color: '#7ec8ff', glyph: 'n2048', desc: '60 秒口算 · 连击加分', seed: 1213 }
   ];
 
   /* 动态计数：避免文案把数字写死（区块/游戏数量随内容增减） */
@@ -198,7 +207,7 @@
       lines: [
         '……又一位旅行者。欢迎来到中心广场。',
         '这里不再是一条直路。左右各有一座总门，路只留着三屏。',
-        '往左走，是工具总门：白噪音和番茄钟。',
+        '往左走，是工具总门：听风、计时、找网站、留句话。',
         '往右走，是游戏总门：' + GAME_COUNT + ' 款小游戏都在那后面。',
         '站到门前按 E，会列出那一整排区块，选一个就能直接传过去。',
         '每个区块里都有人等着给你讲怎么用——先听，再按 E 进门。',
@@ -233,7 +242,7 @@
       line1: '好网站，一起攒。',
       lines: [
         '这里收录大家推荐的好网站，谁都能加、谁都能看。',
-        '网址推荐：点卡片在新标签打开；你也可以提交自己的收藏。',
+        '网址推荐：点名称在新标签打开；你也可以提交自己的收藏。',
         '添加时会自动检查格式和内容，通过就直接上墙，不用等审核。',
         '走出画面边缘，就回广场了。'
       ]
@@ -324,7 +333,7 @@
       lines: [
         '站好了，这里是擂台。',
         '格斗：两个人一台键盘，谁的血条先空谁输。',
-        '1P 用 G J Y H 走跳，S D F 出招，Shift 防御；2P 用方向键加方括号那一排。',
+        '1P 用 W A S D 走跳，J 高拳、K 低拳、L 踢，Shift 防御；2P 用方向键加方括号那一排。',
         '打完了从画面边缘走回去。'
       ]
     },
@@ -367,8 +376,71 @@
         '鼠标瞄准、点击射击，手机上直接触屏操作；需要联网才能进。',
         '从画面边缘走出去，就回广场了。'
       ]
+    },
+    board: {
+      name: '守石人',
+      line1: '石板闲着也是闲着。',
+      lines: [
+        '这块石板空了几百年了。',
+        '留言板：谁路过都能刻一句话，所有人都看得见。',
+        '署名最多十个字，留言一百二十个字，别写隐私。',
+        '联网时写进云端，断了网先替你刻在本机。'
+      ]
+    },
+    memory: {
+      name: '洗牌人',
+      line1: '图案都朝下，看你记性。',
+      lines: [
+        '这是我压箱底的牌。',
+        '记忆翻牌：一次翻两张，一样的就配对，全配完算过关。',
+        '三档棋盘越翻越多；步数越少、时间越短，纪录就越漂亮。',
+        '手机上也能玩，点牌就行。'
+      ]
+    },
+    reaction: {
+      name: '闪电使',
+      line1: '快，比想更快。',
+      lines: [
+        '这里测的不是聪明，是手。',
+        '反应速度：红圆变绿的瞬间点它，五轮取平均定级。',
+        '绿之前就点算抢跑，那一轮作废重来。',
+        '平均 180 毫秒以内，就算得上是闪电了。'
+      ]
+    },
+    mathdash: {
+      name: '算盘先生',
+      line1: '心里打算盘，别怕。',
+      lines: [
+        '六十秒，能算几题算几题。',
+        '算术挑战：加减乘除轮流上，连对越多题越难、分越高。',
+        '连对五个开始翻倍，答错降一档。',
+        '手机上用下面那个小键盘，点着比打字快。'
+      ]
     }
   };
+
+  /* ---------------- 大厅皮肤（只改氛围：色相/饱和度/昼夜强度） ---------------- */
+  var SKINS = {
+    paper: { name: '剪纸', hue: 1.00, sat: 1.00 },
+    ink:   { name: '水墨', hue: 0.92, sat: 0.55 },
+    dusk:  { name: '琥珀暮色', hue: 1.06, sat: 1.12 }
+  };
+  var SKIN_KEY = 'worldhub.skin.v1';
+  function skinId() {
+    try { var v = global.localStorage.getItem(SKIN_KEY); return SKINS[v] ? v : 'paper'; }
+    catch (e) { return 'paper'; }
+  }
+  function skinData() { return SKINS[skinId()]; }
+  function desat(hex, satK) {
+    if (satK === 1) return hex;
+    var n = parseInt(hex.slice(1), 16);
+    var r = (n >> 16) & 255, g0 = (n >> 8) & 255, b = n & 255;
+    var lum = (r * 299 + g0 * 587 + b * 114) / 1000;
+    r = Math.round(lum + (r - lum) * satK);
+    g0 = Math.round(lum + (g0 - lum) * satK);
+    b = Math.round(lum + (b - lum) * satK);
+    return '#' + ((1 << 24) + (clamp(r, 0, 255) << 16) + (clamp(g0, 0, 255) << 8) + clamp(b, 0, 255)).toString(16).slice(1);
+  }
 
   /* ============================================================
    * 2. 场景表
@@ -417,7 +489,13 @@
     arr.push(gateScene('tools', 1091));
     arr.push({
       id: 'plaza', kind: 'plaza', cat: '', title: '中心广场',
-      themeKey: 'center', seed: 0, item: null, npcX: 470, door: null
+      themeKey: 'center', seed: 0, item: null, npcX: 470,
+      door: {
+        x: 960, w: 150, h: 150,
+        isNotice: true, isGate: false, cat: '',
+        name: '每日一题', desc: '站过来按 E 看今天的题',
+        color: '#f0a76e', glyph: 'gate', src: ''
+      }
     });
     arr.push(gateScene('games', 1092));
 
@@ -514,6 +592,7 @@
     ['总门', '广场往左 / 往右各有一座总门，站过去按 E 选区块'],
     ['传送', '选完直接落到那个区块中央，先听 NPC 讲，再按 E 进门'],
     ['区块', '任意一侧边缘走出去，就回中心广场'],
+    ['告示牌', '广场正中那块牌：按 E 答今天的每日一题'],
     ['游戏 / 工具', '左上「← 回上一级」回到进门前那屏，右上「← 回大厅」回广场'],
     ['设置', '顶栏齿轮或 O 键：场景背景 / 音量 / 全屏 / 重置存档'],
     ['通用', 'Esc 关闭面板 · H 关掉这块面板']
@@ -838,6 +917,34 @@
       ctx.moveTo(cx - 22, cy + 2); ctx.lineTo(cx + 22, cy + 2);
       ctx.stroke();
 
+    } else if (kind === 'cards') {
+      /* 记忆翻牌：两张错位的牌 + 一颗星 */
+      ctx.save();
+      ctx.translate(cx - 8, cy);
+      ctx.rotate(-0.14);
+      roundRect(ctx, -11, -16, 22, 32, 4);
+      ctx.stroke();
+      ctx.restore();
+      ctx.save();
+      ctx.translate(cx + 9, cy + 2);
+      ctx.rotate(0.12);
+      roundRect(ctx, -11, -16, 22, 32, 4);
+      ctx.globalAlpha = 0.6;
+      ctx.stroke();
+      ctx.globalAlpha = 1;
+      ctx.beginPath();
+      for (i = 0; i < 5; i++) {
+        a = -Math.PI / 2 + i * Math.PI * 2 / 5;
+        x = Math.cos(a) * 7;
+        y = 0 + Math.sin(a) * 7;
+        if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+        a += Math.PI * 2 / 10;
+        ctx.lineTo(Math.cos(a) * 3, Math.sin(a) * 3);
+      }
+      ctx.closePath();
+      ctx.fill();
+      ctx.restore();
+
     } else {
       /* pomodoro：番茄 + 指针 */
       ctx.beginPath();
@@ -906,6 +1013,8 @@
     this._photo = null;
     this._photoSrc = '';
     this._photoFail = '';
+    this.staticLayer = null;
+    this.staticCanvas = null;
 
     /* 镜头：横向跟随玩家，纵向固定在 CAM_Y（地面贴屏幕底边） */
     this.cam = global.Camera ? new global.Camera(CAM_W, CAM_H, VIEW_W, VIEW_H) : null;
@@ -932,6 +1041,7 @@
     this.near = null;
     this.npcNear = false;
 
+    this.bakeStatic();
     if (!opts.keepBg) this.bakeBg();
   };
 
@@ -1030,8 +1140,10 @@
     var z = this.scene;
     var theme = THEME[z.themeKey] || THEME.center;
     var rng = mulberry32(z.seed || 1);
-    var k = this.hueK;
+    var sk = skinData();
+    var k = this.hueK * sk.hue;
     var i;
+    function SC(hex, mul) { return shade(desat(hex, sk.sat), k * (mul || 1)); }
 
     if (!this.bg) {
       this.bg = document.createElement('canvas');
@@ -1045,12 +1157,13 @@
     var sky = g.createLinearGradient(0, 0, 0, GROUND_Y);
     var stops = [0, 0.24, 0.46, 0.66, 0.83, 1];
     for (i = 0; i < stops.length; i++) {
-      sky.addColorStop(stops[i], shade(theme.sky[i], k));
+      sky.addColorStop(stops[i], SC(theme.sky[i]));
     }
     g.fillStyle = sky;
     g.fillRect(0, 0, VIEW_W, GROUND_Y);
 
-    /* --- 太阳（位置随主题确定性偏移；总门屏一律挪到左边，别压住右侧名录板） --- */
+    /* --- 太阳 / 月亮（夜里烘月；位置随主题确定性偏移） --- */
+    var night = global.DayNight && global.DayNight.phase() === 'night';
     var sx;
     if (z.kind === 'gate') sx = 200 + rng() * 170;
     else if (z.themeKey === 'left') sx = 240 + rng() * 160;
@@ -1058,21 +1171,42 @@
     else sx = 940 + rng() * 100;
     var sy = 300 + rng() * 80;
     var sr = 58 + rng() * 18;
-    var halo = g.createRadialGradient(sx, sy, sr * 0.7, sx, sy, sr * 5.2);
-    halo.addColorStop(0, 'rgba(255, 205, 145, 0.30)');
-    halo.addColorStop(0.42, 'rgba(255, 165, 100, 0.11)');
-    halo.addColorStop(1, 'rgba(255, 140, 80, 0)');
-    g.fillStyle = halo;
-    g.fillRect(0, 0, VIEW_W, GROUND_Y);
+    if (!night) {
+      var halo = g.createRadialGradient(sx, sy, sr * 0.7, sx, sy, sr * 5.2);
+      halo.addColorStop(0, 'rgba(255, 205, 145, 0.30)');
+      halo.addColorStop(0.42, 'rgba(255, 165, 100, 0.11)');
+      halo.addColorStop(1, 'rgba(255, 140, 80, 0)');
+      g.fillStyle = halo;
+      g.fillRect(0, 0, VIEW_W, GROUND_Y);
 
-    g.beginPath();
-    g.arc(sx, sy, sr, 0, Math.PI * 2);
-    var disc = g.createLinearGradient(0, sy - sr, 0, sy + sr);
-    disc.addColorStop(0, '#ffefd0');
-    disc.addColorStop(0.55, '#ffd09a');
-    disc.addColorStop(1, '#f0a066');
-    g.fillStyle = disc;
-    g.fill();
+      g.beginPath();
+      g.arc(sx, sy, sr, 0, Math.PI * 2);
+      var disc = g.createLinearGradient(0, sy - sr, 0, sy + sr);
+      disc.addColorStop(0, '#ffefd0');
+      disc.addColorStop(0.55, '#ffd09a');
+      disc.addColorStop(1, '#f0a066');
+      g.fillStyle = disc;
+      g.fill();
+    } else {
+      var mx = sx, my = Math.max(240, Math.min(380, sy - 40)), mr = 40 + rng() * 10;
+      var mhalo = g.createRadialGradient(mx, my, mr * 0.6, mx, my, mr * 3.6);
+      mhalo.addColorStop(0, 'rgba(200, 215, 255, 0.20)');
+      mhalo.addColorStop(1, 'rgba(160, 180, 255, 0)');
+      g.fillStyle = mhalo;
+      g.fillRect(0, 0, VIEW_W, GROUND_Y);
+
+      g.beginPath();
+      g.arc(mx, my, mr, 0, Math.PI * 2);
+      g.fillStyle = '#e8ecff';
+      g.fill();
+      g.beginPath();
+      g.arc(mx + mr * 0.55, my - mr * 0.25, mr * 0.92, 0, Math.PI * 2);
+      g.fillStyle = SC(theme.sky[2]);
+      g.fill();
+      g.fillStyle = 'rgba(150, 160, 200, 0.35)';
+      g.beginPath(); g.arc(mx - mr * 0.3, my + mr * 0.15, mr * 0.16, 0, Math.PI * 2); g.fill();
+      g.beginPath(); g.arc(mx - mr * 0.05, my + mr * 0.45, mr * 0.10, 0, Math.PI * 2); g.fill();
+    }
 
     /* --- 剪纸云带 --- */
     if ('filter' in g) g.filter = 'blur(5px)';
@@ -1103,7 +1237,7 @@
     var ridgeAmp = [176, 140, 92, 58];
     for (i = 0; i < 4; i++) {
       var pts = makeRidge(rng, VIEW_W, ridgeBase[i], ridgeAmp[i], 110 + i * 4, 190 + i * 20);
-      drawRidge(g, pts, shade(theme.ridge[i].c, k), theme.ridge[i].rim, VIEW_H, i > 0);
+      drawRidge(g, pts, SC(theme.ridge[i].c), theme.ridge[i].rim, VIEW_H, i > 0);
     }
 
     /* --- 林：挂在后两层山脊上 --- */
@@ -1117,7 +1251,7 @@
         y: layer === 2 ? 534 + rng() * 8 : 556 + rng() * 5,
         h: th,
         w: th * (0.52 + rng() * 0.16),
-        color: shade(theme.tree[layer - 2], k)
+        color: SC(theme.tree[layer - 2])
       });
     }
     for (i = 0; i < this.trees.length; i++) {
@@ -1135,9 +1269,9 @@
 
     /* --- 地面 --- */
     var PATH_H = 40;
-    g.fillStyle = shade(theme.road, k);
+    g.fillStyle = SC(theme.road);
     g.fillRect(0, GROUND_Y, VIEW_W, PATH_H);
-    g.fillStyle = shade(theme.roadDark, k);
+    g.fillStyle = SC(theme.roadDark);
     g.fillRect(0, GROUND_Y + PATH_H, VIEW_W, VIEW_H - GROUND_Y - PATH_H);
 
     g.fillStyle = theme.edge;
@@ -1152,7 +1286,7 @@
       var rx = rng() * VIEW_W;
       var ry = GROUND_Y + 10 + rng() * 25;
       var rr = 2.5 + rng() * 7;
-      g.fillStyle = shade(theme.road, k * 1.25);
+      g.fillStyle = SC(theme.road, 1.25);
       g.beginPath();
       g.ellipse(rx, ry, rr, rr * 0.5, 0, 0, Math.PI * 2);
       g.fill();
@@ -1164,7 +1298,7 @@
 
     /* 草丛 */
     for (i = 0; i < 120; i++) {
-      drawGrass(g, rng() * VIEW_W, GROUND_Y + 1, 9 + rng() * 15, shade(theme.grass, k));
+      drawGrass(g, rng() * VIEW_W, GROUND_Y + 1, 9 + rng() * 15, SC(theme.grass));
     }
 
     /* --- 路灯：每屏两盏，位置由 seed 决定 --- */
@@ -1325,7 +1459,8 @@
   WorldScene.prototype.onKey = function (e) {
     /* 任何浮层开着，键盘全归它，这里不接 */
     if ((global.GatePanel && global.GatePanel.isOpen()) ||
-        (global.Settings && global.Settings.isOpen())) return;
+        (global.Settings && global.Settings.isOpen()) ||
+        (global.Riddle && global.Riddle.Panel && global.Riddle.Panel.isOpen())) return;
 
     var npc = this.npc;
 
@@ -1377,12 +1512,21 @@
   WorldScene.prototype.useDoor = function (d) {
     if (!d) return;
     if (d.isGate) { this.openGate(d.cat); return; }
+    if (d.isNotice) {
+      if (global.Riddle && global.Riddle.Panel) {
+        global.Riddle.Panel.open();
+      } else if (global.HUD) {
+        global.HUD.toast('每日一题模块没加载');
+      }
+      return;
+    }
     this.enterDoor(d);
   };
 
   WorldScene.prototype.enterDoor = function (d) {
     if (!d || !d.src) return;
     this.remember();
+    if (global.Stats && global.Stats.count) global.Stats.count('door');
     sfx('portal');
     if (global.HUD) global.HUD.toast('');
     if (global.SceneManager && global.SceneManager.has('iframe')) {
@@ -1420,6 +1564,7 @@
     var idx = sceneIndexById(it.id);
     if (idx < 0) return;
 
+    if (global.Stats && global.Stats.count) global.Stats.count('teleport');
     this.setScene(idx);
 
     this.player.x = TELEPORT_X;
@@ -1478,6 +1623,7 @@
     if (global.Save && global.Save.setPlayer) {
       global.Save.setPlayer(this.player.x, this.player.facing, this.scene.id);
     }
+    if (global.Stats && global.Stats.hit) global.Stats.hit(this.scene.id);
   };
 
   /* ---------------- 换屏 ----------------
@@ -1539,7 +1685,8 @@
 
     /* 浮层打开：角色冻结，提示条清空，只留动画时间在走 */
     var frozen = (global.GatePanel && global.GatePanel.isOpen()) ||
-                 (global.Settings && global.Settings.isOpen());
+                 (global.Settings && global.Settings.isOpen()) ||
+                 (global.Riddle && global.Riddle.Panel && global.Riddle.Panel.isOpen());
     if (frozen) {
       if (!this._frozen) {
         this._frozen = true;
@@ -1553,6 +1700,8 @@
     }
     this._frozen = false;
 
+    if (global.Stats && global.Stats.seeTime) global.Stats.seeTime(dt);
+
     var prevGround = this.prevGround;
 
     this.player.update(dt, this);
@@ -1560,7 +1709,10 @@
     /* 镜头跟随：指数平滑，帧率无关；换屏 / 传送处会 snap 直接归位 */
     if (this.cam) this.cam.follow(this.player, dt);
 
-    if (prevGround && this.player.vy < -60) sfx('jump');
+    if (prevGround && this.player.vy < -60) {
+      sfx('jump');
+      if (global.Stats && global.Stats.count) global.Stats.count('jump');
+    }
     if (!prevGround && this.player.onGround) sfx('land');
     this.prevGround = this.player.onGround;
     this.prevVy = this.player.vy;
@@ -1617,7 +1769,8 @@
       } else if (npcNear) {
         msg = '按 E 与' + npc.name + '说话';
       } else if (hit) {
-        msg = hit.isGate ? '按 E 打开《' + hit.name + '》列表' : '按 E 进入《' + hit.name + '》';
+        msg = hit.isNotice ? '按 E 看今天的题'
+          : hit.isGate ? '按 E 打开《' + hit.name + '》列表' : '按 E 进入《' + hit.name + '》';
       } else if (this.edgeT > 0) {
         msg = this.scene.kind === 'zone'
           ? '已到尽头'
@@ -1654,13 +1807,16 @@
       ctx.fillRect(0, 0, VIEW_W, VIEW_H);
     }
 
-    /* 星（会呼吸） */
+    var dn = global.DayNight ? global.DayNight.state() : null;
+
+    /* 星（会呼吸，夜里更亮） */
     ctx.save();
     ctx.globalCompositeOperation = 'lighter';
     for (i = 0; i < this.stars.length; i++) {
       var s = this.stars[i];
       if (s.y < CAM_Y - 8 || s.y > GROUND_Y + 8) continue;   /* 视野外不画 */
-      var a = this.reduceMotion ? 0.42 : (0.18 + 0.5 * Math.abs(Math.sin(this.t * s.s + s.p)));
+      var a = (this.reduceMotion ? 0.42 : (0.18 + 0.5 * Math.abs(Math.sin(this.t * s.s + s.p)))) * (dn ? dn.star : 1);
+      if (a < 0.03) continue;
       ctx.fillStyle = 'rgba(255, 236, 210, ' + a.toFixed(3) + ')';
       ctx.beginPath();
       ctx.arc(s.x, s.y, s.r, 0, Math.PI * 2);
@@ -1668,31 +1824,30 @@
     }
     ctx.restore();
 
-    /* 路灯 + 光晕 */
-    for (i = 0; i < this.lamps.length; i++) {
-      drawLamp(ctx, this.lamps[i].x, GROUND_Y + 4, this.lamps[i].h);
+    /* 路灯 + 光晕（白天熄灯） */
+    if (dn && dn.lamp) {
+      for (i = 0; i < this.lamps.length; i++) {
+        drawLamp(ctx, this.lamps[i].x, GROUND_Y + 4, this.lamps[i].h);
+      }
+      ctx.save();
+      ctx.globalCompositeOperation = 'lighter';
+      for (i = 0; i < this.lamps.length; i++) {
+        var lq = this.lamps[i];
+        var flicker = 0.82 + Math.sin(this.t * 2.3 + lq.x) * 0.06;
+        ctx.globalAlpha = 0.5 * flicker;
+        ctx.drawImage(this.lampGlow, lq.x - 130, GROUND_Y + 4 - lq.h - 132, 260, 260);
+      }
+      ctx.restore();
     }
-    ctx.save();
-    ctx.globalCompositeOperation = 'lighter';
-    for (i = 0; i < this.lamps.length; i++) {
-      var lq = this.lamps[i];
-      var flicker = 0.82 + Math.sin(this.t * 2.3 + lq.x) * 0.06;
-      ctx.globalAlpha = 0.5 * flicker;
-      ctx.drawImage(this.lampGlow, lq.x - 130, GROUND_Y + 4 - lq.h - 132, 260, 260);
-    }
-    ctx.restore();
 
-    /* 路标牌 */
-    this.drawSign(ctx);
+    /* 静态层：路标牌 / 走道口 / 名录板（换屏时一次性烘焙） */
+    if (this.staticLayer) ctx.drawImage(this.staticLayer, 0, 0, VIEW_W, VIEW_H);
 
-    /* 广场两端的走道口指引 */
-    this.drawEdgeCues(ctx);
-
-    /* 名录板（只有总门屏有） */
-    this.drawRoster(ctx);
+    /* 告示牌（每日一题，微微呼吸） */
+    if (this.scene.door && this.scene.door.isNotice) this.drawNotice(ctx);
 
     /* 门 */
-    if (this.scene.door) this.drawPortal(ctx, this.scene.door);
+    if (this.scene.door && !this.scene.door.isNotice) this.drawPortal(ctx, this.scene.door);
 
     /* NPC + 角色 */
     if (this.npc) this.npc.render(ctx);
@@ -1732,6 +1887,15 @@
       ctx.restore();
     }
 
+    /* 昼夜色调 */
+    if (dn && dn.tint) {
+      ctx.save();
+      ctx.globalAlpha = dn.alpha;
+      ctx.fillStyle = dn.tint;
+      ctx.fillRect(0, 0, VIEW_W, VIEW_H);
+      ctx.restore();
+    }
+
     /* 切换时的一层暖光 */
     if (this.veil > 0) {
       ctx.save();
@@ -1744,6 +1908,63 @@
     /* 覆盖层 */
     if (this.intro > 0) this.drawIntro(ctx);
     if (this.help) this.drawHelp(ctx);
+  };
+
+  /* ---------------- 静态层烘焙 ---------------- */
+  WorldScene.prototype.bakeStatic = function () {
+    if (!this.staticCanvas) {
+      this.staticCanvas = document.createElement('canvas');
+      this.staticCanvas.width = VIEW_W;
+      this.staticCanvas.height = VIEW_H;
+    }
+    var g = this.staticCanvas.getContext('2d');
+    g.clearRect(0, 0, VIEW_W, VIEW_H);
+    this.drawSign(g);
+    this.drawEdgeCues(g);
+    this.drawRoster(g);
+    this.staticLayer = this.staticCanvas;
+  };
+
+  /* ---------------- 告示牌（每日一题） ---------------- */
+  WorldScene.prototype.drawNotice = function (ctx) {
+    var d = this.scene.door;
+    var x = d.x, base = GROUND_Y + 4;
+    var w = d.w || 150, h = d.h || 150;
+    var top = base - h;
+    var pulse = 0.62 + 0.38 * Math.sin(this.t * 2.0);
+
+    ctx.save();
+    /* 支柱 */
+    ctx.fillStyle = 'rgba(32, 20, 12, 0.95)';
+    ctx.fillRect(x - w / 2 + 8, top - 10, 9, h + 14);
+    ctx.fillRect(x + w / 2 - 17, top - 10, 9, h + 14);
+    /* 板面 */
+    ctx.fillStyle = 'rgba(42, 27, 16, 0.96)';
+    roundRect(ctx, x - w / 2, top, w, h, 10);
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(240, 167, 110, 0.55)';
+    ctx.lineWidth = 3;
+    ctx.stroke();
+    ctx.strokeStyle = 'rgba(240, 167, 110, 0.25)';
+    ctx.lineWidth = 1;
+    roundRect(ctx, x - w / 2 + 9, top + 9, w - 18, h - 18, 7);
+    ctx.stroke();
+    /* 挂环 */
+    ctx.strokeStyle = 'rgba(240, 167, 110, 0.9)';
+    ctx.lineWidth = 2.5;
+    ctx.beginPath();
+    ctx.arc(x, top - 2, 6, 0, Math.PI * 2);
+    ctx.stroke();
+    /* 标题 */
+    ctx.fillStyle = '#f6dcc0';
+    ctx.font = '700 24px ' + SANS;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText('每日一题', x, top + 44);
+    ctx.fillStyle = 'rgba(240, 200, 160, ' + pulse.toFixed(3) + ')';
+    ctx.font = '400 15px ' + SANS;
+    ctx.fillText('按 E 挑战', x, top + 78);
+    ctx.restore();
   };
 
   /* ---------------- 路标牌 ---------------- */

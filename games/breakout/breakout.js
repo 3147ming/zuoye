@@ -25,9 +25,9 @@ Breakout = {
       radius:  0.3,
       speed:   15,
       labels: {
-        3: { text: 'ready...', fill: '#D82800', stroke: 'black', font: 'bold 28pt arial' },
-        2: { text: 'set..',    fill: '#FC9838', stroke: 'black', font: 'bold 28pt arial' },
-        1: { text: 'go!',      fill: '#80D010', stroke: 'black', font: 'bold 28pt arial' }
+        3: { text: '准备…', fill: '#D82800', stroke: 'black', font: 'bold 28pt arial' },
+        2: { text: '预备…',    fill: '#FC9838', stroke: 'black', font: 'bold 28pt arial' },
+        1: { text: '开始！',      fill: '#80D010', stroke: 'black', font: 'bold 28pt arial' }
       }
     },
 
@@ -165,7 +165,7 @@ Breakout = {
   },
 
   onbeforeabandon: function() {
-    return this.runner.confirm("Abandon game?")
+    return this.runner.confirm("放弃本局？")
   },
 
   loseBall: function() {
@@ -276,7 +276,7 @@ Breakout = {
       ctx.font = this.scorefont;
       this.scorewidth = ctx.measureText(this.format(0)).width;
       ctx.font = this.highfont;
-      this.highwidth  = ctx.measureText("HIGH SCORE: " + this.format(0)).width;
+      this.highwidth  = ctx.measureText("最高分：" + this.format(0)).width;
       ctx.restore();
       this.rerender = true;
     },
@@ -300,7 +300,7 @@ Breakout = {
       ctx.fillText(text, 0, this.height/2);
 
       ctx.fillStyle = ishigh ? this.game.color.score : this.game.color.highscore;
-      text          = "HIGH SCORE: " + this.format(ishigh ? this.score : this.highscore);
+      text          = "最高分：" + this.format(ishigh ? this.score : this.highscore);
       ctx.font      = this.highfont;
       width         = ctx.measureText(text).width;
       ctx.fillText(text, this.width - width, this.height/2);

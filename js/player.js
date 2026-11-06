@@ -75,6 +75,15 @@
       reset: function () {
         state.left = state.right = state.jump = false;
         buffer = 0;
+      },
+      /* 手柄（gamepad.js）直接写方向与跳跃 */
+      setDir: function (left, right) {
+        state.left = !!left;
+        state.right = !!right;
+      },
+      pressJump: function () {
+        if (!state.jump) buffer = 0.14;
+        state.jump = true;
       }
     };
   })();

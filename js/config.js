@@ -13,9 +13,9 @@
   'use strict';
 
   var CONFIG = {
-    version: '1.5.1',
-    build: '2026-11-13',
-    stage: '修复 1.5.0 回归：浮层关闭后主循环永久冻结（卡死）；SW 改 network-first 防旧缓存',
+    version: '1.6.0',
+    build: '2026-11-14',
+    stage: '第六批·汉化：全部界面中文；昼夜循环与三套皮肤；广场每日一题；留言板；三款自研小游戏；手柄支持；足迹统计',
 
     /* assets/bg/ 下的图片文件名。留空则设置里的下拉只有「默认」。
        例：['plaza.jpg', 'forest.png'] */

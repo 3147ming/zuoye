@@ -314,7 +314,7 @@
 
   mk.controllers.WebcamInput.prototype._addMovementHandlers = function () {
     if (Movement === undefined) {
-      throw 'The WebcamInput requires movement.js';
+      throw 'WebcamInput 需要 movement.js';
     }
     var self = this,
       f = this.fighters[0];
@@ -549,11 +549,11 @@
     });
     this._transport.on('response', function (response) {
       if (response !== self.Responses.SUCCESS) {
-        alert('Error while connecting to the server.');
+        alert('连接服务器出错。');
       }
     });
     this._transport.on('disconnect', function () {
-      alert('Disconnected from the server.');
+      alert('与服务器断开连接。');
     });
   };
 
@@ -1573,7 +1573,7 @@
   mk.fighters.Fighter = function (options) {
     var name = options.name.toLowerCase();
     if (!mk.fighters.list[name]) {
-      throw 'Invalid fighter name!';
+      throw '无效的角色名！';
     }
     this._name = name;
     this._arena = options.arena;
