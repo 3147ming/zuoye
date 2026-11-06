@@ -1437,7 +1437,7 @@
     global.addEventListener('wh:help', this._onHelp);
     global.addEventListener('wh:contrib', this._onContrib);
 
-    this.intro = 2.5;
+    this.intro = opts.skipIntro ? 0 : 2.5;
     this.help = false;
     this.veil = 0;
     this.zoneT = 1.6;

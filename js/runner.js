@@ -196,7 +196,7 @@
 
   Runner.prototype.exit = function () {
     if (global.Input && global.Input.reset) global.Input.reset();
-    if (global.SceneManager) global.SceneManager.change('world', {});
+    if (global.SceneManager) global.SceneManager.change('world', { skipIntro: true });
   };
 
   /* ---------------- update ---------------- */
