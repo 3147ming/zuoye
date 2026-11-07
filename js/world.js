@@ -1554,6 +1554,15 @@
       }
       wEl.textContent = runs ? '本周合计 ' + runs + ' 局 · 累计金币 ' + coins + ' · 最佳 ' + best + ' 分' : '本周合计 —';
     }
+    var aEl = document.getElementById('rec-allbest');
+    if (aEl && meta.allbest) {
+      var ab = meta.allbest();
+      if (ab && ab.s) {
+        aEl.innerHTML = '历史最高分 <b>' + ab.s + '</b> · ' + (ab.mode === 'side' ? '横版' : '神庙') + ' · 距离 ' + ab.d + ' · 金币 ' + ab.c;
+      } else {
+        aEl.textContent = '历史最高分 —';
+      }
+    }
   };
 
   WorldScene.prototype.closeRunnerPick = function () {

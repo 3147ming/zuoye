@@ -150,6 +150,22 @@
     return o;
   }
 
+  /* ---------------- 跨模式历史最高分 ---------------- */
+  function allBest() {
+    try {
+      var a = JSON.parse(global.localStorage.getItem('worldhub.runner.allbest.v1') || 'null');
+      return (a && typeof a === 'object') ? a : null;
+    } catch (e) { return null; }
+  }
+  function saveAllBest(mode, rec) {
+    var a = allBest();
+    if (!a || rec.s > a.s) {
+      try { global.localStorage.setItem('worldhub.runner.allbest.v1', JSON.stringify({ mode: mode, s: rec.s, d: rec.d, c: rec.c })); } catch (e) {}
+      return true;
+    }
+    return false;
+  }
+
   /* ---------------- 颜色混合（横版入夜） ---------------- */
   function mixHex(a, b, t) {
     function hv(s) {
@@ -170,6 +186,7 @@
     top: loadTop,
     week: weekLoad,
     streak: streakCount,
+    allbest: allBest,
     goal: goalOf,
     done: goalDone
   };
@@ -345,6 +362,18 @@
     this.fork = null;
     this.forkCd = 10 + Math.random() * 4;
     this.forkMsg = null;
+    this.newAllBest = false;
+    this.meteor = null;
+    this.meteorCd = 5 + Math.random() * 4;
+    this.flies = [];
+    if (this.mode === 'temple') {
+      for (var fi = 0; fi < 26; fi++) {
+        this.flies.push({
+          x: Math.random() * W, y: 30 + Math.random() * 250,
+          r: 1 + Math.random() * 2.2, ph: Math.random() * 6.28, sp: 8 + Math.random() * 18
+        });
+      }
+    }
     if (this.mode === 'side') {
       this.p = { x: 300, y: GROUND, vy: 0, onGround: true, jumps: 0, slide: 0 };
     } else {
@@ -421,7 +450,15 @@
     if (this.shieldT > 0) active++;
     if (this.dashT > 0) active++;
     if (this.glideT > 0) active++;
-    if (active > 1) {
+    if (active >= 3) {
+      var triple = this.tripleFor();
+      if (triple) {
+        msg = '三连 · ' + triple.name;
+        triple.apply(this);
+        this.comboFx = { t: 1.6, name: triple.name, triple: true };
+        this.play('ult');
+      }
+    } else if (active > 1) {
       var combo = this.comboFor(pkind);
       if (combo) {
         msg = '连击 · ' + combo.name;
@@ -453,6 +490,16 @@
     return null;
   };
 
+  /* 三连：同时持有三种道具 */
+  Runner.prototype.tripleFor = function () {
+    var m = this.magnetT > 0, s = this.shieldT > 0, d = this.dashT > 0, g = this.glideT > 0;
+    if (m && s && d) return { name: '黄金冲刺', apply: function (r) { r.shieldT = Math.max(r.shieldT, 8); r.dashT = Math.max(r.dashT, 4.2); r.magnetT = Math.max(r.magnetT, 10); r.coinScore = true; } };
+    if (m && s && g) return { name: '天降金币', apply: function (r) { r.shieldT = Math.max(r.shieldT, 8); r.glideT = Math.max(r.glideT, 7); r.magnetT = Math.max(r.magnetT, 10); r.coinScore = true; } };
+    if (m && d && g) return { name: '流星冲刺', apply: function (r) { r.magnetT = Math.max(r.magnetT, 10); r.dashT = Math.max(r.dashT, 4.2); r.glideT = Math.max(r.glideT, 7); r.coinScore = true; } };
+    if (s && d && g) return { name: '无敌飞驰', apply: function (r) { r.shieldT = Math.max(r.shieldT, 8); r.dashT = Math.max(r.dashT, 4.2); r.glideT = Math.max(r.glideT, 7); } };
+    return null;
+  };
+
   Runner.prototype.die = function () {
     if (this.over) return;
     if (this.shieldT > 0) return;          /* 护盾持续期间完全无敌 */
@@ -465,6 +512,7 @@
     var rec = { s: sc, d: d, c: this.coins, t: Date.now() };
     this.top = addRun(this.mode, rec);
     this.week = weekAddRun(this.mode, rec);
+    this.newAllBest = saveAllBest(this.mode, rec);
     this.runRank = 0;
     for (var i = 0; i < this.top.length; i++) {
       if (this.top[i].t === rec.t) { this.runRank = i + 1; break; }
@@ -499,6 +547,30 @@
     if (this.comboFx) { this.comboFx.t -= dt; if (this.comboFx.t <= 0) this.comboFx = null; }
     if (this.shake > 0) this.shake = Math.max(0, this.shake - dt * 2.2);
     if (this.themeFade > 0) this.themeFade = Math.max(0, this.themeFade - dt * 1.6);
+
+    /* 神庙氛围粒子：萤火虫 / 雪粒 / 流星 */
+    if (this.mode === 'temple') {
+      for (var fi = 0; fi < this.flies.length; fi++) {
+        var fl = this.flies[fi];
+        fl.ph += dt * 0.9;
+        fl.y += (this.themeIdx === 2 ? fl.sp : fl.sp * 0.5) * dt;
+        fl.x += Math.sin(fl.ph) * 7 * dt;
+        if (fl.y > 262) fl.y = 30;
+      }
+      if (!this.meteor) {
+        this.meteorCd -= dt;
+        if (this.meteorCd <= 0) {
+          this.meteor = { x: Math.random() * W, y: -40, len: 130, vy: 430, tx: -0.7 + Math.random() * 1.4, t: 1.7 };
+          this.meteorCd = 5 + Math.random() * 7;
+        }
+      } else {
+        this.meteor.x += this.meteor.tx * 400 * dt;
+        this.meteor.y += this.meteor.vy * dt;
+        this.meteor.t -= dt;
+        if (this.meteor.t <= 0) this.meteor = null;
+      }
+    }
+
     if (this.over) return;
     if (this.mode === 'side') this.updateSide(dt);
     else this.updateTemple(dt);
@@ -560,10 +632,15 @@
       });
       return;
     }
-    var kind = r < 0.55 ? 'box' : (r < 0.78 ? 'tall' : 'bar');
+    var night = clamp((this.dist - 7000) / 9000, 0, 1);
+    var kind;
+    /* 入夜后偶尔刷出夜行怪 */
+    if (night > 0.45 && Math.random() < 0.3) kind = 'ghost';
+    else kind = r < 0.55 ? 'box' : (r < 0.78 ? 'tall' : 'bar');
     if (kind === 'box') this.objects.push({ kind: 'box', x: W + 90, y: GROUND, w: 50, h: 54 });
     else if (kind === 'tall') this.objects.push({ kind: 'tall', x: W + 90, y: GROUND, w: 42, h: 98 });
-    else this.objects.push({ kind: 'bar', x: W + 90, y: GROUND - 34, w: 76, h: 20 });
+    else if (kind === 'bar') this.objects.push({ kind: 'bar', x: W + 90, y: GROUND - 34, w: 76, h: 20 });
+    else this.objects.push({ kind: 'ghost', x: W + 90, y: GROUND, w: 46, h: 78 });
     if (Math.random() < 0.55) {
       var base = kind === 'bar' ? GROUND - 66 : GROUND - 120;
       var n = 1 + Math.floor(Math.random() * 3);
@@ -764,6 +841,23 @@
         rr(ctx, o.x - o.w / 2, o.y - o.h, o.w, o.h, 9); ctx.fill();
         ctx.fillStyle = 'rgba(255,255,255,0.5)';
         rr(ctx, o.x - o.w / 2 + 6, o.y - o.h + 4, o.w - 12, 4, 2); ctx.fill();
+      } else if (o.kind === 'ghost') {
+        var bob = Math.sin(this.t * 3 + o.x * 0.01) * 4;
+        ctx.save();
+        ctx.globalAlpha = 0.8;
+        ctx.fillStyle = '#b6a8e8';
+        ctx.beginPath();
+        ctx.ellipse(o.x, o.y - o.h / 2 + bob, o.w / 2, o.h / 2, 0, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = 'rgba(255,255,255,0.35)';
+        ctx.beginPath(); ctx.arc(o.x - o.w * 0.2, o.y - o.h * 0.72 + bob, o.w * 0.12, 0, Math.PI * 2); ctx.fill();
+        ctx.fillStyle = '#3d3350';
+        ctx.beginPath(); ctx.arc(o.x - 9, o.y - o.h / 2 + bob - 7, 3.2, 0, Math.PI * 2); ctx.fill();
+        ctx.beginPath(); ctx.arc(o.x + 9, o.y - o.h / 2 + bob - 7, 3.2, 0, Math.PI * 2); ctx.fill();
+        ctx.strokeStyle = '#3d3350';
+        ctx.lineWidth = 2;
+        ctx.beginPath(); ctx.arc(o.x, o.y - o.h / 2 + bob + 3, 7, 0.1 * Math.PI, 0.9 * Math.PI); ctx.stroke();
+        ctx.restore();
       } else {
         var col = o.kind === 'tall' ? '#ff9aa8' : '#8fd0ff';
         ctx.fillStyle = col;
@@ -846,6 +940,23 @@
       ctx.fill();
     }
 
+    /* 流星 */
+    if (this.meteor) {
+      var mt = this.meteor;
+      var mx = mt.x, my = mt.y, dl = Math.hypot(mt.tx, 1) || 1;
+      ctx.save();
+      ctx.strokeStyle = 'rgba(255, 250, 220, ' + Math.min(1, mt.t * 1.2) + ')';
+      ctx.lineWidth = 4;
+      ctx.lineCap = 'round';
+      ctx.beginPath();
+      ctx.moveTo(mx - mt.tx / dl * mt.len, my - 1 / dl * mt.len * 0.7);
+      ctx.lineTo(mx, my);
+      ctx.stroke();
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.9)';
+      ctx.beginPath(); ctx.arc(mx, my, 4, 0, Math.PI * 2); ctx.fill();
+      ctx.restore();
+    }
+
     var roadTopW = 190, roadBotW = 960;
     var g1 = ctx.createLinearGradient(0, HORIZON, 0, H);
     g1.addColorStop(0, th.road[0]);
@@ -906,6 +1017,28 @@
       ctx.beginPath(); ctx.arc(lx, yy - 74 * sc, 9 * sc, 0, Math.PI * 2); ctx.fill();
       ctx.fillStyle = 'rgba(255, 217, 160, 0.25)';
       ctx.beginPath(); ctx.arc(lx, yy - 74 * sc, 22 * sc, 0, Math.PI * 2); ctx.fill();
+    }
+
+    /* 氛围粒子：竹林萤火虫 / 雪庙雪粒 */
+    if (this.themeIdx === 2) {
+      for (i = 0; i < this.flies.length; i++) {
+        var ff = this.flies[i];
+        var af = 0.4 + 0.6 * Math.abs(Math.sin(t * 1.6 + ff.ph));
+        ctx.globalAlpha = af;
+        ctx.fillStyle = 'rgba(255, 232, 150, 0.35)';
+        ctx.beginPath(); ctx.arc(ff.x, ff.y, ff.r * 3.4, 0, Math.PI * 2); ctx.fill();
+        ctx.fillStyle = '#ffe9a0';
+        ctx.beginPath(); ctx.arc(ff.x, ff.y, ff.r, 0, Math.PI * 2); ctx.fill();
+      }
+      ctx.globalAlpha = 1;
+    } else if (this.themeIdx === 1) {
+      for (i = 0; i < this.flies.length; i++) {
+        var ff = this.flies[i];
+        ctx.globalAlpha = 0.75;
+        ctx.fillStyle = '#ffffff';
+        ctx.beginPath(); ctx.arc(ff.x, ff.y, ff.r * 1.4, 0, Math.PI * 2); ctx.fill();
+      }
+      ctx.globalAlpha = 1;
     }
 
     var objs = this.objects.slice().sort(function (a, b) { return b.z - a.z; });
@@ -1055,18 +1188,20 @@
 
   Runner.prototype.renderCombo = function (ctx) {
     var fx = this.comboFx;
+    var gold = fx.triple;
     ctx.save();
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
-    ctx.font = '700 34px ' + SANS;
-    ctx.fillStyle = 'rgba(232, 160, 80, 0.95)';
-    ctx.fillText('连击 · ' + fx.name, W / 2, 176);
-    ctx.strokeStyle = 'rgba(255, 240, 200, 0.55)';
-    ctx.lineWidth = 3;
-    for (var i = 0; i < 3; i++) {
-      ctx.globalAlpha = Math.min(1, fx.t * 1.3) * (1 - i * 0.2);
+    ctx.font = gold ? '800 40px ' + SANS : '700 34px ' + SANS;
+    ctx.fillStyle = gold ? 'rgba(240, 190, 60, 0.98)' : 'rgba(232, 160, 80, 0.95)';
+    ctx.fillText((gold ? '三连 · ' : '连击 · ') + fx.name, W / 2, 168);
+    ctx.strokeStyle = gold ? 'rgba(255, 230, 150, 0.7)' : 'rgba(255, 240, 200, 0.55)';
+    ctx.lineWidth = gold ? 5 : 3;
+    var n = gold ? 5 : 3;
+    for (var i = 0; i < n; i++) {
+      ctx.globalAlpha = Math.min(1, fx.t * 1.3) * (1 - i * (gold ? 0.16 : 0.2));
       ctx.beginPath();
-      ctx.arc(W / 2, 176, 40 + i * 26, 0, Math.PI * 2);
+      ctx.arc(W / 2, 168, gold ? 46 + i * 30 : 40 + i * 26, 0, Math.PI * 2);
       ctx.stroke();
     }
     ctx.restore();
@@ -1095,8 +1230,8 @@
     ctx.fillText('分数 ' + this.score() + '  ·  金币 ' + this.coins + '  ·  距离 ' + Math.round(this.dist / 10), W / 2, cy + 92);
 
     ctx.font = '600 18px ' + SANS;
-    ctx.fillStyle = this.newBest ? '#e0803c' : '#9a8aa8';
-    ctx.fillText(this.newBest ? '★ 新纪录！' : '最佳 ' + this.best, W / 2, cy + 124);
+    ctx.fillStyle = this.newAllBest ? '#d8a200' : (this.newBest ? '#e0803c' : '#9a8aa8');
+    ctx.fillText(this.newAllBest ? '★ 历史最高分！' : (this.newBest ? '★ 新纪录！' : '最佳 ' + this.best), W / 2, cy + 124);
 
     if (this.goal) {
       ctx.font = '500 16px ' + SANS;
