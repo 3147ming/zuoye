@@ -120,12 +120,55 @@
     return o.count;
   }
 
+  /* ---------------- 本机周榜 ---------------- */
+  function weekKey() {
+    var d = new Date();
+    var t = Date.UTC(d.getFullYear(), d.getMonth(), d.getDate());
+    var dayNr = ((t + 8 * 3600000) / 86400000) % 7;
+    var week1 = Date.UTC(d.getFullYear(), 0, 4);
+    var wk = Math.ceil(((t - week1) / 86400000 + dayNr + 1) / 7);
+    return d.getUTCFullYear() + '-W' + wk;
+  }
+  function weekLoad(mode) {
+    var cur = weekKey();
+    var o = { key: cur, best: 0, bestDist: 0, bestCoins: 0, coins: 0, runs: 0 };
+    try {
+      var raw = JSON.parse(global.localStorage.getItem(keyOf(mode, 'week')) || '{}');
+      if (raw && raw.key === cur) o = raw;
+    } catch (e) {}
+    return o;
+  }
+  function weekSave(mode, o) { try { global.localStorage.setItem(keyOf(mode, 'week'), JSON.stringify(o)); } catch (e) {} }
+  function weekAddRun(mode, rec) {
+    var o = weekLoad(mode);
+    o.best = Math.max(o.best || 0, rec.s);
+    o.bestDist = Math.max(o.bestDist || 0, rec.d);
+    o.bestCoins = Math.max(o.bestCoins || 0, rec.c);
+    o.coins = (o.coins || 0) + rec.c;
+    o.runs = (o.runs || 0) + 1;
+    weekSave(mode, o);
+    return o;
+  }
+
+  /* ---------------- 颜色混合（横版入夜） ---------------- */
+  function mixHex(a, b, t) {
+    function hv(s) {
+      var n = parseInt(s.slice(1), 16);
+      return [(n >> 16) & 255, (n >> 8) & 255, n & 255];
+    }
+    var c1 = hv(a), c2 = hv(b);
+    return 'rgb(' + Math.round(lerp(c1[0], c2[0], t)) + ',' +
+      Math.round(lerp(c1[1], c2[1], t)) + ',' +
+      Math.round(lerp(c1[2], c2[2], t)) + ')';
+  }
+
   /* 大厅「荣誉墙」取用 */
   global.RunnerMeta = {
     record: function (mode) {
       return { score: bestScore(mode), dist: bestDist(mode), coins: bestCoins(mode) };
     },
     top: loadTop,
+    week: weekLoad,
     streak: streakCount,
     goal: goalOf,
     done: goalDone
@@ -291,6 +334,11 @@
     this.themeIdx = 0;
     this.top = loadTop(this.mode);
     this.runRank = 0;
+    this.week = weekLoad(this.mode);
+    this.coinScore = false;
+    this.comboFx = null;
+    this.shake = 0;
+    this.themeFade = 0;
     /* 连签 ≥3 天：开局自带 3 秒护盾 */
     if (streakCount() >= 3) this.shieldT = 3;
     this.challengeDone = this.goalAlready;
@@ -332,6 +380,8 @@
           this.fork.t = 0.75;
           this.dist += 120;
           this.themeIdx = (this.themeIdx + 1) % THEMES.length;
+          this.shake = 0.6;
+          this.themeFade = 1;
           this.forkMsg = { text: '进入' + THEMES[this.themeIdx].name, t: 1.6 };
           this.play('win');
           return;
@@ -365,8 +415,42 @@
     else if (pkind === 'shield') { this.shieldT = SHIELD_T; msg = '护盾！短暂无敌'; }
     else if (pkind === 'dash') { this.dashT = DASH_T; msg = '冲刺！加速前进'; }
     else { this.glideT = GLIDE_T; msg = '滑翔！下落变慢'; }
-    this.play('win');
+    /* 连击：已经持有别的道具时触发组合效果 */
+    var active = 0;
+    if (this.magnetT > 0) active++;
+    if (this.shieldT > 0) active++;
+    if (this.dashT > 0) active++;
+    if (this.glideT > 0) active++;
+    if (active > 1) {
+      var combo = this.comboFor(pkind);
+      if (combo) {
+        msg = '连击 · ' + combo.name;
+        combo.apply(this);
+        this.comboFx = { t: 1.2, name: combo.name };
+        this.play('ult');
+      }
+    } else {
+      this.play('win');
+    }
     this.forkMsg = { text: msg, t: 1.4 };
+  };
+
+  /* 组合效果：按下刚吃到的道具名，返回 { name, apply } */
+  Runner.prototype.comboFor = function (pkind) {
+    var m = this.magnetT > 0, s = this.shieldT > 0, d = this.dashT > 0, g = this.glideT > 0;
+    if (pkind === 'dash' && g) return { name: '飞驰滑翔', apply: function (r) { r.glideT = Math.max(r.glideT, 6.5); } };
+    if (pkind === 'glide' && d) return { name: '飞驰滑翔', apply: function (r) { r.dashT = Math.max(r.dashT, 3.6); } };
+    if (pkind === 'dash' && m) return { name: '金币风暴', apply: function (r) { r.magnetT = Math.max(r.magnetT, 9); r.coinScore = true; } };
+    if (pkind === 'magnet' && d) return { name: '金币风暴', apply: function (r) { r.dashT = Math.max(r.dashT, 3.6); r.coinScore = true; } };
+    if (pkind === 'shield' && m) return { name: '磁力护盾', apply: function (r) { r.shieldT = Math.max(r.shieldT, 7); } };
+    if (pkind === 'magnet' && s) return { name: '磁力护盾', apply: function (r) { r.magnetT = Math.max(r.magnetT, 9); } };
+    if (pkind === 'dash' && s) return { name: '冲刺护盾', apply: function (r) { r.dashT = Math.max(r.dashT, 3.6); r.shieldT = Math.max(r.shieldT, 6); } };
+    if (pkind === 'glide' && s) return { name: '滑翔护盾', apply: function (r) { r.glideT = Math.max(r.glideT, 6); r.shieldT = Math.max(r.shieldT, 6); } };
+    if (pkind === 'shield' && d) return { name: '冲刺护盾', apply: function (r) { r.dashT = Math.max(r.dashT, 3.6); } };
+    if (pkind === 'shield' && g) return { name: '滑翔护盾', apply: function (r) { r.glideT = Math.max(r.glideT, 6); } };
+    if (pkind === 'magnet' && g) return { name: '空中磁铁', apply: function (r) { r.glideT = Math.max(r.glideT, 6); } };
+    if (pkind === 'glide' && m) return { name: '空中磁铁', apply: function (r) { r.magnetT = Math.max(r.magnetT, 9); } };
+    return null;
   };
 
   Runner.prototype.die = function () {
@@ -380,6 +464,7 @@
     saveNum(keyOf(this.mode, 'bestcoins'), Math.max(this.coins, bestCoins(this.mode)));
     var rec = { s: sc, d: d, c: this.coins, t: Date.now() };
     this.top = addRun(this.mode, rec);
+    this.week = weekAddRun(this.mode, rec);
     this.runRank = 0;
     for (var i = 0; i < this.top.length; i++) {
       if (this.top[i].t === rec.t) { this.runRank = i + 1; break; }
@@ -411,6 +496,9 @@
     if (this.dashT > 0) this.dashT = Math.max(0, this.dashT - dt);
     if (this.glideT > 0) this.glideT = Math.max(0, this.glideT - dt);
     if (this.forkMsg) { this.forkMsg.t -= dt; if (this.forkMsg.t <= 0) this.forkMsg = null; }
+    if (this.comboFx) { this.comboFx.t -= dt; if (this.comboFx.t <= 0) this.comboFx = null; }
+    if (this.shake > 0) this.shake = Math.max(0, this.shake - dt * 2.2);
+    if (this.themeFade > 0) this.themeFade = Math.max(0, this.themeFade - dt * 1.6);
     if (this.over) return;
     if (this.mode === 'side') this.updateSide(dt);
     else this.updateTemple(dt);
@@ -449,7 +537,7 @@
         var hit = magnet
           ? (Math.abs(o.x - p.x) < 190 && Math.abs((o.y - 13) - (p.y - ph / 2)) < 170)
           : (px < ox + o.w && px + 44 > ox && py < oy + o.h && py + ph > oy);
-        if (hit) { o.dead = true; this.coins++; this.play('ui'); }
+        if (hit) { o.dead = true; this.coins += this.coinScore ? 2 : 1; this.play('ui'); }
       } else if (o.kind === 'power') {
         if (px < ox + o.w && px + 44 > ox && py < oy + o.h && py + ph > oy) {
           o.dead = true;
@@ -534,7 +622,7 @@
       if (k > 0.88 && k < 1.06) {
         var sameLane = Math.abs(o.lane - p.laneX) < 0.5;
         if (o.kind === 'coin') {
-          if (sameLane || magnet) { o.dead = true; this.coins++; this.play('ui'); }
+          if (sameLane || magnet) { o.dead = true; this.coins += this.coinScore ? 2 : 1; this.play('ui'); }
         } else if (o.kind === 'power') {
           if (sameLane) { o.dead = true; this.activatePower(o.pkind); }
         } else if (sameLane) {
@@ -565,6 +653,7 @@
     if (this.mode === 'side') this.renderSide(ctx);
     else this.renderTemple(ctx);
     this.renderHUD(ctx);
+    if (this.comboFx) this.renderCombo(ctx);
     if (this.mode === 'temple') this.renderFork(ctx);
     if (this.over) this.renderOver(ctx);
   };
@@ -577,18 +666,24 @@
 
   Runner.prototype.renderSide = function (ctx) {
     var t = this.t, i;
+
+    /* 距离够远就入夜 */
+    var night = clamp((this.dist - 7000) / 9000, 0, 1);
+    var day = ['#fde9f4', '#e8ecff', '#d3f2ff'];
+    var noct = ['#2b2746', '#3b3358', '#5b4a78'];
+
     var sky = ctx.createLinearGradient(0, 0, 0, GROUND);
-    sky.addColorStop(0, '#fde9f4');
-    sky.addColorStop(0.45, '#e8ecff');
-    sky.addColorStop(1, '#d3f2ff');
+    sky.addColorStop(0, mixHex(day[0], noct[0], night));
+    sky.addColorStop(0.45, mixHex(day[1], noct[1], night));
+    sky.addColorStop(1, mixHex(day[2], noct[2], night));
     ctx.fillStyle = sky;
     ctx.fillRect(0, 0, W, H);
 
     ctx.save();
-    ctx.globalAlpha = 0.55;
+    ctx.globalAlpha = (1 - night) * 0.55;
     ctx.fillStyle = '#ffd9a0';
     ctx.beginPath(); ctx.arc(1010, 150, 74, 0, Math.PI * 2); ctx.fill();
-    ctx.globalAlpha = 0.18;
+    ctx.globalAlpha = (1 - night) * 0.18;
     ctx.beginPath(); ctx.arc(1010, 150, 120, 0, Math.PI * 2); ctx.fill();
     ctx.restore();
 
@@ -635,6 +730,29 @@
     }
     ctx.fillStyle = 'rgba(255,255,255,0.35)';
     ctx.fillRect(0, GROUND, W, 5);
+
+    /* 入夜：夜色罩 + 星 + 月 */
+    if (night > 0.12) {
+      ctx.save();
+      ctx.globalAlpha = night * 0.5;
+      ctx.fillStyle = '#100c22';
+      ctx.fillRect(0, 0, W, H);
+      ctx.restore();
+      ctx.save();
+      ctx.globalAlpha = night;
+      for (i = 0; i < 30; i++) {
+        var stx = (i * 167 + 20) % W, sty = 40 + ((i * 97) % 220);
+        var sa = night * (0.4 + 0.6 * Math.abs(Math.sin(t * 1.5 + i)));
+        ctx.fillStyle = 'rgba(255,255,255,' + sa.toFixed(3) + ')';
+        ctx.beginPath(); ctx.arc(stx, sty, 1.6, 0, Math.PI * 2); ctx.fill();
+      }
+      ctx.fillStyle = '#eef0ff';
+      ctx.beginPath(); ctx.arc(1010, 150, 46, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = 'rgba(180,190,220,0.4)';
+      ctx.beginPath(); ctx.arc(1028, 138, 11, 0, Math.PI * 2); ctx.fill();
+      ctx.beginPath(); ctx.arc(1046, 162, 7, 0, Math.PI * 2); ctx.fill();
+      ctx.restore();
+    }
 
     for (i = 0; i < this.objects.length; i++) {
       var o = this.objects[i];
@@ -696,12 +814,16 @@
   Runner.prototype.renderTemple = function (ctx) {
     var t = this.t, i;
     var th = THEMES[this.themeIdx % THEMES.length];
+    ctx.save();
+    if (this.shake > 0) {
+      ctx.translate((Math.random() - 0.5) * 16 * this.shake, (Math.random() - 0.5) * 10 * this.shake);
+    }
     var sky = ctx.createLinearGradient(0, 0, 0, HORIZON + 120);
     sky.addColorStop(0, th.sky[0]);
     sky.addColorStop(0.55, th.sky[1]);
     sky.addColorStop(1, th.sky[2]);
     ctx.fillStyle = sky;
-    ctx.fillRect(0, 0, W, H);
+    ctx.fillRect(-30, -30, W + 60, H + 60);
 
     ctx.fillStyle = 'rgba(255, 248, 220, 0.9)';
     ctx.beginPath(); ctx.arc(1040, 120, 52, 0, Math.PI * 2); ctx.fill();
@@ -828,6 +950,16 @@
     } else {
       drawBlob(ctx, cx, cy, 66, '#ffb3c7', p.onGround ? 0 : clamp(-p.vy / 3200, -0.28, 0.28), this.shieldVisual());
     }
+    ctx.restore();
+
+    /* 主题切换入场：新主题色从满屏渐隐 */
+    if (this.themeFade > 0) {
+      ctx.save();
+      ctx.globalAlpha = Math.min(0.9, this.themeFade * 1.5);
+      ctx.fillStyle = th.sky[1];
+      ctx.fillRect(0, 0, W, H);
+      ctx.restore();
+    }
   };
 
   Runner.prototype.renderFork = function (ctx) {
@@ -918,6 +1050,25 @@
       ? '空格 跳（可二段跳）· ↓ 下滑 · 躲开方块与横梁'
       : '← → 换道（路口选路）· 空格 跳 · ↓ 滑铲';
     ctx.fillText(hint, W / 2, H - 34);
+    ctx.restore();
+  };
+
+  Runner.prototype.renderCombo = function (ctx) {
+    var fx = this.comboFx;
+    ctx.save();
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.font = '700 34px ' + SANS;
+    ctx.fillStyle = 'rgba(232, 160, 80, 0.95)';
+    ctx.fillText('连击 · ' + fx.name, W / 2, 176);
+    ctx.strokeStyle = 'rgba(255, 240, 200, 0.55)';
+    ctx.lineWidth = 3;
+    for (var i = 0; i < 3; i++) {
+      ctx.globalAlpha = Math.min(1, fx.t * 1.3) * (1 - i * 0.2);
+      ctx.beginPath();
+      ctx.arc(W / 2, 176, 40 + i * 26, 0, Math.PI * 2);
+      ctx.stroke();
+    }
     ctx.restore();
   };
 

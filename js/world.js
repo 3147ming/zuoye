@@ -1543,6 +1543,17 @@
       var n = meta.streak ? meta.streak() : 0;
       sEl.textContent = '连续达成 ' + n + ' 天' + (n >= 3 ? '（开局自带 3 秒护盾）' : '（≥3 天开局送护盾）');
     }
+    var wEl = document.getElementById('rec-week');
+    if (wEl && meta.week) {
+      var runs = 0, coins = 0, best = 0;
+      for (var j = 0; j < modes.length; j++) {
+        var wk = meta.week(modes[j]);
+        runs += wk.runs || 0;
+        coins += wk.coins || 0;
+        best = Math.max(best, wk.best || 0);
+      }
+      wEl.textContent = runs ? '本周合计 ' + runs + ' 局 · 累计金币 ' + coins + ' · 最佳 ' + best + ' 分' : '本周合计 —';
+    }
   };
 
   WorldScene.prototype.closeRunnerPick = function () {
