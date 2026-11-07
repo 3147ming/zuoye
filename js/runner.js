@@ -450,7 +450,15 @@
     if (this.shieldT > 0) active++;
     if (this.dashT > 0) active++;
     if (this.glideT > 0) active++;
-    if (active >= 3) {
+    if (active >= 4) {
+      var ult = this.ultimateFor();
+      if (ult) {
+        msg = '终极 · ' + ult.name;
+        ult.apply(this);
+        this.comboFx = { t: 2.0, name: ult.name, ultimate: true };
+        this.play('ult');
+      }
+    } else if (active >= 3) {
       var triple = this.tripleFor();
       if (triple) {
         msg = '三连 · ' + triple.name;
@@ -498,6 +506,20 @@
     if (m && d && g) return { name: '流星冲刺', apply: function (r) { r.magnetT = Math.max(r.magnetT, 10); r.dashT = Math.max(r.dashT, 4.2); r.glideT = Math.max(r.glideT, 7); r.coinScore = true; } };
     if (s && d && g) return { name: '无敌飞驰', apply: function (r) { r.shieldT = Math.max(r.shieldT, 8); r.dashT = Math.max(r.dashT, 4.2); r.glideT = Math.max(r.glideT, 7); } };
     return null;
+  };
+
+  /* 四连：四件道具全齐的终极组合 */
+  Runner.prototype.ultimateFor = function () {
+    return {
+      name: '彩虹之力',
+      apply: function (r) {
+        r.shieldT = Math.max(r.shieldT, 12);
+        r.magnetT = Math.max(r.magnetT, 15);
+        r.dashT = Math.max(r.dashT, 6);
+        r.glideT = Math.max(r.glideT, 9);
+        r.coinScore = true;
+      }
+    };
   };
 
   Runner.prototype.die = function () {
@@ -550,11 +572,13 @@
 
     /* 神庙氛围粒子：萤火虫 / 雪粒 / 流星 */
     if (this.mode === 'temple') {
+      var px = W / 2 + this.p.laneX * 320;   /* 玩家在底部的位置，粒子往这儿聚 */
       for (var fi = 0; fi < this.flies.length; fi++) {
         var fl = this.flies[fi];
         fl.ph += dt * 0.9;
         fl.y += (this.themeIdx === 2 ? fl.sp : fl.sp * 0.5) * dt;
-        fl.x += Math.sin(fl.ph) * 7 * dt;
+        fl.x += (px - fl.x) * dt * 0.55 + Math.sin(fl.ph) * 7 * dt;
+        fl.y += (250 - fl.y) * dt * 0.25;
         if (fl.y > 262) fl.y = 30;
       }
       if (!this.meteor) {
@@ -634,13 +658,18 @@
     }
     var night = clamp((this.dist - 7000) / 9000, 0, 1);
     var kind;
-    /* 入夜后偶尔刷出夜行怪 */
-    if (night > 0.45 && Math.random() < 0.3) kind = 'ghost';
+    /* 入夜后刷出夜行怪，夜色越深密度越高，偶尔成群 */
+    if (night > 0.45 && Math.random() < 0.3 + night * 0.4) kind = 'ghost';
     else kind = r < 0.55 ? 'box' : (r < 0.78 ? 'tall' : 'bar');
     if (kind === 'box') this.objects.push({ kind: 'box', x: W + 90, y: GROUND, w: 50, h: 54 });
     else if (kind === 'tall') this.objects.push({ kind: 'tall', x: W + 90, y: GROUND, w: 42, h: 98 });
     else if (kind === 'bar') this.objects.push({ kind: 'bar', x: W + 90, y: GROUND - 34, w: 76, h: 20 });
-    else this.objects.push({ kind: 'ghost', x: W + 90, y: GROUND, w: 46, h: 78 });
+    else {
+      var gn = 1 + (Math.random() < night * 0.5 ? 1 : 0);
+      for (var gi = 0; gi < gn; gi++) {
+        this.objects.push({ kind: 'ghost', x: W + 90 + gi * 56, y: GROUND, w: 46, h: 78 });
+      }
+    }
     if (Math.random() < 0.55) {
       var base = kind === 'bar' ? GROUND - 66 : GROUND - 120;
       var n = 1 + Math.floor(Math.random() * 3);
@@ -1188,20 +1217,22 @@
 
   Runner.prototype.renderCombo = function (ctx) {
     var fx = this.comboFx;
-    var gold = fx.triple;
+    var ult = fx.ultimate;
+    var gold = !ult && fx.triple;
+    var hues = ['#ff7fa8', '#ffb45e', '#ffe27a', '#7fd8c8', '#8fb8ff', '#c79cff'];
     ctx.save();
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
-    ctx.font = gold ? '800 40px ' + SANS : '700 34px ' + SANS;
-    ctx.fillStyle = gold ? 'rgba(240, 190, 60, 0.98)' : 'rgba(232, 160, 80, 0.95)';
-    ctx.fillText((gold ? '三连 · ' : '连击 · ') + fx.name, W / 2, 168);
-    ctx.strokeStyle = gold ? 'rgba(255, 230, 150, 0.7)' : 'rgba(255, 240, 200, 0.55)';
-    ctx.lineWidth = gold ? 5 : 3;
-    var n = gold ? 5 : 3;
+    ctx.font = ult ? '800 44px ' + SANS : (gold ? '800 40px ' + SANS : '700 34px ' + SANS);
+    ctx.fillStyle = ult ? 'rgba(180, 100, 220, 0.98)' : (gold ? 'rgba(240, 190, 60, 0.98)' : 'rgba(232, 160, 80, 0.95)');
+    ctx.fillText((ult ? '终极 · ' : (gold ? '三连 · ' : '连击 · ')) + fx.name, W / 2, 166);
+    var n = ult ? 7 : (gold ? 5 : 3);
     for (var i = 0; i < n; i++) {
-      ctx.globalAlpha = Math.min(1, fx.t * 1.3) * (1 - i * (gold ? 0.16 : 0.2));
+      ctx.globalAlpha = Math.min(1, fx.t * 1.3) * (1 - i * 0.14);
+      ctx.strokeStyle = ult ? hues[i % hues.length] : (gold ? 'rgba(255, 230, 150, 0.7)' : 'rgba(255, 240, 200, 0.55)');
+      ctx.lineWidth = ult ? 6 : (gold ? 5 : 3);
       ctx.beginPath();
-      ctx.arc(W / 2, 168, gold ? 46 + i * 30 : 40 + i * 26, 0, Math.PI * 2);
+      ctx.arc(W / 2, 166, ult ? 44 + i * 34 : (gold ? 46 + i * 30 : 40 + i * 26), 0, Math.PI * 2);
       ctx.stroke();
     }
     ctx.restore();
