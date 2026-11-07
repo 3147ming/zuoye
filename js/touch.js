@@ -33,15 +33,15 @@
       K('↻', 'ArrowUp', 'ArrowUp', 38, 'R'), K('▼', 'ArrowDown', 'ArrowDown', 40, 'R')
     ] },
     'iframe-格斗': { keys: [
-      /* 左组：移动（标签 A/D/W/S，映射到本体 P1 的 WASD：A=65/D=68/W=87/S=83）
-         P1 = Sub-Zero，本体键位已改为 WASD 移动；箭头键是 P2(Kano) 的，别派发错。 */
-      K('A', 'KeyA', 'a', 65, 'L'), K('D', 'KeyD', 'd', 68, 'L'),
-      K('W', 'KeyW', 'w', 87, 'L'), K('S', 'KeyS', 's', 83, 'L'),
-      /* 右组：攻击 + 防御（标签 J/K/L/SHIFT，映射到本体 P1 的 J/K/L/Shift）
-         J=74 高拳 / K=75 低拳 / L=76 踢 / Shift=16 防御 */
-      K('J', 'KeyJ', 'j', 74, 'R'), K('K', 'KeyK', 'k', 75, 'R'),
-      K('L', 'KeyL', 'l', 76, 'R'), K('SHIFT', 'ShiftLeft', 'Shift', 16, 'R')
-    ], note: '双人对战建议电脑端' },
+      /* 左组：P1 移动（mk.js 实际键位：方向键移动，A/S/D/F 攻击，Shift 防御）
+         说明文字已同步改为与 mk.js 一致；P2 暂无键盘控制器（上游需摄像头）。 */
+      K('←', 'ArrowLeft', 'ArrowLeft', 37, 'L'), K('→', 'ArrowRight', 'ArrowRight', 39, 'L'),
+      K('↑', 'ArrowUp', 'ArrowUp', 38, 'L'), K('↓', 'ArrowDown', 'ArrowDown', 40, 'L'),
+      /* 右组：P1 攻击 + 防御 */
+      K('A', 'KeyA', 'a', 65, 'R'), K('S', 'KeyS', 's', 83, 'R'),
+      K('D', 'KeyD', 'd', 68, 'R'), K('F', 'KeyF', 'f', 70, 'R'),
+      K('SHIFT', 'ShiftLeft', 'Shift', 16, 'R')
+    ], note: '双人对战建议电脑端（P2 暂无键盘控制器）' },
     'iframe-打砖块': { swipe: true, keys: [ K('开球', 'Space', ' ', 32, 'R') ] }
     /* 其余（2048 / 五子棋 / 扫雷 / 白噪音 / 番茄钟）：原生触摸即可，只保留返回键 */
   };
