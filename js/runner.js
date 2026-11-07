@@ -444,13 +444,13 @@
     else if (pkind === 'shield') { this.shieldT = SHIELD_T; msg = '护盾！短暂无敌'; }
     else if (pkind === 'dash') { this.dashT = DASH_T; msg = '冲刺！加速前进'; }
     else { this.glideT = GLIDE_T; msg = '滑翔！下落变慢'; }
-    /* 连击：已经持有别的道具时触发组合效果 */
+    /* 连击：已持有 active 个道具，再触发第 active+1 个 */
     var active = 0;
     if (this.magnetT > 0) active++;
     if (this.shieldT > 0) active++;
     if (this.dashT > 0) active++;
     if (this.glideT > 0) active++;
-    if (active >= 4) {
+    if (active >= 3) {
       var ult = this.ultimateFor(pkind);
       if (ult) {
         msg = '终极 · ' + ult.name;
@@ -458,7 +458,7 @@
         this.comboFx = { t: 2.0, name: ult.name, ultimate: true, hue: ult.hue };
         this.play('ult');
       }
-    } else if (active >= 3) {
+    } else if (active >= 2) {
       var triple = this.tripleFor();
       if (triple) {
         msg = '三连 · ' + triple.name;
@@ -466,7 +466,7 @@
         this.comboFx = { t: 1.6, name: triple.name, triple: true };
         this.play('ult');
       }
-    } else if (active > 1) {
+    } else if (active >= 1) {
       var combo = this.comboFor(pkind);
       if (combo) {
         msg = '连击 · ' + combo.name;
@@ -777,9 +777,16 @@
     var lanes = [-1, 0, 1];
     var lane = lanes[Math.floor(Math.random() * 3)];
     var r = Math.random();
-    if (r < 0.07) this.objects.push({ kind: 'power', pkind: Math.random() < 0.5 ? 'magnet' : 'shield', lane: lane, z: MAXZ });
-    else if (r < 0.48) this.objects.push({ kind: 'barrel', lane: lane, z: MAXZ });
-    else if (r < 0.76) this.objects.push({ kind: 'beam', lane: lane, z: MAXZ });
+    if (r < 0.10) {
+      var kinds = ['magnet', 'shield', 'dash', 'glide'];
+      this.objects.push({
+        kind: 'power', pkind: kinds[Math.floor(Math.random() * kinds.length)],
+        lane: lane, z: MAXZ
+      });
+      return;
+    }
+    if (r < 0.50) this.objects.push({ kind: 'barrel', lane: lane, z: MAXZ });
+    else if (r < 0.78) this.objects.push({ kind: 'beam', lane: lane, z: MAXZ });
     else this.objects.push({ kind: 'coin', lane: lane, z: MAXZ });
     if (Math.random() < 0.35) {
       var l2 = lanes[Math.floor(Math.random() * 3)];
