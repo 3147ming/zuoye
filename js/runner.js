@@ -451,11 +451,11 @@
     if (this.dashT > 0) active++;
     if (this.glideT > 0) active++;
     if (active >= 4) {
-      var ult = this.ultimateFor();
+      var ult = this.ultimateFor(pkind);
       if (ult) {
         msg = '终极 · ' + ult.name;
         ult.apply(this);
-        this.comboFx = { t: 2.0, name: ult.name, ultimate: true };
+        this.comboFx = { t: 2.0, name: ult.name, ultimate: true, hue: ult.hue };
         this.play('ult');
       }
     } else if (active >= 3) {
@@ -508,18 +508,51 @@
     return null;
   };
 
-  /* 四连：四件道具全齐的终极组合 */
-  Runner.prototype.ultimateFor = function () {
-    return {
-      name: '彩虹之力',
-      apply: function (r) {
-        r.shieldT = Math.max(r.shieldT, 12);
-        r.magnetT = Math.max(r.magnetT, 15);
-        r.dashT = Math.max(r.dashT, 6);
-        r.glideT = Math.max(r.glideT, 9);
-        r.coinScore = true;
+  /* 四连：四件道具全齐的终极组合。按「最后吃到的那件」分四种增益侧重 */
+  Runner.prototype.ultimateFor = function (pkind) {
+    var VARIANTS = {
+      magnet: {
+        name: '彩虹之力 · 磁极', hue: '#ff7fa8',
+        apply: function (r) {
+          r.magnetT = Math.max(r.magnetT, 18);
+          r.shieldT = Math.max(r.shieldT, 10);
+          r.dashT = Math.max(r.dashT, 5);
+          r.glideT = Math.max(r.glideT, 6);
+          r.coinScore = true;
+        }
+      },
+      shield: {
+        name: '彩虹之力 · 守护', hue: '#8fd0ff',
+        apply: function (r) {
+          r.shieldT = Math.max(r.shieldT, 18);
+          r.magnetT = Math.max(r.magnetT, 10);
+          r.dashT = Math.max(r.dashT, 5);
+          r.glideT = Math.max(r.glideT, 6);
+          r.coinScore = true;
+        }
+      },
+      dash: {
+        name: '彩虹之力 · 疾风', hue: '#ffd45e',
+        apply: function (r) {
+          r.dashT = Math.max(r.dashT, 9);
+          r.shieldT = Math.max(r.shieldT, 8);
+          r.magnetT = Math.max(r.magnetT, 10);
+          r.glideT = Math.max(r.glideT, 6);
+          r.coinScore = true;
+        }
+      },
+      glide: {
+        name: '彩虹之力 · 御风', hue: '#9fe0a8',
+        apply: function (r) {
+          r.glideT = Math.max(r.glideT, 12);
+          r.shieldT = Math.max(r.shieldT, 8);
+          r.magnetT = Math.max(r.magnetT, 10);
+          r.dashT = Math.max(r.dashT, 5);
+          r.coinScore = true;
+        }
       }
     };
+    return VARIANTS[pkind] || VARIANTS.magnet;
   };
 
   Runner.prototype.die = function () {
@@ -576,7 +609,7 @@
       for (var fi = 0; fi < this.flies.length; fi++) {
         var fl = this.flies[fi];
         fl.ph += dt * 0.9;
-        fl.y += (this.themeIdx === 2 ? fl.sp : fl.sp * 0.5) * dt;
+        fl.y += fl.sp * 0.2 * dt;
         fl.x += (px - fl.x) * dt * 0.55 + Math.sin(fl.ph) * 7 * dt;
         fl.y += (250 - fl.y) * dt * 0.25;
         if (fl.y > 262) fl.y = 30;
@@ -1048,24 +1081,26 @@
       ctx.beginPath(); ctx.arc(lx, yy - 74 * sc, 22 * sc, 0, Math.PI * 2); ctx.fill();
     }
 
-    /* 氛围粒子：竹林萤火虫 / 雪庙雪粒 */
-    if (this.themeIdx === 2) {
+    /* 氛围粒子：萤火虫颜色随主题走（竹林绿萤 / 雪庙蓝萤），雪庙另飘雪粒 */
+    var flyCol = this.themeIdx === 1 ? '#a8d8ff' : '#b8ffb0';
+    var flyGlow = this.themeIdx === 1 ? 'rgba(150, 200, 255, 0.35)' : 'rgba(150, 255, 150, 0.35)';
+    for (i = 0; i < this.flies.length; i++) {
+      var ff = this.flies[i];
+      var af = 0.4 + 0.6 * Math.abs(Math.sin(t * 1.6 + ff.ph));
+      ctx.globalAlpha = af;
+      ctx.fillStyle = flyGlow;
+      ctx.beginPath(); ctx.arc(ff.x, ff.y, ff.r * 3.4, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = flyCol;
+      ctx.beginPath(); ctx.arc(ff.x, ff.y, ff.r, 0, Math.PI * 2); ctx.fill();
+    }
+    ctx.globalAlpha = 1;
+
+    if (this.themeIdx === 1) {
       for (i = 0; i < this.flies.length; i++) {
-        var ff = this.flies[i];
-        var af = 0.4 + 0.6 * Math.abs(Math.sin(t * 1.6 + ff.ph));
-        ctx.globalAlpha = af;
-        ctx.fillStyle = 'rgba(255, 232, 150, 0.35)';
-        ctx.beginPath(); ctx.arc(ff.x, ff.y, ff.r * 3.4, 0, Math.PI * 2); ctx.fill();
-        ctx.fillStyle = '#ffe9a0';
-        ctx.beginPath(); ctx.arc(ff.x, ff.y, ff.r, 0, Math.PI * 2); ctx.fill();
-      }
-      ctx.globalAlpha = 1;
-    } else if (this.themeIdx === 1) {
-      for (i = 0; i < this.flies.length; i++) {
-        var ff = this.flies[i];
-        ctx.globalAlpha = 0.75;
+        var sf = this.flies[i];
+        ctx.globalAlpha = 0.65;
         ctx.fillStyle = '#ffffff';
-        ctx.beginPath(); ctx.arc(ff.x, ff.y, ff.r * 1.4, 0, Math.PI * 2); ctx.fill();
+        ctx.beginPath(); ctx.arc(sf.x + 42, sf.y - 24, sf.r * 1.3, 0, Math.PI * 2); ctx.fill();
       }
       ctx.globalAlpha = 1;
     }
@@ -1224,12 +1259,12 @@
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
     ctx.font = ult ? '800 44px ' + SANS : (gold ? '800 40px ' + SANS : '700 34px ' + SANS);
-    ctx.fillStyle = ult ? 'rgba(180, 100, 220, 0.98)' : (gold ? 'rgba(240, 190, 60, 0.98)' : 'rgba(232, 160, 80, 0.95)');
+    ctx.fillStyle = ult ? (fx.hue || 'rgba(180, 100, 220, 0.98)') : (gold ? 'rgba(240, 190, 60, 0.98)' : 'rgba(232, 160, 80, 0.95)');
     ctx.fillText((ult ? '终极 · ' : (gold ? '三连 · ' : '连击 · ')) + fx.name, W / 2, 166);
     var n = ult ? 7 : (gold ? 5 : 3);
     for (var i = 0; i < n; i++) {
       ctx.globalAlpha = Math.min(1, fx.t * 1.3) * (1 - i * 0.14);
-      ctx.strokeStyle = ult ? hues[i % hues.length] : (gold ? 'rgba(255, 230, 150, 0.7)' : 'rgba(255, 240, 200, 0.55)');
+      ctx.strokeStyle = ult ? ((i === 0 && fx.hue) ? fx.hue : hues[i % hues.length]) : (gold ? 'rgba(255, 230, 150, 0.7)' : 'rgba(255, 240, 200, 0.55)');
       ctx.lineWidth = ult ? 6 : (gold ? 5 : 3);
       ctx.beginPath();
       ctx.arc(W / 2, 166, ult ? 44 + i * 34 : (gold ? 46 + i * 30 : 40 + i * 26), 0, Math.PI * 2);
