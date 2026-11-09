@@ -37,6 +37,7 @@ export interface Game3DRef {
     knockback?: number,
   ): number;
   areaEnemies(x: number, y: number, radius: number, damage: number, knockback?: number): number;
+  aimAssist(x: number, y: number, aim: number, range: number, arc: number): number;
   damagePlayer(amount: number, fromX: number, fromY: number): void;
   shake(v: number): void;
   slowmo(duration: number, scale: number): void;

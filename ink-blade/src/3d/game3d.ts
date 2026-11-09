@@ -87,6 +87,7 @@ export class Game3D implements Game3DRef {
   private yaw = -Math.PI / 2;
   private pitch = 0.42;
   private camDist = 9.6;
+  private camDistCur = 9.6;
   private camTarget = new THREE.Vector3();
   private dragging = false;
   private locked = false;
@@ -97,7 +98,7 @@ export class Game3D implements Game3DRef {
   constructor(canvas: HTMLCanvasElement) {
     this.canvas = canvas;
     this.renderer = this.createRenderer(canvas);
-    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.5));
+    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.25));
     this.renderer.setSize(window.innerWidth, window.innerHeight);
     this.renderer.outputColorSpace = THREE.SRGBColorSpace;
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
@@ -305,6 +306,7 @@ export class Game3D implements Game3DRef {
 
   private snapCamera() {
     this.camTarget.set(this.player.x * S, 1.15, this.player.y * S);
+    this.camDistCur = this.camDist;
   }
 
   private resize() {
@@ -559,10 +561,14 @@ export class Game3D implements Game3DRef {
         break;
       }
     }
+    // 光顺避障距离：被遮挡时立即拉近，离开遮挡后缓慢退回，避免镜头跳变
+    if (dd < this.camDistCur) this.camDistCur = dd;
+    else this.camDistCur += (dd - this.camDistCur) * (1 - Math.exp(-3.2 * rawDt));
+    const cur = this.camDistCur;
     const pos = new THREE.Vector3(
-      this.camTarget.x - fx * cp * dd,
-      this.camTarget.y + sp * dd,
-      this.camTarget.z - fz * cp * dd,
+      this.camTarget.x - fx * cp * cur,
+      this.camTarget.y + sp * cur,
+      this.camTarget.z - fz * cp * cur,
     );
     pos.x = clamp(pos.x, 0.4, (this.region.w * S) - 0.4);
     pos.z = clamp(pos.z, 0.4, (this.region.h * S) - 0.4);
@@ -858,6 +864,24 @@ export class Game3D implements Game3DRef {
   }
 
   /* ------------------------------ 战斗 API ------------------------------ */
+  aimAssist(x: number, y: number, aim: number, range: number, arc: number) {
+    let bestD = range;
+    let best = aim;
+    let found = false;
+    const consider = (ex: number, ey: number, er: number) => {
+      const d = Math.max(0, dist(x, y, ex, ey) - er);
+      if (d > bestD) return;
+      const a = angleTo(x, y, ex, ey);
+      if (Math.abs(angleDiff(a, aim)) > arc) return;
+      bestD = d;
+      best = a;
+      found = true;
+    };
+    for (const e of this.enemies) if (!e.dead) consider(e.x, e.y, e.r);
+    if (this.boss && !this.boss.dead) consider(this.boss.x, this.boss.y, this.boss.r);
+    return found ? best : aim;
+  }
+
   hitEnemies(x: number, y: number, angle: number, range: number, halfArc: number, damage: number, knockback = 0) {
     let hits = 0;
     for (const e of this.enemies) {

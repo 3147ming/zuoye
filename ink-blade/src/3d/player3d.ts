@@ -42,6 +42,7 @@ export class Player3D {
   dashStruck = false;
 
   atkCd = 0;
+  private atkBuffer = 0;
   comboWindow = 0;
   comboStep = 0;
   swingT = 0;
@@ -103,6 +104,7 @@ export class Player3D {
     this.hurtT = Math.max(0, this.hurtT - dt);
     this.dodgeCd = Math.max(0, this.dodgeCd - dt);
     this.atkCd = Math.max(0, this.atkCd - dt);
+    this.atkBuffer = Math.max(0, this.atkBuffer - dt);
     this.comboWindow = Math.max(0, this.comboWindow - dt);
     this.swingT = Math.max(0, this.swingT - dt);
     this.perfectWindow = Math.max(0, this.perfectWindow - dt);
@@ -190,7 +192,9 @@ export class Player3D {
 
     const input: Input = game.input;
     const attackPressed = input.mouse.down || input.mouse.clicked || input.isDown('KeyJ') || input.wasPressed('KeyJ');
-    if (attackPressed && this.atkCd <= 0) {
+    if (attackPressed) this.atkBuffer = 0.18;
+    if (this.atkBuffer > 0 && this.atkCd <= 0) {
+      this.atkBuffer = 0;
       this.basicAttack(game, aim);
     }
 
@@ -284,6 +288,8 @@ export class Player3D {
     const dmg = [12, 14, 22][this.comboStep] * this.dmgMult();
     const range = [74, 78, 96][this.comboStep];
     const arc = [1.9, 2.0, 2.6][this.comboStep];
+    // 轻度吸附：镜头对准附近敌人时自动修正一点朝向，第三人称下更跟手
+    aim = game.aimAssist(this.x, this.y, aim, range + 12, 0.95);
     const hits = game.hitEnemies(this.x, this.y, aim, range, arc, dmg, 90 + this.comboStep * 30);
     this.atkCd = 0.27;
     this.comboWindow = 0.55;
@@ -306,6 +312,7 @@ export class Player3D {
       });
       game.audio.hit(this.comboStep === 2);
       game.shake(3 + this.comboStep);
+      game.punchZoom(this.comboStep === 2 ? 2.2 : 0.8);
     }
     this.x += Math.cos(aim) * 5;
     this.y += Math.sin(aim) * 5;

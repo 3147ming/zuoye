@@ -321,7 +321,7 @@ export class Fx3D {
     });
     const sp = new THREE.Sprite(mat);
     const scale = 0.9 + size * 0.05;
-    sp.scale.set(scale * 2.6, scale * 0.98, 1);
+    sp.scale.set(scale * 1.35, scale * 0.52, 1);
     sp.position.set((px + (Math.random() - 0.5) * 16) * S, 1.85, py * S);
     sp.renderOrder = 20;
     this.root.add(sp);
@@ -333,7 +333,7 @@ export class Fx3D {
         obj.position.y = 1.85 + k * 1.15;
         mat.opacity = 1 - k ** 2;
         const s = 1 + k * 0.25;
-        sp.scale.set(scale * 2.6 * s, scale * 0.98 * s, 1);
+        sp.scale.set(scale * 1.35 * s, scale * 0.52 * s, 1);
       },
     });
   }

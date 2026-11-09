@@ -69,6 +69,21 @@ const CFG: Record<'wolf' | 'ghost' | 'monk', EnemyCfg> = {
   },
 };
 
+let barTex: THREE.CanvasTexture | null = null;
+function barTexture() {
+  if (!barTex) {
+    const c = document.createElement('canvas');
+    c.width = 2;
+    c.height = 2;
+    const g = c.getContext('2d')!;
+    g.fillStyle = '#ffffff';
+    g.fillRect(0, 0, 2, 2);
+    barTex = new THREE.CanvasTexture(c);
+    barTex.colorSpace = THREE.SRGBColorSpace;
+  }
+  return barTex;
+}
+
 export class Enemy3D {
   kind: 'wolf' | 'ghost' | 'monk';
   x: number;
@@ -113,6 +128,8 @@ export class Enemy3D {
   private legs: THREE.Group[];
   private telegraph: THREE.Mesh;
   private tMat: THREE.MeshBasicMaterial;
+  private hpBg: THREE.Sprite;
+  private hpFill: THREE.Sprite;
 
   constructor(kind: 'wolf' | 'ghost' | 'monk', x: number, y: number, elite = false, name?: string, key?: string) {
     const cfg = CFG[kind];
@@ -170,6 +187,28 @@ export class Enemy3D {
     this.telegraph.position.y = 0.07;
     this.group.add(this.telegraph);
 
+    // 受伤后显示的小血条
+    const barY = kind === 'wolf' ? 1.3 + (elite ? 0.2 : 0) : kind === 'ghost' ? 2.55 : 2.85 + (elite ? 0.2 : 0);
+    const tex = barTexture();
+    this.hpBg = new THREE.Sprite(
+      new THREE.SpriteMaterial({ map: tex, color: 0x0a0b0d, transparent: true, opacity: 0.72, depthWrite: false }),
+    );
+    this.hpBg.scale.set(0.92, 0.1, 1);
+    this.hpBg.position.y = barY;
+    this.hpBg.renderOrder = 8;
+    this.hpBg.visible = false;
+    this.group.add(this.hpBg);
+
+    this.hpFill = new THREE.Sprite(
+      new THREE.SpriteMaterial({ map: tex, color: elite ? 0xffd889 : 0xff5a4a, transparent: true, depthWrite: false }),
+    );
+    this.hpFill.center.set(0, 0.5);
+    this.hpFill.scale.set(0.84, 0.055, 1);
+    this.hpFill.position.set(-0.42, barY, 0);
+    this.hpFill.renderOrder = 9;
+    this.hpFill.visible = false;
+    this.group.add(this.hpFill);
+
     this.sync();
   }
 
@@ -177,6 +216,7 @@ export class Enemy3D {
     if (this.dead) return;
     this.animT += dt;
     this.hurtT = Math.max(0, this.hurtT - dt);
+    this.updateHpBar(game);
     if (Math.abs(this.kbx) > 1 || Math.abs(this.kby) > 1) {
       const p = game.world.collide(this.x + this.kbx * dt, this.y + this.kby * dt, this.r);
       this.x = p.x;
@@ -350,8 +390,18 @@ export class Enemy3D {
     }
   }
 
+  private updateHpBar(game: Game3DRef) {
+    const ratio = this.maxHp > 0 ? this.hp / this.maxHp : 0;
+    const show = !this.dead && ratio < 0.999 && dist(this.x, this.y, game.player.x, game.player.y) < 1400;
+    this.hpBg.visible = show;
+    this.hpFill.visible = show;
+    if (show) this.hpFill.scale.x = 0.84 * Math.max(0, ratio);
+  }
+
   private die(game: Game3DRef) {
     this.dead = true;
+    this.hpBg.visible = false;
+    this.hpFill.visible = false;
     game.fx.burst(this.x, this.y, {
       count: this.elite ? 46 : 22,
       color: this.kind === 'ghost' ? '#63e0cf' : '#c94a3f',
