@@ -223,6 +223,18 @@
         global.BGM.play();
         tip('正在播放当前曲目');
       });
+
+      /* 空清单不给死按钮：没有曲目时禁用「试听音乐」 */
+      (function () {
+        var has = !!(global.BGM && global.BGM.available && global.BGM.available());
+        var btn = el('bgmTry');
+        if (btn) {
+          btn.disabled = !has;
+          if (!has) btn.style.opacity = '0.45';
+        }
+        var st = el('bgmState');
+        if (st) st.textContent = has ? '背景音乐已就绪' : '还没有背景音乐。';
+      })();
     },
 
     /* ---------------- 其它 ---------------- */

@@ -6,21 +6,26 @@
 <title>世界大厅</title>
 <meta name="description" content="基于 Web 的 2D 横版世界大厅游戏合集">
 <meta name="theme-color" content="#0b0817">
-<meta name="wh-version" content="1.15.0">
+<meta name="wh-version" content="1.16.0">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-touch-icon" href="/assets/icon.svg">
 <meta property="og:title" content="世界大厅">
 <meta property="og:description" content="基于 Web 的 2D 横版世界大厅游戏合集">
 <meta property="og:type" content="website">
-<meta property="og:image" content="/assets/icon.svg">
+<meta property="og:url" content="https://zuoye-e0c.pages.dev/">
+<meta property="og:image" content="https://zuoye-e0c.pages.dev/assets/og.png">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="世界大厅">
+<meta name="twitter:description" content="基于 Web 的 2D 横版世界大厅游戏合集">
+<meta name="twitter:image" content="https://zuoye-e0c.pages.dev/assets/og.png">
 <link rel="canonical" href="https://zuoye-e0c.pages.dev/">
 <link rel="preconnect" href="https://ming-games.pages.dev" crossorigin>
 <link rel="preconnect" href="https://warehouse-strike.pages.dev" crossorigin>
 <link rel="manifest" href="manifest.webmanifest">
 <!-- 内联 SVG 图标：不额外发请求，http(s) 与 file:// 下都不会有 /favicon.ico 404 -->
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='7' fill='%230b0817'/><path d='M9 25V15a7 7 0 0 1 14 0v10' fill='none' stroke='%23f0a76e' stroke-width='2.6'/><circle cx='16' cy='18' r='2.1' fill='%23ffd9a8'/></svg>">
-<link rel="stylesheet" href="assets/main.f713d005cd.css">
+<link rel="stylesheet" href="assets/main.6e2989137e.css">
 </head>
 <body>
   <div class="frame">
@@ -103,7 +108,7 @@
                 <button class="set-btn ghost" id="bgReset" type="button">恢复默认</button>
               </div>
               <p class="set-note" id="bgHint">这一屏用的是默认剪纸背景</p>
-              <p class="set-tip">图片会压到 1440×810 后存在这台电脑的浏览器里（换设备不会带走）。也可以把图片放进 <code>assets/bg/</code>，写进 <code>js/config.js</code> 的 <code>bgFiles</code> 后从下拉里选。</p>
+              <p class="set-tip">图片会压到 1440×810 后存在这台电脑的浏览器里（换设备不会带走）。</p>
               <input type="file" id="bgFile" accept="image/*" hidden>
             </section>
 
@@ -126,7 +131,7 @@
                 <button class="set-btn ghost" id="bgmTry" type="button">试听音乐</button>
                 <span class="set-tip" id="tryTip">用当前音量放一小段</span>
               </div>
-              <p class="set-note" id="bgmState">曲目表还是空的：把 mp3 放进 <code>audio/bgm/</code>，写进 <code>js/config.js</code> 的 <code>bgm</code> 就会响。</p>
+              <p class="set-note" id="bgmState">还没有背景音乐。</p>
             </section>
 
             <section class="set-sec">
@@ -175,9 +180,17 @@
 
             <section class="set-sec">
               <h3>自建内容</h3>
-              <p class="set-note" id="contribEmpty">还没有东西注册进来。把做好的页面放进 <code>contrib/</code>，在 <code>contrib/manifest.js</code> 里调一次 <code>WorldHub.register()</code>，它就会出现在上面的总门选单里。</p>
+              <p class="set-note" id="contribEmpty">还没有自建内容。</p>
               <ul class="set-contribs" id="contribList"></ul>
             </section>
+
+            <!-- 开发者选项：终端用户默认收起；构建说明等文档性内容不占产品 UI -->
+            <details class="set-dev">
+              <summary>开发者选项</summary>
+              <p class="set-tip">背景图：把图片放进 <code>assets/bg/</code>，写进 <code>js/config.js</code> 的 <code>bgFiles</code> 后会出现在上方下拉里。</p>
+              <p class="set-tip">背景音乐：把 mp3 放进 <code>audio/bgm/</code>，写进 <code>js/config.js</code> 的 <code>bgm</code> 列表即可。</p>
+              <p class="set-tip">自建内容：把页面放进 <code>contrib/</code>，在 <code>contrib/manifest.js</code> 里调一次 <code>WorldHub.register()</code>，它就会出现在总门选单里。</p>
+            </details>
           </div>
 
           <footer class="set-foot">
@@ -244,13 +257,13 @@
       </div>
     </div>
 
-    <p class="caption">世界大厅 · 画布 1280 × 720 · 原生 HTML / CSS / JavaScript</p>
+    <p class="caption">世界大厅 · 画布 1280 × 720 · 原生 HTML / CSS / JavaScript · <a href="directory.html">区块目录</a></p>
   </div>
 
   <!--
     第四批：五款内置小游戏（games/*.js）不再加载，大厅改成 iframe 接入开源页面。
     历史文件仍保留在 js/games/ 与 js/games/*.js 里，只是没有 <script> 引用。
   -->
-  <script src="assets/app.7fd0c28190.js" defer></script>
+  <script src="assets/app.7ac8cf2a6f.js" defer></script>
 </body>
 </html>

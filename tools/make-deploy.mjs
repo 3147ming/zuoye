@@ -21,6 +21,9 @@ const OUT = path.join(ROOT, 'deploy');
 /* 白名单：目录以 / 结尾，其余按文件 */
 const COPY = [
   'index.html',
+  'directory.html',
+  'sitemap.xml',
+  'robots.txt',
   'version.json',
   '404.html',
   'manifest.webmanifest',

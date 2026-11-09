@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://zuoye-e0c.pages.dev/sitemap.xml
