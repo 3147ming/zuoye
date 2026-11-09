@@ -2,6 +2,6 @@ import { defineConfig } from 'vite';
 
 export default defineConfig({
   base: './',
-  server: { host: '0.0.0.0', port: 5173 },
+  server: { port: 5173, open: true },
   build: { target: 'es2020', assetsInlineLimit: 0 },
 });
