@@ -6,34 +6,30 @@
  *   - /api：放行，不缓存
  * 缓存以版本号命名，发新版本时旧缓存自动失效。
  */
-const VERSION = 'worldhub-v1.5.1';
+const VERSION = 'worldhub-v1.15.0-7fd0c28190';
 const CORE = [
   '/',
   '/index.html',
   '/manifest.webmanifest',
-  '/css/main.css',
-  '/js/audio.js',
-  '/js/sceneManager.js',
-  '/js/player.js',
-  '/js/npc.js',
-  '/js/save.js',
-  '/js/config.js',
-  '/js/daynight.js',
-  '/js/weather.js',
-  '/js/stats.js',
-  '/js/riddle.js',
-  '/js/gamepad.js',
-  '/js/parkour.js',
-  '/js/runner.js',
-  '/js/contrib.js',
-  '/contrib/manifest.js',
-  '/js/bgm.js',
-  '/js/gatePanel.js',
-  '/js/settings.js',
-  '/js/world.js',
-  '/js/iframeScene.js',
-  '/js/touch.js',
-  '/js/boot.js'
+  '/assets/main.f713d005cd.css',
+  '/assets/app.7fd0c28190.js',
+  '/games/breakout/index.html',
+  '/games/fight/index.html',
+  '/games/game2048/index.html',
+  '/games/gomoku/index.html',
+  '/games/mathdash/index.html',
+  '/games/memory/index.html',
+  '/games/mine/index.html',
+  '/games/reaction/index.html',
+  '/games/snake/index.html',
+  '/games/tetris/index.html',
+  '/tools/board/index.html',
+  '/tools/color/index.html',
+  '/tools/links/index.html',
+  '/tools/noise/index.html',
+  '/tools/pomodoro/index.html',
+  '/tools/timer/index.html',
+  '/tools/unit/index.html'
 ];
 
 self.addEventListener('install', function (e) {

@@ -33,6 +33,7 @@ const COPY = [
   'tools/noise/',
   'tools/pomodoro/',
   'tools/board/',
+  'tools/links/',
   'tools/timer/',
   'tools/unit/',
   'tools/color/',

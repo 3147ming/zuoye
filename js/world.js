@@ -1489,6 +1489,17 @@
 
   /* ---------------- 跑酷选择 ---------------- */
   WorldScene.prototype.openRunner = function () {
+    /* 跑酷大块（runner/parkour）是懒加载的：没到位就先取，取到再开面板 */
+    if (global.SceneManager && !global.SceneManager.has('runner') &&
+        global.WorldHub && global.WorldHub.loadExtra) {
+      var self0 = this;
+      if (global.HUD) global.HUD.toast('正在加载跑酷…');
+      global.WorldHub.loadExtra(function (ok) {
+        if (global.HUD) global.HUD.toast('');
+        if (ok) self0.openRunner();
+      });
+      return;
+    }
     var el = document.getElementById('runnerPick');
     if (!el) return;
     var self = this;
