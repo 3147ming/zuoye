@@ -13,7 +13,7 @@
   'use strict';
 
   var CONFIG = {
-    version: '1.15.0',
+    version: '1.17.0',
     build: '2026-11-09',
     stage: '第十四批·跑酷两加：四连彩虹之力分四种分支、萤火虫按主题变色',
 

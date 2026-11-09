@@ -6,13 +6,14 @@
  *   - /api：放行，不缓存
  * 缓存以版本号命名，发新版本时旧缓存自动失效。
  */
-const VERSION = 'worldhub-v1.15.0-7fd0c28190';
+const VERSION = 'worldhub-v1.17.0-67ba4a8dbc';
 const CORE = [
   '/',
   '/index.html',
   '/manifest.webmanifest',
-  '/assets/main.f713d005cd.css',
-  '/assets/app.7fd0c28190.js',
+  '/assets/main.6e2989137e.css',
+  '/assets/app.67ba4a8dbc.js',
+  '/games/brain-gym/index.html',
   '/games/breakout/index.html',
   '/games/fight/index.html',
   '/games/game2048/index.html',
