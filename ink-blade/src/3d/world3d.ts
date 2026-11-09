@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import type { ChestDef, NodeDef, NpcDef, PortalDef, PropKind, RegionDef } from '../types';
+import { assetUrl } from '../core/assets';
 import {
   S,
   createChestModel,
@@ -127,7 +128,7 @@ export class World3D {
 
   private buildGround() {
     const r = this.region;
-    const tex = new THREE.TextureLoader().load(`./assets/tiles/${r.ground}.jpg`);
+    const tex = new THREE.TextureLoader().load(assetUrl('tiles', r.ground));
     tex.colorSpace = THREE.SRGBColorSpace;
     tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
     tex.repeat.set(Math.max(2, r.w / 240), Math.max(2, r.h / 240));

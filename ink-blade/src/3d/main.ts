@@ -1,5 +1,6 @@
 import '../style.css';
 import { Game3D } from './game3d';
+import { assetUrl } from '../core/assets';
 
 function boot() {
   const canvas = document.getElementById('game') as HTMLCanvasElement | null;
@@ -12,7 +13,7 @@ function boot() {
 
   const titleBg = document.querySelector<HTMLElement>('.title-bg');
   if (titleBg) {
-    titleBg.style.backgroundImage = "url('./assets/art/title.jpg')";
+    titleBg.style.backgroundImage = `url('${assetUrl('art', 'title')}')`;
   }
 
   (window as unknown as { __game?: Game3D }).__game = game;

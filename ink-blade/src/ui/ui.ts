@@ -2,6 +2,7 @@ import type { ItemId } from '../types';
 import { ITEMS, RECIPES, SHOP_GOODS } from '../data/items';
 import type { DialogLine } from '../data/dialogs';
 import { drawItemIcon } from '../core/utils';
+import { assetUrl } from '../core/assets';
 import { SKILL_INFO } from '../data/skills';
 
 export interface UIHooks {
@@ -441,7 +442,7 @@ export class UI {
     this.dialogTextEl.textContent = '';
     this.dialogPortraitEl.className = 'dlg-portrait';
     this.dialogPortraitEl.style.backgroundImage = line.portrait
-      ? `url(./assets/art/${line.portrait}.jpg)`
+      ? `url(${assetUrl('art', line.portrait)})`
       : '';
     if (line.portrait) this.dialogPortraitEl.classList.add('has-art');
     this.dialogChars = 0;
