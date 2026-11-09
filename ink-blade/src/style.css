@@ -41,10 +41,58 @@ body {
 
 canvas#game {
   display: block;
-  image-rendering: pixelated;
-  image-rendering: crisp-edges;
   box-shadow: 0 0 80px rgba(0, 0, 0, 0.9) inset;
   background: #0a0c10;
+  touch-action: none;
+}
+
+#flash3d {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 2;
+  opacity: 0;
+  transition: opacity 0.08s linear;
+  mix-blend-mode: screen;
+}
+
+#crosshair {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 10px;
+  height: 10px;
+  margin: -5px 0 0 -5px;
+  z-index: 3;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.2s ease;
+}
+
+#crosshair::before,
+#crosshair::after {
+  content: '';
+  position: absolute;
+  background: rgba(255, 226, 180, 0.85);
+  box-shadow: 0 0 6px rgba(255, 180, 120, 0.8);
+}
+
+#crosshair::before {
+  left: 4px;
+  top: 0;
+  width: 2px;
+  height: 10px;
+}
+
+#crosshair::after {
+  left: 0;
+  top: 4px;
+  width: 10px;
+  height: 2px;
+}
+
+#crosshair.on {
+  opacity: 0.85;
 }
 
 #vignette {
@@ -573,8 +621,8 @@ button {
 .boss-bar {
   position: absolute;
   left: 50%;
-  top: clamp(20px, 4vh, 38px);
-  width: min(560px, 56vw);
+  top: clamp(84px, 12vh, 110px);
+  width: min(480px, 46vw);
   transform: translateX(-50%);
 }
 

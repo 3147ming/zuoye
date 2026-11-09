@@ -2,7 +2,7 @@ import type { ItemId } from '../types';
 import { ITEMS, RECIPES, SHOP_GOODS } from '../data/items';
 import type { DialogLine } from '../data/dialogs';
 import { drawItemIcon } from '../core/utils';
-import { SKILL_INFO } from '../game/player';
+import { SKILL_INFO } from '../data/skills';
 
 export interface UIHooks {
   onStart: () => void;
@@ -128,7 +128,7 @@ export class UI {
         <div class="title-bg"></div>
         <div class="title-shade"></div>
         <div class="title-content">
-          <div class="title-kicker">2D 像素 · 俯视角武侠 · 动作冒险</div>
+          <div class="title-kicker">3D 低多边形 · 第三人称武侠 · 动作冒险</div>
           <h1 class="game-title">烬影<span>·</span>墨刃</h1>
           <p class="title-sub">师父死了，凶手没有脸。<br />你带着他的刀，走进这场红雨。</p>
           <div class="title-buttons">
@@ -136,8 +136,9 @@ export class UI {
             <button class="btn" data-action="title-help">操 作 说 明</button>
           </div>
           <div class="title-controls hidden" id="title-controls">
-            <div><b>WASD</b> 移动</div>
-            <div><b>鼠标左键 / J</b> 挥刀</div>
+            <div><b>点击画面</b> 锁定视角 · <b>移动鼠标</b> 转动镜头</div>
+            <div><b>WASD</b> 相对镜头移动</div>
+            <div><b>鼠标左键 / J</b> 挥刀（朝镜头方向）</div>
             <div><b>1 2 3</b> 三段武学</div>
             <div><b>空格 / Shift</b> 翻滚闪避（有完美闪避判定）</div>
             <div><b>Q / R</b> 快速服丹</div>
@@ -512,13 +513,14 @@ export class UI {
     this.snapshot = snap;
     if (!this.panelOpen) return;
     if (this.panelKind === 'inventory') this.renderInventory();
+    else if (this.panelKind === 'shop') {
+      const activeTab = this.panelEl.querySelector('.tab.active') as HTMLElement | null;
+      this.renderPanel(activeTab?.dataset.tab === 'craft' ? 'craft' : 'buy');
+    }
   }
 
   refreshShop(snap: Snapshot) {
-    this.snapshot = snap;
-    if (!this.panelOpen || this.panelKind !== 'shop') return;
-    const activeTab = this.panelEl.querySelector('.tab.active') as HTMLElement | null;
-    this.renderPanel(activeTab?.dataset.tab === 'craft' ? 'craft' : 'buy');
+    this.refreshPanel(snap);
   }
 
   openHelp() {
@@ -529,8 +531,9 @@ export class UI {
     this.panelEl.innerHTML = `
       <div class="panel-head"><div class="panel-title">刀谱 · 操作</div><button class="close-btn" data-action="close">×</button></div>
       <div class="help-grid">
-        <div><span class="key">W A S D</span> 八方移动</div>
-        <div><span class="key">鼠标左键 / J</span> 三段普攻（朝鼠标方向）</div>
+        <div><span class="key">点击画面</span> 锁定视角，移动鼠标转动第三人称镜头</div>
+        <div><span class="key">W A S D</span> 相对镜头移动</div>
+        <div><span class="key">鼠标左键 / J</span> 三段普攻（朝镜头方向）</div>
         <div><span class="key">1</span> 裂空·一闪：突进斩，突进期间无敌</div>
         <div><span class="key">2</span> 回风·刃轮：环身刀气，持续伤害</div>
         <div><span class="key">3</span> 烬灭·斩：蓄力后大范围爆发</div>
