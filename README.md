@@ -411,6 +411,21 @@ HUD 文字全部走 DOM（不画在 canvas 上），任意缩放下都清晰；
 - **顶部不再重叠**：H/O 按钮右移（横屏移到返回键右侧），「建议横屏」提示改每会话一次、6 秒自动消失；横屏直接不显示。
 - **兜底文案**：`index.html` 的「十六个区块」改「二十三个区块」，与动态计数一致。
 
+### 3.20 构建与产品化批次（1.16.0 / 1.17.0）
+
+继续按《世界大厅·网站分析报告》落地阶段二~四：
+
+- **打包（1.16.0 起）**：`node tools/build.mjs` 用 esbuild 把 21 个核心脚本拼接压缩成一个 `assets/app.<hash>.js`（219→143KB），CSS→`assets/main.<hash>.css`，首屏请求 **25→5**；`runner/parkour` 切成懒加载包 `extra.<hash>.js`（按 P 才取，空闲预取）。构建期依赖 esbuild，运行期依旧零依赖。
+- **缓存分层**：hash 资源 `max-age=31536000, immutable`；HTML/sw/version.json no-cache；SW 对 `/assets/*` cache-first、导航 network-first，并预缓存 `games/*/index.html`、`tools/*/index.html` 入口。
+- **版本单一数据源**：`package.json` 的 `version` 由构建脚本写进 `js/config.js` / `version.json` / `sw.js` VERSION / `index.html` meta，不再手写四处。
+- **SEO 产品化**：`tools/make-directory.mjs` 从 ITEMS 生成静态 `/directory`（真实 DOM 文本 + JSON-LD ItemList + 响应式卡片）；`sitemap.xml`（19 URL）+ `robots.txt`；`assets/og.png` 1200×630 分享预览图（canvas 绘制导出），`og:image`/`twitter:card` 指向 PNG。
+- **设置清理**：开发者说明（放 mp3 / 注册 contrib 等）收进折叠「开发者选项」；曲目表为空时禁用「试听音乐」，不留点了没反应的死按钮。
+- **每日一题脱明文**：题库答案换成盐化 SHA-256（纯 JS 实现，file:// 也能判），看源码不再直接看到答案；提示改存长度/首字。
+- **安全**：`_headers` 补 CSP（大厅 `script-src 'self'` 收紧、`frame-src` 只白名单仓库行动域名）、HSTS、X-Frame-Options；games/tools 子页因单文件内联脚本单独放宽。
+- **API 治理**：`/api/links`、`/api/board` 删除改软删除（挪进 tomb 留痕）+ 增删审计日志（最近 100 条）；links 只收 http(s) 绝对地址。
+- **降外部依赖**：6 个脑力街机从 `ming-games.pages.dev` 自托管到 `games/brain-gym/`（锁定版本、可离线），23 个区块里只剩「仓库行动」需要联网。
+- **轻量埋点**：`Stats.metric` 记 FCP/DCL，`portrait/landscape/iframeFail` 计数进本地足迹（不上云）。
+
 ---
 
 ## 四、开源致谢

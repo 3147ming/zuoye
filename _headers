@@ -2,11 +2,29 @@
   X-Content-Type-Options: nosniff
   Referrer-Policy: strict-origin-when-cross-origin
   Permissions-Policy: camera=(), microphone=(), geolocation=()
-
-/sw.js
-  Cache-Control: no-cache
+  Strict-Transport-Security: max-age=31536000; includeSubDomains
+  X-Frame-Options: SAMEORIGIN
 
 /index.html
+  Content-Security-Policy: default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; media-src 'self' data: blob:; font-src 'self' data:; connect-src 'self'; worker-src 'self' blob:; frame-src 'self' https://warehouse-strike.pages.dev; object-src 'none'; base-uri 'self'; frame-ancestors 'self'
+  Cache-Control: no-cache
+
+/
+  Content-Security-Policy: default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; media-src 'self' data: blob:; font-src 'self' data:; connect-src 'self'; worker-src 'self' blob:; frame-src 'self' https://warehouse-strike.pages.dev; object-src 'none'; base-uri 'self'; frame-ancestors 'self'
+  Cache-Control: no-cache
+
+/directory.html
+  Content-Security-Policy: default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; object-src 'none'; base-uri 'self'
+  Cache-Control: no-cache
+
+/* 子页（games/tools）多为单文件内联脚本，收紧 script-src 会直接打死它们——放宽脚本，保留防嵌套与禁 object */
+/games/*
+  Content-Security-Policy: default-src 'self' data: blob:; script-src 'self' 'unsafe-inline' 'unsafe-eval' blob:; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; media-src 'self' data: blob:; connect-src 'self' data: blob:; worker-src 'self' blob:; frame-ancestors 'self'; object-src 'none'
+
+/tools/*
+  Content-Security-Policy: default-src 'self' data: blob:; script-src 'self' 'unsafe-inline' 'unsafe-eval' blob:; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; media-src 'self' data: blob:; connect-src 'self' data: blob:; worker-src 'self' blob:; frame-ancestors 'self'; object-src 'none'
+
+/sw.js
   Cache-Control: no-cache
 
 /version.json
@@ -24,6 +42,7 @@
 
 /games/*
   Cache-Control: public, max-age=86400
+
 /tools/*
   Cache-Control: public, max-age=86400
 

@@ -1519,17 +1519,8 @@
     return null;
   }
 
-  function reachable(url) {
-    return new Promise(function (resolve) {
-      var done = false;
-      var ctrl = (typeof AbortController !== 'undefined') ? new AbortController() : null;
-      var timer = setTimeout(function () { done = true; if (ctrl) ctrl.abort(); resolve(false); }, 5000);
-      fetch(url, { mode: 'no-cors', signal: ctrl ? ctrl.signal : undefined })
-        .then(function () { if (!done) resolve(true); })
-        .catch(function () { if (!done) resolve(false); })
-        .finally(function () { clearTimeout(timer); });
-    });
-  }
+  /* （可达性探活已移除：no-cors 只能判网络层，404/500 也算可达，意义不大；
+     且任意外站 fetch 会拖垮 CSP connect-src 收紧） */
 
   /* 自动归类：① 域名命中已有预置 → 直接沿用其分类（最准）；② 否则按关键词规则分到 11 类之一 */
   var AUTO_RULES = [

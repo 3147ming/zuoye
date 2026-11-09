@@ -1,7 +1,7 @@
 {
   "name": "worldhub",
   "private": true,
-  "version": "1.16.0",
+  "version": "1.17.0",
   "description": "世界大厅 —— 2D 横版探索式游戏合集入口（构建期用 esbuild，运行期零依赖）",
   "scripts": {
     "build": "node tools/build.mjs"

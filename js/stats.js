@@ -20,7 +20,8 @@
       v: 1,
       visits: 1,
       seconds: 0,
-      actions: { jump: 0, teleport: 0, door: 0, edge: 0, talk: 0, riddle: 0 },
+      actions: { jump: 0, teleport: 0, door: 0, edge: 0, talk: 0, riddle: 0, portrait: 0, landscape: 0, iframeFail: 0 },
+      metrics: { fcp: 0, dcl: 0 },
       zones: {},
       first: Date.now(),
       last: Date.now()
@@ -36,6 +37,7 @@
       if (typeof s.visits !== 'number') s.visits = 1;
       if (typeof s.seconds !== 'number') s.seconds = 0;
       if (!s.actions || typeof s.actions !== 'object') s.actions = defaults().actions;
+      if (!s.metrics || typeof s.metrics !== 'object') s.metrics = defaults().metrics;
       if (!s.zones || typeof s.zones !== 'object') s.zones = {};
       return s;
     } catch (e) { return defaults(); }
@@ -65,6 +67,16 @@
     count: function (name) {
       if (data.actions[name] == null) data.actions[name] = 0;
       data.actions[name]++;
+    },
+    /* 性能/环境指标：记最近值与滑动平均（首屏耗时、DCL 等） */
+    metric: function (name, val) {
+      if (typeof val !== 'number' || !isFinite(val) || val < 0) return;
+      var m = data.metrics[name] || { last: 0, n: 0, avg: 0 };
+      m.last = Math.round(val);
+      m.n++;
+      m.avg = Math.round(m.avg + (val - m.avg) / Math.min(m.n, 20));
+      data.metrics[name] = m;
+      persist();
     },
     /* 由主循环按帧调用，自己攒够 SAVE_EVERY 秒落盘一次 */
     seeTime: function (sec) {
@@ -101,6 +113,7 @@
         favorite: fav,
         favoriteCount: favN,
         actions: data.actions,
+        metrics: data.metrics,
         days: Math.max(1, Math.round((Date.now() - (data.first || Date.now())) / 86400000))
       };
     }

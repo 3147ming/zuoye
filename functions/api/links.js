@@ -21,6 +21,23 @@ const RATE_KEY = (ip) => 'links.rate.' + ip;
 const RATE_LIMIT = 6;          /* 每分钟条数 */
 const RATE_WINDOW = 60;        /* 秒 */
 
+/* 软删除与审计：删除只挪进 tomb（可追溯），增删各留一条审计（最近 100 条） */
+const TOMB_KEY = 'links.tomb.v1';
+const AUDIT_KEY = 'links.audit.v1';
+
+async function readArr(env, key) {
+  const raw = await env.LINKS_KV.get(key);
+  if (!raw) return [];
+  try { const v = JSON.parse(raw); return Array.isArray(v) ? v : []; } catch { return []; }
+}
+
+async function appendCapped(env, key, entry, cap) {
+  const list = await readArr(env, key);
+  list.push(entry);
+  while (list.length > cap) list.shift();
+  await env.LINKS_KV.put(key, JSON.stringify(list));
+}
+
 const BLACK = ['赌博', '博彩', '赌场', '彩票', '时时彩', '六合彩', '色情', '成人', '淫秽',
   '黄色', '嫖娼', '诈骗', '刷单', '外挂', '私服', '恶意软件', '钓鱼', '毒品', '枪支',
   '传销', '高利贷', '裸聊', 'http://', 'https://', 'www.'];
@@ -99,6 +116,10 @@ export async function onRequestPost(context) {
   const cat = clean(body.cat, 20);
   const author = clean(body.author, 10);
   if (!url) return json({ ok: false, error: 'empty_url' }, 400);
+  /* 只收 http(s) 绝对地址 */
+  if (!/^https?:\/\/[^\s]+$/i.test(url)) {
+    return json({ ok: false, error: 'bad_url' }, 400);
+  }
 
   const low = (name + desc + cat + author).toLowerCase();
   if (BLACK.some(w => low.includes(w))) {
@@ -111,6 +132,7 @@ export async function onRequestPost(context) {
   if (items.length > MAX_ITEMS) items.length = MAX_ITEMS;
 
   await writeItems(env, items);
+  await appendCapped(env, AUDIT_KEY, { op: 'add', id, ts: Date.now() }, 100);
   return json({ ok: true, items });
 }
 
@@ -133,8 +155,12 @@ export async function onRequestDelete(context) {
   const items = await readItems(env);
   const idx = items.findIndex(i => i.id === id);
   if (idx < 0) return json({ ok: false, error: 'not_found' }, 404);
-  items.splice(idx, 1);
+  const rm = items.splice(idx, 1)[0];
 
   await writeItems(env, items);
+  /* 软删除：整条挪进 tomb 留痕，不做物理抹除 */
+  await appendCapped(env, TOMB_KEY,
+    { id: rm.id, name: rm.name, url: rm.url, deletedAt: Date.now() }, 200);
+  await appendCapped(env, AUDIT_KEY, { op: 'del', id: rm.id, ts: Date.now() }, 100);
   return json({ ok: true, items });
 }

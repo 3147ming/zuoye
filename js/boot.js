@@ -83,7 +83,7 @@
     };
     document.head.appendChild(s);
   };
-  /* 空闲预取：等首屏稳定后再拉，不抢加载带宽 */
+  /* ---------- 空闲预取：等首屏稳定后再拉，不抢加载带宽 ---------- */
   (window.requestIdleCallback || function (f) { setTimeout(f, 2500); })(function () {
     if (!extraUrl || extraReady()) return;
     var l = document.createElement('link');
@@ -97,4 +97,19 @@
       navigator.serviceWorker.register('/sw.js').catch(function () { /* 离线/不支持时静默 */ });
     });
   }
+
+  /* ---------- 轻量埋点（本机足迹，不上云）：首屏耗时 + 横竖屏占比 ---------- */
+  window.addEventListener('load', function () {
+    if (!window.Stats) return;
+    try {
+      var fcp = performance.getEntriesByName && performance.getEntriesByName('first-contentful-paint')[0];
+      if (fcp) Stats.metric('fcp', fcp.startTime);
+      if (performance.timing) {
+        Stats.metric('dcl', performance.timing.domContentLoadedEventEnd - performance.timing.navigationStart);
+      }
+    } catch (e) { /* 忽略 */ }
+    var portrait = window.matchMedia && window.matchMedia('(orientation: portrait)').matches;
+    Stats.count(portrait ? 'portrait' : 'landscape');
+    Stats.flush();
+  });
 })();

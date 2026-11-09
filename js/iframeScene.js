@@ -139,6 +139,7 @@
 
   IFrameScene.prototype.showOffline = function () {
     this._clearLoading();
+    if (global.Stats && global.Stats.count) global.Stats.count('iframeFail');
     if (this._offlineOv) return;
     var ov = document.createElement('div');
     ov.className = 'iframe-offline';
