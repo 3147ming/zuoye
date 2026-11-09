@@ -414,8 +414,9 @@ body[data-scene]:not([data-scene="world"]) .hud-keys {
   border-radius: 50%; font-size: 6cqw;
 }
 
-/* 触屏下补的 帮助H / 设置O 入口（手机无实体键） */
-.t-top { position: absolute; top: 2.6cqw; left: 50%; transform: translateX(-50%); display: flex; gap: 2.4cqw; z-index: 3; pointer-events: none; }
+/* 触屏下补的 帮助H / 设置O 入口（手机无实体键）
+   锚在右侧：居中会与「建议横屏」提示条重叠（P0 修复） */
+.t-top { position: absolute; top: 2.6cqw; right: 46px; left: auto; transform: none; display: flex; gap: 2.4cqw; z-index: 3; pointer-events: none; }
 .t-util { width: 9cqw; height: 9cqw; min-width: 38px; min-height: 38px; font-size: 4cqw; border-radius: 50%; pointer-events: auto; }
 .t-launch { width: 16cqw; height: 16cqw; min-width: 64px; min-height: 64px; font-size: 4.6cqw; }
 
@@ -1063,3 +1064,189 @@ body[data-scene]:not([data-scene="world"]) .gear {
 .pick-ch.ok{color:#3f9c62}
 .pick-streak{margin:8px 0 0;font-size:12px;color:#9a8aa8;text-align:center}
 .pick-streak b{color:#e0803c}
+
+/* ============================================================
+   P0 移动端整改（按《世界大厅·网站分析报告》）
+   1) .dir 区块目录：竖屏自动弹出、各端 HUD「目录」按钮直达
+   2) 手机横屏舞台铺满（contain 不变形），触控件退到四角安全区
+   3) 顶部提示不再与 H/O 重叠（.t-top 已右移；.rotate-hint 一次性、自动消失）
+   ============================================================ */
+
+/* ---------- 区块目录 ---------- */
+.dir {
+  position: fixed; inset: 0; z-index: 50;
+  display: flex; align-items: center; justify-content: center; padding: 12px;
+  background: radial-gradient(80% 70% at 50% 45%, rgba(6, 4, 12, 0.78), rgba(4, 3, 9, 0.94));
+  backdrop-filter: blur(3px);
+  opacity: 0; visibility: hidden;
+  transition: opacity 170ms ease, visibility 200ms;
+}
+.dir.on { opacity: 1; visibility: visible; }
+
+/* max-height:100% 依赖 .dir 的确定高度（inset:0）——用 flex 而不是 grid，
+   grid 隐式行 auto 会让百分比解析成内容高度，列表就压不住、滚不动（P0 实测 1731px） */
+.dir-card {
+  width: min(620px, 100%); max-height: 100%;
+  display: flex; flex-direction: column;
+  border-radius: 14px;
+  background: linear-gradient(180deg, rgba(30, 24, 50, 0.98), rgba(14, 11, 25, 0.98));
+  border: 1px solid rgba(240, 167, 110, 0.42);
+  box-shadow: 0 24px 60px -18px rgba(0, 0, 0, 0.92);
+}
+.dir-head { position: relative; padding: 14px 16px 6px; }
+.dir-head h2 { margin: 0; font-family: var(--serif); font-size: 17px; font-weight: 600; color: #ffe3bd; letter-spacing: 0.06em; }
+.dir-sub { margin: 4px 0 0; font-size: 11px; color: rgba(243, 233, 218, 0.55); }
+.dir-x {
+  position: absolute; top: 10px; right: 10px;
+  width: 30px; height: 30px; border-radius: 8px;
+  border: 1px solid rgba(255, 220, 180, 0.22); background: transparent;
+  color: rgba(243, 233, 218, 0.8); font-size: 17px; line-height: 1; cursor: pointer;
+}
+.dir-x:hover { background: rgba(255, 220, 180, 0.12); }
+
+.dir-search { padding: 8px 16px 6px; }
+.dir-search input {
+  width: 100%; box-sizing: border-box;
+  padding: 10px 12px; min-height: 42px;
+  border-radius: 10px; border: 1px solid rgba(255, 220, 180, 0.18);
+  background: rgba(255, 255, 255, 0.05); color: #f6ede0; font-size: 14px;
+}
+.dir-search input::placeholder { color: rgba(243, 233, 218, 0.38); }
+
+.dir-chips { display: flex; flex-wrap: wrap; gap: 6px; padding: 0 16px 8px; }
+.dir-chip {
+  border: 1px solid rgba(255, 220, 180, 0.2); background: transparent;
+  color: rgba(243, 233, 218, 0.75); border-radius: 999px;
+  padding: 6px 12px; min-height: 32px; font-size: 12px; cursor: pointer;
+}
+.dir-chip.on { background: rgba(240, 167, 110, 0.22); border-color: rgba(240, 167, 110, 0.75); color: #ffe3bd; }
+
+.dir-list {
+  overflow: auto; -webkit-overflow-scrolling: touch;
+  flex: 1 1 auto; min-height: 0;
+  padding: 0 12px 10px;
+  display: grid; grid-template-columns: 1fr; gap: 8px;
+}
+@media (min-width: 560px) { .dir-list { grid-template-columns: 1fr 1fr; } }
+
+.dir-sec-h {
+  grid-column: 1 / -1;
+  font-size: 11px; letter-spacing: 0.12em; color: rgba(243, 233, 218, 0.5);
+  padding: 6px 4px 0;
+}
+.dir-item {
+  display: flex; align-items: center; gap: 10px;
+  text-align: left; font: inherit; cursor: pointer;
+  padding: 10px 12px; min-height: 52px;
+  border-radius: 12px; border: 1px solid rgba(255, 220, 180, 0.12);
+  background: rgba(255, 255, 255, 0.035); color: #f6ede0;
+}
+.dir-item:hover, .dir-item:focus-visible { background: rgba(240, 167, 110, 0.12); border-color: rgba(240, 167, 110, 0.4); }
+.dir-item:active { transform: scale(0.985); }
+.dir-dot { flex: none; width: 10px; height: 10px; border-radius: 50%; background: var(--c, #f0a76e); box-shadow: 0 0 8px var(--c, #f0a76e); }
+.dir-txt { flex: 1; min-width: 0; }
+.dir-txt b { display: block; font-size: 14px; font-weight: 600; color: #ffe3bd; }
+.dir-txt i {
+  display: block; font-style: normal; font-size: 11px; color: rgba(243, 233, 218, 0.55);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.dir-tag {
+  flex: none; font-size: 10px; color: rgba(243, 233, 218, 0.5);
+  border: 1px solid rgba(255, 220, 180, 0.16); border-radius: 6px; padding: 2px 6px;
+}
+.dir-foot {
+  display: flex; align-items: center; justify-content: space-between; gap: 10px;
+  padding: 10px 16px 12px; border-top: 1px solid rgba(255, 220, 180, 0.1);
+}
+.dir-hall {
+  border: 1px solid rgba(255, 220, 180, 0.28); background: transparent;
+  color: #ffe3bd; border-radius: 10px; padding: 8px 14px; min-height: 40px;
+  font-size: 12px; cursor: pointer;
+}
+.dir-hall:hover { background: rgba(240, 167, 110, 0.14); }
+.dir-foot-tip { font-size: 10px; color: rgba(243, 233, 218, 0.4); text-align: right; }
+
+/* ---------- HUD「目录」直达按钮（紧挨齿轮左侧） ---------- */
+.dirbtn {
+  position: absolute; top: 1.4cqw; right: 4.8cqw; z-index: 20;
+  height: 2.6cqw; min-height: 30px; padding: 0 1.1cqw;
+  border-radius: 999px; border: 1px solid rgba(255, 220, 180, 0.28);
+  background: rgba(10, 8, 18, 0.55); color: #ffe3bd;
+  font-family: var(--sans); font-size: 1.2cqw; letter-spacing: 0.12em; cursor: pointer;
+}
+.dirbtn:hover { background: rgba(240, 167, 110, 0.22); }
+.dirbtn:focus-visible { outline: 2px solid rgba(240, 167, 110, 0.9); outline-offset: 2px; }
+body[data-scene]:not([data-scene="world"]) .dirbtn { display: none; }
+
+@media (max-width: 720px) {
+  .dirbtn { top: 8px; right: 46px; height: 30px; font-size: 12px; padding: 0 10px; }
+  .dir-head h2 { font-size: 16px; }
+  .dir-item { min-height: 52px; }
+}
+
+/* ---------- 手机横屏：舞台铺满，触控件退到四角安全区 ----------
+   仅 (hover:none) 短横屏（手机）启用；平板横屏维持原有 16:9 装裱盒。 */
+@media (orientation: landscape) and (hover: none) and (max-height: 520px) {
+  .frame { width: 100%; max-width: none; gap: 0; }
+  .stage {
+    width: 100vw; height: 100dvh; max-width: none;
+    aspect-ratio: auto; border-radius: 0; box-shadow: none;
+  }
+  .stage canvas { object-fit: contain; }   /* 16:9 内容等比居中，两侧留黑边放按键 */
+  .caption { display: none; }
+
+  /* cqw 随全屏舞台会涨到 100px+，触控件整组改固定 px；≥44px 热区 */
+  .tbtn {
+    width: 56px; height: 56px; min-width: 44px; min-height: 44px;
+    font-size: 22px; border-radius: 16px;
+    background: rgba(10, 8, 18, 0.34);
+    border-color: rgba(255, 240, 220, 0.22);
+  }
+  .tbtn.pressed { background: rgba(255, 196, 120, 0.5); }
+  .t-grp { gap: 10px; }
+  .t-grp-l { left: max(10px, env(safe-area-inset-left, 0px)); bottom: max(10px, env(safe-area-inset-bottom, 0px)); }
+  .t-grp-r { right: max(10px, env(safe-area-inset-right, 0px)); bottom: max(10px, env(safe-area-inset-bottom, 0px)); }
+  .t-back {
+    width: 46px; height: 46px; min-width: 44px; min-height: 44px; font-size: 22px;
+    top: max(10px, env(safe-area-inset-top, 0px)); left: max(10px, env(safe-area-inset-left, 0px));
+  }
+  /* H/O 挪到左上（返回键右侧），右上让给目录 + 齿轮 */
+  .t-top {
+    top: max(10px, env(safe-area-inset-top, 0px));
+    left: max(64px, calc(env(safe-area-inset-left, 0px) + 58px));
+    right: auto; transform: none; gap: 10px;
+  }
+  .t-util { width: 44px; height: 44px; min-width: 44px; min-height: 44px; font-size: 17px; }
+  .gear {
+    top: max(10px, env(safe-area-inset-top, 0px)); right: max(10px, env(safe-area-inset-right, 0px));
+    width: 34px; height: 34px;
+  }
+  .dirbtn {
+    top: max(10px, env(safe-area-inset-top, 0px));
+    right: max(52px, calc(env(safe-area-inset-right, 0px) + 46px));
+    height: 34px; font-size: 12px;
+  }
+  .hud-title h1 { font-size: 15px; }
+  .hud-title p { font-size: 10px; }
+  .toast { font-size: 12px; padding: 7px 14px; bottom: 72px; }
+  .dialogue {
+    width: min(560px, 86%);
+    bottom: max(76px, calc(env(safe-area-inset-bottom, 0px) + 68px));
+    padding: 14px 16px 10px; border-radius: 12px;
+  }
+  .dialogue-name { font-size: 11px; }
+  .dialogue-text { font-size: 14px; line-height: 1.62; }
+  .dialogue-foot { font-size: 10px; }
+  .rotate-hint { display: none !important; }  /* 横屏不需要转屏提示 */
+}
+
+/* 竖屏触屏：目录整屏铺满（.dir 已 fixed，卡片高度锁死视口，列表内部滚动） */
+@media (orientation: portrait) and (hover: none) {
+  .dir { padding: 0; align-items: stretch; }
+  .dir-card {
+    width: 100%; max-width: none; height: 100%; max-height: none;
+    border-radius: 0; border: none;
+    padding-top: env(safe-area-inset-top, 0px);
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+}

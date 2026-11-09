@@ -29,7 +29,7 @@
       <div class="hud">
         <div class="hud-title">
           <h1>世界大厅</h1>
-          <p>三屏走道 · 两座总门 · 十六个区块</p>
+          <p>三屏走道 · 两座总门 · 二十三个区块</p>
         </div>
 
         <div class="hud-keys">
@@ -47,6 +47,7 @@
         <div class="toast" id="toast" role="status" aria-live="polite"></div>
       </div>
 
+      <button class="dirbtn" id="dirBtn" type="button" aria-label="区块目录" title="区块目录">目录</button>
       <button class="gear" id="gear" type="button" aria-label="设置（O 键）" title="设置 · O">
         <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
           <path d="M12 8a4 4 0 1 0 0 8 4 4 0 0 0 0-8z" fill="none" stroke="currentColor" stroke-width="1.6"/>
@@ -264,6 +265,7 @@
   <script src="js/world.js" defer></script>
   <script src="js/iframeScene.js" defer></script>
   <script src="js/touch.js" defer></script>
+  <script src="js/directory.js" defer></script>
   <!--
     第四批：五款内置小游戏（games/*.js）不再加载，大厅改成 iframe 接入开源页面。
     历史文件仍保留在 js/games/ 与 js/games/*.js 里，只是没有 <script> 引用。

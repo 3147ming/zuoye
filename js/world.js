@@ -1584,6 +1584,7 @@
     /* 任何浮层开着，键盘全归它，这里不接 */
     if ((global.GatePanel && global.GatePanel.isOpen()) ||
         (global.Settings && global.Settings.isOpen()) ||
+        (global.Directory && global.Directory.isOpen()) ||
         (global.Riddle && global.Riddle.Panel && global.Riddle.Panel.isOpen())) return;
 
     var npc = this.npc;
@@ -1820,6 +1821,7 @@
     var frozen = (global.GatePanel && global.GatePanel.isOpen()) ||
                  (global.Settings && global.Settings.isOpen()) ||
                  (global.Riddle && global.Riddle.Panel && global.Riddle.Panel.isOpen()) ||
+                 (global.Directory && global.Directory.isOpen()) ||
                  this.pickerOpen === true;
     if (frozen) {
       if (!this._frozen) {

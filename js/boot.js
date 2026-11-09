@@ -43,6 +43,12 @@
     });
   }
 
+  /* ---------- 「目录」直达入口 ---------- */
+  var dirBtn = document.getElementById('dirBtn');
+  if (dirBtn && window.Directory) {
+    dirBtn.addEventListener('click', function () { window.Directory.toggle(); });
+  }
+
   /* 供手动调试：SceneManager.change('world') */
   window.WorldHub = window.WorldHub || {};
   window.WorldHub.SceneManager = SceneManager;

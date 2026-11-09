@@ -241,10 +241,23 @@
   }
   rebuild();
 
-  /* 横屏提示：竖屏 + 触屏才显示 */
+  /* 横屏提示：竖屏 + 触屏才显示；每会话只提示一次，6 秒后自动消失（不再与 H/O 长期叠着） */
+  var hintTimer = 0;
+  function hideHint() {
+    hint.style.display = 'none';
+    try { sessionStorage.setItem('wh.rotateHint', 'done'); } catch (_) {}
+    if (hintTimer) { clearTimeout(hintTimer); hintTimer = 0; }
+  }
+  hint.addEventListener('pointerdown', hideHint);
   function updateRotate() {
     var portrait = global.matchMedia && global.matchMedia('(orientation: portrait)').matches;
-    hint.style.display = portrait ? 'block' : 'none';
+    if (!portrait) { hideHint(); return; }
+    var done = false;
+    try { done = sessionStorage.getItem('wh.rotateHint') === 'done'; } catch (_) {}
+    if (done) { hint.style.display = 'none'; return; }
+    hint.style.display = 'block';
+    if (hintTimer) clearTimeout(hintTimer);
+    hintTimer = setTimeout(hideHint, 6000);
   }
   if (global.matchMedia) {
     var mq = global.matchMedia('(orientation: portrait)');
