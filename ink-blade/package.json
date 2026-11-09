@@ -1,0 +1,16 @@
+{
+  "name": "ink-blade",
+  "private": true,
+  "version": "0.1.0",
+  "description": "烬影·墨刃 —— 2D 像素俯视角武侠动作冒险",
+  "type": "module",
+  "scripts": {
+    "dev": "vite --host 0.0.0.0 --port 5173",
+    "build": "vite build",
+    "preview": "vite preview --host 0.0.0.0 --port 4173"
+  },
+  "devDependencies": {
+    "typescript": "^5.7.2",
+    "vite": "^6.0.5"
+  }
+}
