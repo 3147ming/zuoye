@@ -1,9 +1,25 @@
 {
   "name": "worldhub",
   "private": true,
-  "version": "1.17.0",
+  "version": "1.24.8",
   "description": "世界大厅 —— 2D 横版探索式游戏合集入口（构建期用 esbuild，运行期零依赖）",
   "scripts": {
-    "build": "node tools/build.mjs"
+    "build": "node tools/build.mjs",
+    "sw": "node tools/gen-sw.mjs",
+    "check": "node tools/verify-dist.mjs",
+    "release": "node tools/build.mjs && node tools/verify-dist.mjs",
+    "party": "node server/index.js",
+    "test:party": "node server/selftest.mjs",
+    "ws:build": "node tools/build-ws.mjs",
+    "ws:dev": "wrangler dev --config wrangler.ws.jsonc",
+    "ws:deploy": "node tools/build-ws.mjs && wrangler deploy --config wrangler.ws.jsonc",
+    "ws:smoke": "node tools/ws-smoke.mjs",
+    "ws:bundle": "node tools/make-ws-bundle.mjs",
+    "party:tunnel": "node tools/tunnel.mjs",
+    "party:local": "node tools/tunnel.mjs --local",
+    "party:standalone": "node tools/make-standalone-server.mjs"
+  },
+  "dependencies": {
+    "ws": "^8.23.0"
   }
 }

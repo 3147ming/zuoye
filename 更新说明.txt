@@ -1,0 +1,30 @@
+WorldHub 1.24.4 → 1.24.8 更新包
+================================
+
+用法：把这个包里的所有文件，按同名路径覆盖到你的项目根目录
+（README 里写的 D:\Projects\WorldHub），然后 git 提交推送即可。
+不要删任何原有文件，这个包只是「覆盖」。
+
+本包包含什么
+------------
+js/party/games.js              碰碰存活位修正、七玩法操作说明、球场开球提示、抢答即时反馈
+js/party/kit.js                「怎么玩」说明条的渲染与收起
+games/party/party.css          说明条、抢答反馈条的样式
+version.json                   1.24.8
+package.json  js/config.js     版本号同步
+README.md                      1.24.8 变更记录
+index.html  sw.js             构建产物入口与缓存版本
+assets/*.js  assets/*.css     重新构建的脚本与样式（文件名带哈希，必须一起换）
+server/index.js               根路径无页面时的降级说明页
+tools/_standalone-*.mjs       单文件开服脚本的生成模板（ssh 隧道）
+开服.mjs                       零依赖单文件开服器（173.5 KB）
+
+推送命令（在项目根目录执行）
+----------------------------
+git add -A
+git commit -m "1.24.8: 修复碰碰全员出局、补七玩法操作说明"
+git push origin master
+
+推完等 1~2 分钟，打开 https://zuoye-e0c.pages.dev/version.json
+看到 {"version":"1.24.8", ...} 就算上线成功。
+如果还看到 HTML，说明构建还没跑完，或者构建失败了（去 Cloudflare 看这次提交的 check）。

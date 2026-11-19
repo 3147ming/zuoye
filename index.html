@@ -2,14 +2,14 @@
 <html lang="zh-CN" data-extra="assets/extra.af9188f73b.js">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>世界大厅</title>
 <meta name="description" content="基于 Web 的 2D 横版世界大厅游戏合集">
 <meta name="theme-color" content="#0b0817">
-<meta name="wh-version" content="1.17.0">
+<meta name="wh-version" content="1.24.8">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<meta name="apple-touch-icon" href="/assets/icon.svg">
+<link rel="apple-touch-icon" href="/assets/icon-180.png">
 <meta property="og:title" content="世界大厅">
 <meta property="og:description" content="基于 Web 的 2D 横版世界大厅游戏合集">
 <meta property="og:type" content="website">
@@ -20,12 +20,14 @@
 <meta name="twitter:description" content="基于 Web 的 2D 横版世界大厅游戏合集">
 <meta name="twitter:image" content="https://zuoye-e0c.pages.dev/assets/og.png">
 <link rel="canonical" href="https://zuoye-e0c.pages.dev/">
-<link rel="preconnect" href="https://ming-games.pages.dev" crossorigin>
 <link rel="preconnect" href="https://warehouse-strike.pages.dev" crossorigin>
 <link rel="manifest" href="manifest.webmanifest">
+<!-- 极限性能：主包与 CSS 并行预加载；懒加载的跑酷扩展包空闲时预取 -->
+<link rel="preload" href="assets/app.9bdf2c5c29.js" as="script">
+<link rel="prefetch" href="assets/extra.af9188f73b.js" as="script">
 <!-- 内联 SVG 图标：不额外发请求，http(s) 与 file:// 下都不会有 /favicon.ico 404 -->
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='7' fill='%230b0817'/><path d='M9 25V15a7 7 0 0 1 14 0v10' fill='none' stroke='%23f0a76e' stroke-width='2.6'/><circle cx='16' cy='18' r='2.1' fill='%23ffd9a8'/></svg>">
-<link rel="stylesheet" href="assets/main.6e2989137e.css">
+<link rel="stylesheet" href="assets/main.f0130d185b.css">
 </head>
 <body>
   <div class="frame">
@@ -37,7 +39,7 @@
       <div class="hud">
         <div class="hud-title">
           <h1>世界大厅</h1>
-          <p>三屏走道 · 两座总门 · 二十三个区块</p>
+          <p>三屏走道 · 两座总门 · 二十四个区块</p>
         </div>
 
         <div class="hud-keys">
@@ -257,13 +259,13 @@
       </div>
     </div>
 
-    <p class="caption">世界大厅 · 画布 1280 × 720 · 原生 HTML / CSS / JavaScript · <a href="directory.html">区块目录</a></p>
+    <p class="caption">世界大厅 · 走走看看，或者直接进 <a href="/directory">区块目录</a></p>
   </div>
 
   <!--
     第四批：五款内置小游戏（games/*.js）不再加载，大厅改成 iframe 接入开源页面。
     历史文件仍保留在 js/games/ 与 js/games/*.js 里，只是没有 <script> 引用。
   -->
-  <script src="assets/app.67ba4a8dbc.js" defer></script>
+  <script src="assets/app.9bdf2c5c29.js" defer></script>
 </body>
 </html>
