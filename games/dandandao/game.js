@@ -848,16 +848,33 @@
 
   function drawGuide() {
     if (!showGuide || phase !== 'aim' || !player || !player.alive) return;
+    /* 用与实际飞行完全相同的步长推演，一路画到落点，别在半路淡掉 */
     var s = launchVec(player.x, player.y - 13, angle, power, WEAPONS[weapon].speed);
+    var pts = [], land = null;
+    for (var i = 0; i < 520; i++) {
+      stepShot(s, DT);
+      if (i % 4 === 0) pts.push({ x: s.x, y: s.y });
+      if (solidPx(s.x, s.y)) { land = { x: s.x, y: s.y }; break; }
+      if (s.y > H || s.x < -20 || s.x > W + 20) break;
+    }
+    if (pts.length < 2) return;
     ctx.save();
-    ctx.fillStyle = 'rgba(255,255,255,.8)';
-    for (var i = 0; i < 150; i++) {
-      stepShot(s, DT * 2);
-      if (i % 7 === 0) {
-        ctx.globalAlpha = Math.max(0.12, 0.75 - i / 210);
-        ctx.beginPath(); ctx.arc(s.x, s.y, i < 40 ? 3 : 2, 0, 7); ctx.fill();
-      }
-      if (solidPx(s.x, s.y) || s.y > H) break;
+    ctx.lineWidth = 2.4;
+    ctx.strokeStyle = 'rgba(255,255,255,.80)';
+    ctx.setLineDash([5, 8]);
+    ctx.beginPath();
+    ctx.moveTo(pts[0].x, pts[0].y);
+    for (var j = 1; j < pts.length; j++) ctx.lineTo(pts[j].x, pts[j].y);
+    ctx.stroke();
+    ctx.setLineDash([]);
+    if (land && land.x > 0 && land.x < W && land.y > 0 && land.y < H) {
+      ctx.strokeStyle = '#ffd166'; ctx.lineWidth = 2.5;
+      ctx.beginPath(); ctx.arc(land.x, land.y, 9, 0, 7); ctx.stroke();
+      ctx.beginPath();
+      ctx.moveTo(land.x - 17, land.y); ctx.lineTo(land.x - 11, land.y);
+      ctx.moveTo(land.x + 11, land.y); ctx.lineTo(land.x + 17, land.y);
+      ctx.moveTo(land.x, land.y - 17); ctx.lineTo(land.x, land.y - 11);
+      ctx.stroke();
     }
     ctx.restore();
   }
