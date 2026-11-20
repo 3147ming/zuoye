@@ -341,6 +341,38 @@ body.playing .pk-wrap { flex: 1 1 auto; min-height: 0; }
   cursor: pointer;
 }
 .pk-exit:hover { background: var(--card-2); }
+/* 手机专用「横屏」按钮：竖屏下画布高度被宽高比锁死（372×245），
+   全屏横过来能到 495×327，面积接近两倍。桌面没有 orientation 概念，不显示。 */
+.pk-fs { display: none; border-color: rgba(126, 200, 255, .32); color: #9fd0ff; }
+@media (pointer: coarse) { .pk-fs { display: inline-block; } }
+
+/* 窄屏默认收起说明条 —— 闪五下告诉玩家操作说明在这儿 */
+@keyframes pk-attn {
+  0%, 100% { background: rgba(255, 214, 170, .08); border-color: rgba(255, 214, 170, .3); }
+  50% { background: rgba(255, 214, 170, .3); border-color: rgba(255, 214, 170, .8); }
+}
+.pk-how-attn { animation: pk-attn .8s ease-in-out 5; }
+
+/* 断线遮罩：薄薄一层，不挡视野也不拆舞台，只让玩家知道「在重连，别慌」 */
+.pk-drop {
+  position: absolute;
+  inset: 0;
+  z-index: 7;
+  display: none;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  padding: 18px;
+  text-align: center;
+  border-radius: 12px;
+  background: rgba(6, 9, 15, .74);
+  -webkit-backdrop-filter: blur(2px);
+  backdrop-filter: blur(2px);
+}
+.pk-drop.on { display: flex; }
+.pk-drop b { font-size: 15px; color: var(--warm-2); }
+.pk-drop span { font-size: 12.5px; line-height: 1.6; color: var(--ink-soft); }
 /* 操作说明：默认展开，点「怎么玩」收起；收起状态记在 localStorage */
 .pk-how-btn {
   padding: 6px 11px;
@@ -371,6 +403,15 @@ body.playing .pk-wrap { flex: 1 1 auto; min-height: 0; }
 @media (max-width: 560px) {
   .pk-how { font-size: 12px; line-height: 1.7; padding: 8px 10px; }
   .pk-how-btn { padding: 5px 9px; font-size: 11.5px; }
+  /* 窄屏把每一像素都让给画布：顶栏、记分条、摇杆全部收一圈 */
+  .pk-top { padding: 6px 8px; gap: 7px; }
+  .pk-exit, .pk-fs { padding: 5px 9px; font-size: 11.5px; }
+  .pk-code { font-size: 11px; }
+  .pk-scores { padding: 5px 8px; gap: 6px; }
+  .pk-score { padding: 4px 8px; font-size: 11.5px; }
+  .pk-touch { bottom: 8px; padding: 0 12px; }
+  .pk-stick { width: 96px; height: 96px; }
+  .pk-stick i { width: 38px; height: 38px; }
 }
 .pk-info { margin-left: auto; display: flex; gap: 12px; font-size: 12px; color: var(--ink-soft); font-variant-numeric: tabular-nums; }
 .pk-code { color: var(--warm-2); }
@@ -614,6 +655,10 @@ body.playing .pk-wrap { flex: 1 1 auto; min-height: 0; }
   background: rgba(240, 167, 110, .12);
   border-bottom: 1px solid var(--line);
 }
+/* 淡出：6 秒自动消失，或点「知道了」。transition 放在这里，
+   JS 只负责加 .off 类，不写内联样式。 */
+.pk-rotate { transition: opacity .24s, transform .24s, max-height .24s; max-height: 60px; }
+.pk-rotate.off { opacity: 0; transform: translateY(6px); max-height: 0; padding-top: 0; padding-bottom: 0; overflow: hidden; }
 .pk-rotate-x {
   margin-left: auto;
   padding: 3px 10px;
@@ -781,4 +826,77 @@ body.playing .pk-wrap { flex: 1 1 auto; min-height: 0; }
   body.playing .pp-stage { min-height: 0; }
   body.playing .pk-wrap { height: auto; }
   .pk-canvas-wrap { min-height: 220px; }
+}
+
+/* ============================================================
+ * 窄屏（手机竖屏）最后一层收紧
+ * ------------------------------------------------------------
+ * 实测 iPhone 13 竖屏（390×664 可视）：
+ *   · 大厅页总高 1680px —— 7 张玩法卡每张约 165px，把「创建房间」
+ *     挤到两屏之外，玩家进页面第一眼完全不知道下一步点哪；
+ *   · 对局里摇杆还是 108px（上面的窄屏块写在 .pk-stick 定义之前，
+ *     同特异性下被后面的规则盖掉了，等于没生效）。
+ * 这里统一放在文件末尾，专门收这两处。
+ * ============================================================ */
+@media (max-width: 560px) {
+  /* ---- 大厅：两列紧凑卡，7 个玩法压进两屏内 ---- */
+  .pp-wrap { gap: 12px; }
+  .pp-head { gap: 6px; }
+  .pp-title { font-size: 19px; }
+  .pp-sub { font-size: 12px; line-height: 1.5; }
+  .pp-games { grid-template-columns: 1fr 1fr; gap: 8px; }
+  .pp-game { padding: 9px 10px 10px; gap: 2px; border-radius: 12px; }
+  .pp-game b { font-size: 13px; }
+  .pp-game em { font-size: 10px; letter-spacing: .05em; }
+  .pp-game-desc { display: none; }
+  .pp-game-dot { width: 7px; height: 7px; right: 9px; top: 9px; }
+  .pp-panel { padding: 12px; gap: 9px; }
+  .pp-panel h3 { font-size: 13px; }
+  .pp-tips { font-size: 11.5px; line-height: 1.6; }
+
+  /* ---- 对局：摇杆收一圈，画布能多出来的都给它 ---- */
+  .pk-stick { width: 96px; height: 96px; }
+  .pk-stick i { width: 38px; height: 38px; }
+  .pk-touch { bottom: 8px; padding: 0 12px; }
+  .pk-btn { min-width: 66px; height: 56px; font-size: 12.5px; }
+  .pk-canvas-wrap { padding-bottom: 108px; }
+}
+
+/* 窄屏换序：先给「创建 / 进入」，再给玩法列表。
+   手机上玩家打开大厅最想做的事是建房或进房，玩法卡只是选项；
+   按原来的顺序，7 张卡把按钮推到 1100px 下面，等于藏起来了。
+   用 flex order 换序，桌面端顺序丝毫不变。 */
+@media (max-width: 560px) {
+  .pp-wrap > .pp-head { order: 1; }
+  .pp-wrap > .pp-row { order: 2; }
+  .pp-wrap > .pp-acts { order: 3; }
+  .pp-wrap > .pp-games { order: 4; }
+  .pp-wrap > .pp-err { order: 5; }
+  .pp-wrap > .pp-tips { order: 6; }
+  .pp-wrap > .pp-net { order: 0; }
+  /* 副标题在窄屏压成一行，省下两行高度 */
+  .pp-sub {
+    display: -webkit-box;
+    -webkit-line-clamp: 1;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+}
+
+/* 手机横屏（844×390 这类）：高度只有 390，说明条一展开就吃掉 107px。
+   这里和竖屏一样收，保证画布能拿到 300px 以上的高度。 */
+@media (max-height: 480px) {
+  body.playing .pk-wrap { height: 100%; }
+  .pk-top { padding: 5px 8px; gap: 7px; }
+  .pk-exit, .pk-fs, .pk-how-btn { padding: 4px 8px; font-size: 11px; }
+  .pk-scores { padding: 4px 8px; gap: 6px; }
+  .pk-score { padding: 3px 7px; font-size: 11px; }
+  .pk-how { font-size: 11.5px; line-height: 1.6; padding: 6px 10px; }
+  /* 横屏时不要再给摇杆留底部空间：那会直接吃掉 92px 高度。
+     摇杆本来就 position:absolute，浮在画布上更省地方（横屏手游的通行做法）。 */
+  .pk-canvas-wrap { min-height: 0; padding-bottom: 0; }
+  .pk-touch { bottom: 6px; padding: 0 10px; }
+  .pk-stick { width: 84px; height: 84px; }
+  .pk-stick i { width: 34px; height: 34px; }
+  .pk-btn { min-width: 60px; height: 50px; font-size: 12px; border-radius: 14px; }
 }

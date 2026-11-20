@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+<meta name="theme-color" content="#12233b">
+<title>弹弹岛 · 抛物线对轰</title>
+<style>
+  :root{
+    --sans:"PingFang SC","Microsoft YaHei",system-ui,-apple-system,sans-serif;
+    --ink:#f4f7ff; --dim:rgba(244,247,255,.62);
+    --gold:#ffd166; --mint:#7fe3b0; --coral:#ff8b7a; --sky:#7fc7ff;
+    --panel:rgba(14,26,44,.82); --line:rgba(255,255,255,.14);
+  }
+  *{box-sizing:border-box}
+  html,body{height:100%;margin:0;overflow:hidden;background:#0b1526;font-family:var(--sans)}
+  body{display:flex;align-items:center;justify-content:center;-webkit-tap-highlight-color:transparent;user-select:none;-webkit-user-select:none;touch-action:none}
+  #app{position:relative;width:min(100vw,177.78vh);height:min(56.25vw,100vh);overflow:hidden;background:#7ec8ff;box-shadow:0 0 60px rgba(0,0,0,.5)}
+  #cv{display:block;width:100%;height:100%}
+
+  /* ---------- 顶栏 ---------- */
+  #top{position:absolute;left:0;right:0;top:0;display:flex;align-items:center;gap:1.2vmin;
+       padding:1.4vmin 1.8vmin;color:var(--ink);font-size:clamp(11px,1.55vmin,20px);
+       background:linear-gradient(180deg,rgba(9,18,33,.72),rgba(9,18,33,0));pointer-events:none}
+  #top .pill{background:var(--panel);border:1px solid var(--line);border-radius:999px;padding:.42em 1em;white-space:nowrap;backdrop-filter:blur(6px)}
+  #top .name{font-weight:700;letter-spacing:.06em;color:var(--gold)}
+  #top .sp{flex:1}
+  #top button{pointer-events:auto;font:inherit;color:var(--ink);background:var(--panel);border:1px solid var(--line);
+              border-radius:999px;padding:.42em 1em;cursor:pointer}
+  #top button:hover{border-color:var(--gold)}
+
+  /* ---------- 底部操作条 ---------- */
+  #bottom{position:absolute;left:0;right:0;bottom:0;display:flex;align-items:flex-end;justify-content:space-between;
+          gap:1.2vmin;padding:1.6vmin 1.8vmin;color:var(--ink);pointer-events:none}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:1.4vmin;padding:1.1vmin 1.4vmin;backdrop-filter:blur(6px)}
+  .label{font-size:clamp(9px,1.25vmin,15px);color:var(--dim);letter-spacing:.08em}
+  #hpbar{width:clamp(90px,17vmin,230px);height:1.25vmin;min-height:6px;border-radius:99px;background:rgba(255,255,255,.14);overflow:hidden;margin:.55vmin 0}
+  #hpfill{height:100%;width:100%;border-radius:99px;background:linear-gradient(90deg,#7fe3b0,#b6f5c9);transition:width .28s}
+  #weapons{display:flex;gap:.6vmin;margin-top:.7vmin;pointer-events:auto}
+  .wp{font:inherit;font-size:clamp(10px,1.35vmin,17px);color:var(--ink);background:rgba(255,255,255,.07);
+      border:1px solid var(--line);border-radius:.9vmin;padding:.42em .72em;cursor:pointer;line-height:1.25;text-align:center;min-width:6.4vmin}
+  .wp b{display:block;font-size:1.1em}
+  .wp small{display:block;font-size:.72em;color:var(--dim)}
+  .wp.sel{border-color:var(--gold);background:rgba(255,209,102,.18);box-shadow:0 0 0 1px rgba(255,209,102,.35) inset}
+  .wp.empty{opacity:.4;cursor:not-allowed}
+  #right{display:flex;align-items:flex-end;gap:1.2vmin}
+  #gauge{text-align:right;font-variant-numeric:tabular-nums}
+  #gauge .row{font-size:clamp(10px,1.4vmin,18px);white-space:nowrap;margin-top:.2vmin}
+  #gauge b{color:var(--gold);font-weight:700}
+  #fire{pointer-events:auto;font:inherit;font-size:clamp(13px,2vmin,26px);font-weight:700;letter-spacing:.14em;
+        color:#1b1405;background:linear-gradient(180deg,#ffdf8a,#ffbd4a);border:0;border-radius:1.1vmin;
+        padding:.72em 1.5em;cursor:pointer;box-shadow:0 .5vmin 0 #b67a21,0 .9vmin 2vmin rgba(0,0,0,.35)}
+  #fire:hover{filter:brightness(1.08)}
+  #fire:active{transform:translateY(.35vmin);box-shadow:0 .15vmin 0 #b67a21}
+  #fire:disabled{filter:grayscale(.8);opacity:.5;cursor:default;transform:none;box-shadow:none}
+
+  /* ---------- 覆盖层 ---------- */
+  #ov{position:absolute;inset:0;display:none;align-items:center;justify-content:center;
+      background:radial-gradient(ellipse at center,rgba(8,17,31,.72),rgba(4,9,18,.94));color:var(--ink);z-index:9;padding:3vmin}
+  #ov.on{display:flex}
+  .box{width:min(92%,74vmin);max-height:94%;overflow:auto;text-align:center;
+       background:linear-gradient(160deg,rgba(28,48,78,.96),rgba(12,23,40,.97));
+       border:1px solid rgba(255,255,255,.18);border-radius:2vmin;padding:3vmin 3.4vmin;
+       box-shadow:0 3vmin 8vmin rgba(0,0,0,.55)}
+  .box h1{margin:0;font-size:clamp(26px,5.4vmin,64px);letter-spacing:.18em;
+          background:linear-gradient(180deg,#fff3cf,#ffc65c);-webkit-background-clip:text;background-clip:text;color:transparent}
+  .box h2{margin:0 0 .6em;font-size:clamp(20px,3.6vmin,42px);color:var(--gold);letter-spacing:.08em}
+  .box p{margin:.7em 0;font-size:clamp(12px,1.75vmin,21px);line-height:1.7;color:var(--dim)}
+  .box p.tip{color:rgba(244,247,255,.8)}
+  .box kbd{font:inherit;font-size:.92em;background:rgba(255,255,255,.12);border:1px solid var(--line);border-radius:.35em;padding:.05em .5em;color:#fff}
+  #levels{display:grid;grid-template-columns:repeat(3,1fr);gap:1vmin;margin:2vmin 0}
+  .lv{font:inherit;cursor:pointer;color:var(--ink);background:rgba(255,255,255,.07);border:1px solid var(--line);
+      border-radius:1vmin;padding:1.1vmin .5vmin;line-height:1.45;min-height:7.4vmin}
+  .lv:hover{border-color:var(--gold);background:rgba(255,209,102,.14)}
+  .lv.lock{opacity:.35;cursor:not-allowed}
+  .lv b{display:block;font-size:clamp(12px,1.9vmin,23px)}
+  .lv span{font-size:clamp(9px,1.25vmin,15px);color:var(--dim)}
+  .lv .st{color:var(--gold);letter-spacing:.12em}
+  .btn{font:inherit;font-size:clamp(13px,2vmin,24px);font-weight:700;letter-spacing:.1em;color:#1b1405;
+       background:linear-gradient(180deg,#ffdf8a,#ffbd4a);border:0;border-radius:999px;padding:.7em 2.2em;
+       cursor:pointer;margin:.8vmin .4vmin 0}
+  .btn.ghost{background:transparent;color:var(--ink);border:1px solid var(--line)}
+  .btn:hover{filter:brightness(1.1)}
+  .star{font-size:clamp(28px,6vmin,70px);letter-spacing:.12em;color:#42526b}
+  .star .lit{color:var(--gold);text-shadow:0 0 2vmin rgba(255,209,102,.6)}
+  #toast{position:absolute;left:50%;top:12%;transform:translateX(-50%);z-index:8;pointer-events:none;
+         font-size:clamp(15px,2.4vmin,30px);font-weight:700;letter-spacing:.12em;color:#fff;
+         text-shadow:0 2px 8px rgba(0,0,0,.8);opacity:0;transition:opacity .25s,top .25s;
+         max-width:78%;white-space:normal;text-align:center;line-height:1.4}
+  #toast.on{opacity:1;top:9%}
+
+  /* 竖屏时画布只有屏宽 × 9/16，上下空得多；在下方黑边里给一个横屏入口 */
+  #rotate{display:none;position:fixed;z-index:10;left:0;right:0;
+          top:calc(50% + 28.125vw + 14px);flex-direction:column;align-items:center;gap:10px;
+          color:rgba(255,255,255,.8);font-size:clamp(12px,3.4vw,18px);letter-spacing:.06em;text-shadow:0 2px 8px #000}
+  #rotate button{font:inherit;font-size:clamp(13px,3.6vw,19px);font-weight:700;color:#1b1405;
+          background:linear-gradient(180deg,#ffdf8a,#ffbd4a);border:0;border-radius:999px;
+          padding:.55em 1.6em;cursor:pointer;box-shadow:0 .4vmin 0 #a8711e}
+  @media (orientation:portrait) and (max-width:640px){ #rotate{display:flex} }
+
+  @media (max-width:600px){
+    #top{font-size:clamp(10px,2.1vmin,15px)}
+    .wp{min-width:7.6vmin;padding:.4em .3em}
+    #gauge .row{font-size:clamp(9px,1.9vmin,14px)}
+  }
+</style>
+</head>
+<body>
+<div id="app">
+  <canvas id="cv" width="1280" height="720"></canvas>
+
+  <div id="top">
+    <span class="pill name" id="lvname">弹弹岛</span>
+    <span class="pill" id="wind">风 → 0</span>
+    <span class="pill" id="turn">第 1 回合</span>
+    <span class="sp"></span>
+    <button type="button" id="helpBtn">玩法</button>
+    <button type="button" id="restartBtn">重来</button>
+  </div>
+
+  <div id="toast"></div>
+
+  <div id="rotate">
+    <div>横屏玩，战场大得多</div>
+    <button id="rotBtn" type="button">↻ 一键横屏</button>
+  </div>
+
+  <div id="bottom">
+    <div class="card">
+      <div class="label">我的血量</div>
+      <div id="hpbar"><div id="hpfill"></div></div>
+      <div id="weapons">
+        <button class="wp sel" data-w="0" type="button"><b>●</b><small>标准弹</small></button>
+        <button class="wp" data-w="1" type="button"><b>✦✦✦</b><small>三连散 <span id="a1">3</span></small></button>
+        <button class="wp" data-w="2" type="button"><b>◆</b><small>重弹 <span id="a2">2</span></small></button>
+      </div>
+    </div>
+    <div id="right">
+      <div class="card" id="gauge">
+        <div class="row">角度 <b id="ang">45°</b></div>
+        <div class="row">力度 <b id="pow">70%</b></div>
+      </div>
+      <button id="fire" type="button">开 火</button>
+    </div>
+  </div>
+
+  <div id="ov" class="on"><div class="box" id="box"></div></div>
+</div>
+<script src="game.js"></script>
+</body>
+</html>

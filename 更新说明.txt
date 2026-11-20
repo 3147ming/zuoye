@@ -1,30 +1,33 @@
-WorldHub 1.24.4 → 1.24.8 更新包
-================================
+WorldHub 1.25.0 更新包
+========================
 
-用法：把这个包里的所有文件，按同名路径覆盖到你的项目根目录
-（README 里写的 D:\Projects\WorldHub），然后 git 提交推送即可。
-不要删任何原有文件，这个包只是「覆盖」。
+本次新增：单机「弹弹岛」（六关抛物线对轰），原有联机玩法全部保持不变。
 
-本包包含什么
-------------
-js/party/games.js              碰碰存活位修正、七玩法操作说明、球场开球提示、抢答即时反馈
-js/party/kit.js                「怎么玩」说明条的渲染与收起
-games/party/party.css          说明条、抢答反馈条的样式
-version.json                   1.24.8
-package.json  js/config.js     版本号同步
-README.md                      1.24.8 变更记录
-index.html  sw.js             构建产物入口与缓存版本
-assets/*.js  assets/*.css     重新构建的脚本与样式（文件名带哈希，必须一起换）
-server/index.js               根路径无页面时的降级说明页
-tools/_standalone-*.mjs       单文件开服脚本的生成模板（ssh 隧道）
-开服.mjs                       零依赖单文件开服器（173.5 KB）
+【怎么装】
+1. 把这个包里的文件，按相同路径覆盖到你的 WorldHub 目录。
+2. 重启本地服务（或推到 master 让 Cloudflare Pages 自动构建）。
+3. 浏览器 Ctrl+F5 硬刷，核对 /version.json 显示 1.25.0。
 
-推送命令（在项目根目录执行）
-----------------------------
-git add -A
-git commit -m "1.24.8: 修复碰碰全员出局、补七玩法操作说明"
-git push origin master
+【玩法入口】
+大厅 → 游戏总门 → ✨ 大厅新玩 → 弹弹岛
+也可直接打开 games/dandandao/index.html（离线可玩）。
 
-推完等 1~2 分钟，打开 https://zuoye-e0c.pages.dev/version.json
-看到 {"version":"1.24.8", ...} 就算上线成功。
-如果还看到 HTML，说明构建还没跑完，或者构建失败了（去 Cloudflare 看这次提交的 check）。
+【新增内容】
+- 六关：新兵海湾 / 双礁伏击 / 高台狙击 / 三岛混战 / 强风岬 / 落日要塞
+- 炮弹受重力与风力影响；地形可破坏，炸断的土整块塌进海里
+- 敌人脚下被炸空落海也算击杀
+- 三种弹药：标准弹（无限）/ 三连散 / 重弹，每回合补给
+- AI 使用与玩家相同的弹道推演，按关卡调整精度
+- ↑↓ 角度、←→ 力度、空格开火、1/2/3 换弹、G 切瞄准线
+- 手机/触屏：往目标方向拖拽，松手发射
+- 三星评价与解锁进度本地存档
+
+【验证】
+cd WorldHub
+npm run test:dandandao     # 39 项端到端断言，全部通过
+npm run test:party         # 联机自测 129 项
+
+【注意】
+- assets/app.41528cfd03.js 是新的首屏打包文件，index.html 已指向它；旧的 app.*.js 可以留着，不影响。
+- games/dandandao/ 是新增目录，整个拷进去即可。
+- 单文件版服务端 开服.mjs 已重新生成；前端按 WEB_ROOT 读磁盘，新游戏目录要在同一工程下。

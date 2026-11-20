@@ -21,12 +21,12 @@
  *   用户首屏后第一次点游戏，两者抢同一条带宽，越点越慢。现在 install
  *   只拿首屏必需的 4 项，区块页放到空闲队列串行取。
  * ============================================================ */
-const VERSION = 'worldhub-ccc8320346';
+const VERSION = 'worldhub-31aae9c300';
 const SHELL = [
   '/',
   '/index.html',
   '/manifest.webmanifest',
-  '/assets/app.9bdf2c5c29.js',
+  '/assets/app.41528cfd03.js',
   '/assets/extra.af9188f73b.js',
   '/assets/main.f0130d185b.css'
 ];
@@ -35,8 +35,8 @@ const LAZY = [
   '/tools/pomodoro/index.html',
   '/games/mine/index.html',
   '/games/breakout/index.html',
-  '/games/party/index.html',
   '/games/tetris/index.html',
+  '/games/party/index.html',
   '/games/game2048/index.html',
   '/games/brain-gym/index.html',
   '/games/snake/index.html',
@@ -71,6 +71,7 @@ const LAZY = [
   '/games/ff/sbti-test/index.html',
   '/tools/pomodoro/timer.html',
   '/tools/color/index.html',
+  '/games/dandandao/index.html',
   '/tools/focus/index.html',
   '/tools/board/index.html',
   '/games/memory/index.html',

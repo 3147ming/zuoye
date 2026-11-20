@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>联机大厅 · 世界大厅</title>
+<meta name="description" content="建房、输房号、和朋友一起玩：咱俩碰碰 / 泡泡堂 / 坦克大战 / 贪吃蛇大作战 / 抢答赛 / 你画我猜">
+<meta name="theme-color" content="#0b0817">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='7' fill='%230b0817'/><circle cx='11' cy='12' r='3.4' fill='%23ffd166'/><circle cx='21' cy='12' r='3.4' fill='%237ec8ff'/><path d='M6 24c2-4 8-4 10 0M16 24c2-4 8-4 10 0' fill='none' stroke='%23ffd9a8' stroke-width='2' stroke-linecap='round'/></svg>">
+<!-- 联机服务地址由部署配置 / 网址参数提供，不在页面展示。
+     meta 留空表示默认同源 /ws（本地服务、局域网、Cloudflare 隧道均自动可用）。 -->
+<meta name="wh-net" content="">
+<link rel="stylesheet" href="/games/party/party.css">
+</head>
+<body>
+<div class="pp-bg" aria-hidden="true"></div>
+<main id="party" class="pp-app" aria-live="polite"></main>
+<footer class="pp-foot">
+  <a href="/">← 回世界大厅</a>
+  <span>联机需要网络连接 · 房号 1–5 位数字 · 密码可选 4 位</span>
+</footer>
+<script src="/js/party/net.js"></script>
+<script src="/js/party/predict.js"></script>
+<script src="/js/party/shared.js"></script>
+<script src="/js/party/kit.js"></script>
+<!-- games.js 是公共底座（WH_PARTY_GAMES），七个玩法各自一个文件；
+     顺序不能乱：底座必须最先，玩法之间互不依赖。 -->
+<script src="/js/party/games.js"></script>
+<script src="/js/party/games.bounce.js"></script>
+<script src="/js/party/games.balloon.js"></script>
+<script src="/js/party/games.tank.js"></script>
+<script src="/js/party/games.snake.js"></script>
+<script src="/js/party/games.quiz.js"></script>
+<script src="/js/party/games.draw.js"></script>
+<script src="/js/party/games.pitch.js"></script>
+<script src="/js/party/lobby.js"></script>
+<script>PartyLobby.boot();</script>
+</body>
+</html>

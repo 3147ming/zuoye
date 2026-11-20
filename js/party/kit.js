@@ -97,6 +97,11 @@
     }
     if (host.__kitTeardown) { try { host.__kitTeardown(); } catch (e) { /* ignore */ } }
 
+    /* 上一局的循环、监听、定时器先收干净，避免两个循环抢同一个 net */
+    if (KIT._teardown) {
+      try { KIT._teardown(); } catch (e) { /* ignore */ }
+      KIT._teardown = null;
+    }
     host.innerHTML = '';
     document.body.classList.add('playing');
     var wrap = el('div', 'pk-wrap');
@@ -109,9 +114,41 @@
        以前舞台里只有一个「开炮」按钮，玩家根本不知道 W/S 是前进后退、
        更不知道坦克是「往前开」而不是「往屏幕上方开」。这里按玩法给一句人话，
        默认展开一次、点一下收起，收起状态记在 localStorage 里。 */
+    /* 「窄」有两层含义：手机竖屏（宽度不够）和手机横屏（高度不够）。
+       844×390 横过来时宽度 844，按 max-width 判不出来，说明条照样展开 107px，
+       把画布挤到 240px —— 比竖屏还小。所以这里同时看高度。 */
+    var narrowScreen = !!(global.matchMedia &&
+      global.matchMedia('(max-width: 560px), (max-height: 480px)').matches);
     var howBtn = el('button', 'pk-how-btn', '怎么玩');
     howBtn.type = 'button';
     top.appendChild(exitBtn);
+    /* 竖屏手机：横版玩法的画布高度是被「宽度 / 宽高比」锁死的（390 宽 → 372×245），
+       说明条再占掉 99px 就纯属浪费。所以这里给一个「横屏」按钮：
+       全屏 + 锁横屏之后画布能到 495×327，面积接近两倍。
+       iOS 不支持 orientation.lock，那就只进全屏，用户自己转。 */
+    var fsBtn = null;
+    if (global.matchMedia && global.matchMedia('(pointer: coarse)').matches) {
+      fsBtn = el('button', 'pk-exit pk-fs', '横屏');
+      fsBtn.type = 'button';
+      fsBtn.onclick = function () {
+        var de = document.documentElement;
+        var req = de.requestFullscreen || de.webkitRequestFullscreen;
+        var p = req ? req.call(de) : null;
+        Promise.resolve(p).catch(function () { /* iOS 不支持，忽略 */ })
+          .then(function () {
+            if (global.screen && global.screen.orientation && global.screen.orientation.lock) {
+              return global.screen.orientation.lock('landscape').catch(function () { });
+            }
+          })
+          .then(function () {
+            fsBtn.textContent = '横过来玩';
+            global.setTimeout(resize, 260);
+            global.setTimeout(resize, 700);
+          })
+          .catch(function () { });
+      };
+      top.appendChild(fsBtn);
+    }
     top.appendChild(howBtn);
 
     var info = el('div', 'pk-info');
@@ -128,13 +165,23 @@
     }).join('');
     wrap.appendChild(how);
     var howKey = 'pk-how-open';
-    var howOpen = true;
-    try { howOpen = global.localStorage.getItem(howKey) !== '0'; } catch (e) { /* 隐私模式 */ }
+    /* 窄屏默认收起，桌面默认展开：手机上一张屏只有 664px 高，说明条要吃掉 99px。
+       只要用户手动点过，就以他存的选择为准（桌面点过展开，手机上同样展开）。 */
+    var howOpen = !narrowScreen;
+    try {
+      var savedHow = global.localStorage.getItem(howKey);
+      if (savedHow === '0' || savedHow === '1') howOpen = savedHow === '1';
+    } catch (e) { /* 隐私模式 */ }
     function applyHow() {
       wrap.classList.toggle('how-on', howOpen);
       howBtn.classList.toggle('on', howOpen);
     }
     applyHow();
+    /* 窄屏收起时闪三下，告诉玩家「东西在这儿」，不然他永远不知道有操作说明 */
+    if (narrowScreen && !howOpen) {
+      howBtn.classList.add('pk-how-attn');
+      global.setTimeout(function () { howBtn.classList.remove('pk-how-attn'); }, 4200);
+    }
     howBtn.onclick = function () {
       howOpen = !howOpen;
       applyHow();
@@ -163,14 +210,43 @@
     var overlay = el('div', 'pk-overlay');
     canvasWrap.appendChild(overlay);
 
-    /* 竖屏提示：横版竞技在竖屏里上下空太多，给一句可关闭的提示 */
-    if (global.matchMedia && global.matchMedia('(max-width: 520px) and (orientation: portrait)').matches) {
-      var rot = el('div', 'pk-rotate', '横过来玩更顺 · 竖屏也能操作');
+    /* 断线提示：只盖一层薄纱，绝不拆舞台、不跳回大厅。
+       net 会退避重连（0.8s→8s，最多 60 次），连上后 onopen 自动续房；
+       这期间预测状态、记分、历史输入全都在，玩家不会「白玩一局」。 */
+    var drop = el('div', 'pk-drop');
+    drop.innerHTML = '<b>网络断开了</b><span>正在自动重连，这局不会丢，先别退出</span>';
+    canvasWrap.appendChild(drop);
+    net.on('status', function (st) {
+      if (!st) return;
+      if (st.state === 'online') { drop.classList.remove('on'); return; }
+      if (!net._everOnline) return;
+      if (st.state === 'offline' || st.state === 'connecting') drop.classList.add('on');
+      if (st.failed) {
+        drop.querySelector('span').textContent = '重试很久了，还是没连上 —— 可以点左上角「退出对局」回大厅';
+      }
+    });
+
+    /* 竖屏提示：横版玩法在竖屏里的画布高度被宽高比锁死（390 → 372×246），
+       横过来能到 439×290，还能全屏。给一句可关闭的引导，6 秒后自动淡出，
+       点过「知道了」就再也不出现（记在 localStorage）。 */
+    var rotOff = false;
+    try { rotOff = global.localStorage.getItem('pk-rotate-off') === '1'; } catch (e) { /* 隐私模式 */ }
+    if (!rotOff && global.matchMedia && global.matchMedia('(max-width: 560px) and (orientation: portrait)').matches) {
+      var rot = el('div', 'pk-rotate', '点上方「横屏」放大画面 · 竖屏也能玩');
       var rotX = el('button', 'pk-rotate-x', '知道了');
       rotX.type = 'button';
-      rotX.onclick = function () { rot.remove(); };
+      rotX.onclick = function () {
+        rot.classList.add('off');
+        global.setTimeout(function () { if (rot.parentNode) rot.parentNode.removeChild(rot); }, 260);
+        try { global.localStorage.setItem('pk-rotate-off', '1'); } catch (e) { /* ignore */ }
+      };
       rot.appendChild(rotX);
       wrap.appendChild(rot);
+      global.setTimeout(function () {
+        if (!rot.parentNode) return;
+        rot.classList.add('off');
+        global.setTimeout(function () { if (rot.parentNode) rot.parentNode.removeChild(rot); }, 260);
+      }, 6000);
     }
 
     host.appendChild(wrap);
@@ -366,6 +442,11 @@
     host.__kitTeardown = KIT._teardown;
     var raf = 0, last = performance.now();
     function frame(now) {
+      /* 舞台已经不在文档里（切房、重连重建、退出）：立刻停。
+         没有这道闸时，旧循环会一直活着，和新循环一起往 net.input 塞数据，
+         后到的 thr:0 覆盖真实输入 —— 表现就是「重连后按键没反应」。 */
+      var root = document.documentElement;
+      if (!root.contains(wrap)) { raf = 0; return; }
       raf = global.requestAnimationFrame(frame);
       var dt = Math.min(0.05, (now - last) / 1000);
       last = now;

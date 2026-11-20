@@ -139,67 +139,145 @@
    * ============================================================ */
   var ITEMS = [
     { id: 'noise', cat: 'tools', name: '白噪音', src: 'tools/noise/index.html',
-      color: '#7fd8c8', glyph: 'noise', desc: '棕噪音 · 计时 · 便签', seed: 1103 },
-    { id: 'pomodoro', cat: 'tools', name: '番茄钟', src: 'tools/pomodoro/index.html',
-      color: '#f07167', glyph: 'pomodoro', desc: '专注计时 · 陪伴小猫', seed: 1104 },
+      color: '#7fd8c8', glyph: 'noise', desc: '棕噪音 · 计时 · 便签', seed: 1103, ratio: 'auto' },
+    { id: 'pomodoro', cat: 'tools', name: '番茄钟', src: 'tools/pomodoro/timer.html',
+      color: '#f07167', glyph: 'pomodoro', desc: '专注计时 · 陪伴小猫', seed: 1104, ratio: 'auto' },
+    { id: 'focus', cat: 'tools', name: '专注模式', src: 'tools/focus/index.html',
+      color: '#8fd8c8', glyph: 'noise', desc: '番茄钟 + 棕噪音 · 一键开始', seed: 1125, ratio: 'auto' },
     { id: 'links', cat: 'tools', name: '网址推荐', src: 'tools/links/index.html',
-      color: '#f6c177', glyph: 'links', desc: '大家分享的好网站', seed: 1117 },
+      color: '#f6c177', glyph: 'links', desc: '大家分享的好网站', seed: 1117, ratio: 'auto' },
     { id: 'board', cat: 'tools', name: '留言板', src: 'tools/board/index.html',
-      color: '#c8a5ff', glyph: 'links', desc: '给路过的人留句话', seed: 1121 },
+      color: '#c8a5ff', glyph: 'links', desc: '给路过的人留句话', seed: 1121, ratio: 'auto' },
     { id: 'timer', cat: 'tools', name: '计时器', src: 'tools/timer/index.html',
-      color: '#8fd0ff', glyph: 'pomodoro', desc: '秒表 · 倒计时', seed: 1122 },
+      color: '#8fd0ff', glyph: 'pomodoro', desc: '秒表 · 倒计时', seed: 1122, ratio: 'auto' },
     { id: 'unit', cat: 'tools', name: '单位换算', src: 'tools/unit/index.html',
-      color: '#a5e0c0', glyph: 'links', desc: '长度 · 重量 · 温度 · 数据', seed: 1123 },
+      color: '#a5e0c0', glyph: 'links', desc: '长度 · 重量 · 温度 · 数据', seed: 1123, ratio: 'auto' },
     { id: 'color', cat: 'tools', name: '色卡', src: 'tools/color/index.html',
-      color: '#f0a0c0', glyph: 'cards', desc: '和谐配色 · 一键复制', seed: 1124 },
+      color: '#f0a0c0', glyph: 'cards', desc: '和谐配色 · 一键复制', seed: 1124, ratio: 'auto' },
     /* ---- 🎮 脑力街机（brain 直达，需联网；手机直接触屏玩，WorldHub 不派发按键） ---- */
     { id: 'snake', cat: 'games', group: '🎮 脑力街机', name: '贪吃蛇',
       src: 'games/brain-gym/index.html?game=snake',
-      color: '#5fd39a', glyph: 'snake', desc: '人机蛇 · 经验豆 · 无限地图', seed: 1105 },
+      color: '#5fd39a', glyph: 'snake', desc: '人机蛇 · 经验豆 · 无限地图', seed: 1105, ratio: '9/16' },
     { id: 'flappy', cat: 'games', group: '🎮 脑力街机', name: '飞扬的小鸟',
       src: 'games/brain-gym/index.html?game=flappy',
-      color: '#ffd166', glyph: 'arcade', desc: '点触飞行 · 穿水管', seed: 1112 },
+      color: '#ffd166', glyph: 'arcade', desc: '点触飞行 · 穿水管', seed: 1112, ratio: '9/16' },
     { id: 'tiles', cat: 'games', group: '🎮 脑力街机', name: '别踩白块儿',
       src: 'games/brain-gym/index.html?game=tiles',
-      color: '#a5b4fc', glyph: 'arcade', desc: '踩白块 · 别踩黑', seed: 1113 },
+      color: '#a5b4fc', glyph: 'arcade', desc: '踩白块 · 别踩黑', seed: 1113, ratio: '9/16' },
     { id: 'plane', cat: 'games', group: '🎮 脑力街机', name: '飞机大战',
       src: 'games/brain-gym/index.html?game=plane',
-      color: '#7ec8ff', glyph: 'arcade', desc: '射击弹幕 · 躲避', seed: 1114 },
+      color: '#7ec8ff', glyph: 'arcade', desc: '射击弹幕 · 躲避', seed: 1114, ratio: '9/16' },
     { id: 'bubble', cat: 'games', group: '🎮 脑力街机', name: '泡泡龙',
       src: 'games/brain-gym/index.html?game=bubble',
-      color: '#d0a5ff', glyph: 'arcade', desc: '同色消除 · 连击', seed: 1115 },
+      color: '#d0a5ff', glyph: 'arcade', desc: '同色消除 · 连击', seed: 1115, ratio: '9/16' },
     { id: 'pong', cat: 'games', group: '🎮 脑力街机', name: '乒乓',
       src: 'games/brain-gym/index.html?game=pong',
-      color: '#ff9f9f', glyph: 'arcade', desc: '挡板对拍 · 接球', seed: 1116 },
+      color: '#ff9f9f', glyph: 'arcade', desc: '挡板对拍 · 接球', seed: 1116, ratio: '9/16' },
     /* ---- 🕹 开源小游戏（本地，可离线） ---- */
     { id: 'game2048', cat: 'games', group: '🕹 开源小游戏', name: '2048', src: 'games/game2048/index.html',
-      color: '#f2cc60', glyph: 'n2048', desc: '数字合璧', seed: 1106 },
+      color: '#f2cc60', glyph: 'n2048', desc: '数字合璧', seed: 1106, ratio: '1/1' },
     { id: 'tetris', cat: 'games', group: '🕹 开源小游戏', name: '俄罗斯方块', src: 'games/tetris/index.html',
-      color: '#9b8afb', glyph: 'tetris', desc: '方块下落 · 消行', seed: 1107 },
+      color: '#9b8afb', glyph: 'tetris', desc: '方块下落 · 消行', seed: 1107, ratio: '16/9' },
     { id: 'fight', cat: 'games', group: '🕹 开源小游戏', name: '格斗', src: 'games/fight/index.html',
-      color: '#e8545f', glyph: 'fight', desc: '本地双人 · 出招掉血', seed: 1108 },
+      color: '#e8545f', glyph: 'fight', desc: '本地双人 · 出招掉血', seed: 1108, ratio: '16/9' },
     { id: 'mine', cat: 'games', group: '🕹 开源小游戏', name: '扫雷', src: 'games/mine/index.html',
-      color: '#6fc2ef', glyph: 'mine', desc: '翻格子 · 插旗', seed: 1109 },
+      color: '#6fc2ef', glyph: 'mine', desc: '翻格子 · 插旗', seed: 1109, ratio: '4/3' },
     { id: 'gomoku', cat: 'games', group: '🕹 开源小游戏', name: '五子棋', src: 'games/gomoku/index.html',
-      color: '#e8b45a', glyph: 'gomoku', desc: '人机对弈 · 五连', seed: 1110 },
+      color: '#e8b45a', glyph: 'gomoku', desc: '人机对弈 · 五连', seed: 1110, ratio: '1/1' },
     { id: 'breakout', cat: 'games', group: '🕹 开源小游戏', name: '打砖块', src: 'games/breakout/index.html',
-      color: '#f2a0c0', glyph: 'breakout', desc: '反弹消砖 · 逐关', seed: 1111 },
+      color: '#f2a0c0', glyph: 'breakout', desc: '反弹消砖 · 逐关', seed: 1111, ratio: '16/9' },
     { id: 'warehouse', cat: 'games', group: '🕹 开源小游戏', name: '仓库行动',
       src: 'https://warehouse-strike.pages.dev/',
       color: '#ff6b6b', glyph: 'arcade', desc: '第一人称 · 仓库枪战',
-      cross: true, seed: 1201 },
+      cross: true, seed: 1201, ratio: '16/9' },
     /* ---- ✨ 大厅新玩（自研，可离线） ---- */
     { id: 'memory', cat: 'games', group: '✨ 大厅新玩', name: '记忆翻牌', src: 'games/memory/index.html',
-      color: '#f2a0c0', glyph: 'cards', desc: '配对消除 · 三档棋盘', seed: 1211 },
+      color: '#f2a0c0', glyph: 'cards', desc: '配对消除 · 三档棋盘', seed: 1211, ratio: '1/1' },
     { id: 'reaction', cat: 'games', group: '✨ 大厅新玩', name: '反应速度', src: 'games/reaction/index.html',
-      color: '#5fd39a', glyph: 'arcade', desc: '变绿就点 · 五轮定级', seed: 1212 },
+      color: '#5fd39a', glyph: 'arcade', desc: '变绿就点 · 五轮定级', seed: 1212, ratio: '16/9' },
     { id: 'mathdash', cat: 'games', group: '✨ 大厅新玩', name: '算术挑战', src: 'games/mathdash/index.html',
-      color: '#7ec8ff', glyph: 'n2048', desc: '60 秒口算 · 连击加分', seed: 1213 }
+      color: '#7ec8ff', glyph: 'n2048', desc: '60 秒口算 · 连击加分', seed: 1213, ratio: '9/16' },
+    { id: 'dualnback', cat: 'games', group: '✨ 大厅新玩', name: '双重 N-Back', src: 'games/dualnback/index.html',
+      color: '#c0a5ff', glyph: 'cards', desc: '位置 + 字母 · 工作记忆训练', seed: 1214, ratio: '1/1' },
+    { id: 'dandandao', cat: 'games', group: '✨ 大厅新玩', name: '弹弹岛', src: 'games/dandandao/index.html',
+      color: '#ffc46b', glyph: 'arcade', desc: '抛物线对轰 · 炸塌地形 · 六关', seed: 1228, ratio: '16/9' },
+
+    /* ---- 🧩 脑力训练场（复刻自 FreeFocusGames，全部本地可离线） ---- */
+    { id: 'f1-reaction', cat: 'games', group: '🧩 脑力训练场', name: 'F1 反应测试', src: 'games/ff/f1-reaction/index.html',
+      color: '#ff7a7a', glyph: 'arcade', desc: '五盏灯熄灯起步 · 抢跑检测', seed: 1300, ratio: '16/9' },
+    { id: 'cps-test', cat: 'games', group: '🧩 脑力训练场', name: 'CPS 点击速度', src: 'games/ff/cps-test/index.html',
+      color: '#ffd166', glyph: 'arcade', desc: '1/5/10/30 秒 · 每秒点击数', seed: 1301, ratio: '9/16' },
+    { id: 'spacebar-clicker', cat: 'games', group: '🧩 脑力训练场', name: '空格键连点', src: 'games/ff/spacebar-clicker/index.html',
+      color: '#7ec8ff', glyph: 'arcade', desc: '键盘/触屏 · 本地最佳', seed: 1302, ratio: '9/16' },
+    { id: 'challenge-10-seconds', cat: 'games', group: '🧩 脑力训练场', name: '10 秒挑战', src: 'games/ff/challenge-10-seconds/index.html',
+      color: '#f6c177', glyph: 'arcade', desc: '时间感知 · 可见/隐藏计时', seed: 1303, ratio: '9/16' },
+    { id: 'larger-number', cat: 'games', group: '🧩 脑力训练场', name: '更大数字挑战', src: 'games/ff/larger-number/index.html',
+      color: '#a5e0c0', glyph: 'n2048', desc: '30 秒比大小 · 五级递进', seed: 1304, ratio: '9/16' },
+    { id: 'schulte-table', cat: 'games', group: '🧩 脑力训练场', name: '舒尔特表格', src: 'games/ff/schulte-table/index.html',
+      color: '#7fd8c8', glyph: 'cards', desc: '3×3/4×4/5×5 视觉搜索', seed: 1305, ratio: '1/1' },
+    { id: 'rotating-schulte', cat: 'games', group: '🧩 脑力训练场', name: '动态舒尔特表', src: 'games/ff/rotating-schulte/index.html',
+      color: '#8fd0ff', glyph: 'cards', desc: '三环旋转 · 1→42', seed: 1306, ratio: '1/1' },
+    { id: 'fish-trace', cat: 'games', group: '🧩 脑力训练场', name: '发光小鱼', src: 'games/ff/fish-trace/index.html',
+      color: '#7fd8c8', glyph: 'snake', desc: '多目标视觉追踪', seed: 1307, ratio: '1/1' },
+    { id: 'double-decision', cat: 'games', group: '🧩 脑力训练场', name: '双重决策', src: 'games/ff/double-decision/index.html',
+      color: '#f0a76e', glyph: 'arcade', desc: '中央车辆 + 周边路牌 · 自适应', seed: 1308, ratio: '1/1' },
+    { id: 'flanker-test', cat: 'games', group: '🧩 脑力训练场', name: 'Flanker 侧翼', src: 'games/ff/flanker-test/index.html',
+      color: '#c0a5ff', glyph: 'arcade', desc: '箭头干扰 · 测侧翼效应', seed: 1309, ratio: '16/9' },
+    { id: 'stroop-effect', cat: 'games', group: '🧩 脑力训练场', name: '斯特鲁普效应', src: 'games/ff/stroop-effect/index.html',
+      color: '#ff9f9f', glyph: 'cards', desc: '色词冲突 · 20 题测抑制', seed: 1310, ratio: '9/16' },
+    { id: 'trail-making', cat: 'games', group: '🧩 脑力训练场', name: '连线测试', src: 'games/ff/trail-making/index.html',
+      color: '#a5b4fc', glyph: 'links', desc: 'A/B 部分 · 数字字母交替', seed: 1311, ratio: '1/1' },
+    { id: 'pvt', cat: 'games', group: '🧩 脑力训练场', name: 'PVT 警觉测试', src: 'games/ff/pvt/index.html',
+      color: '#ff6b6b', glyph: 'arcade', desc: '3/10 分钟 · 走神与抢按', seed: 1312, ratio: '9/16' },
+    { id: 'digit-span', cat: 'games', group: '🧩 脑力训练场', name: '数字广度', src: 'games/ff/digit-span/index.html',
+      color: '#7ec8ff', glyph: 'n2048', desc: '正背/倒背 · 逐级加长', seed: 1313, ratio: '9/16' },
+    { id: 'sequence-memory', cat: 'games', group: '🧩 脑力训练场', name: '序列记忆', src: 'games/ff/sequence-memory/index.html',
+      color: '#a5e0c0', glyph: 'cards', desc: 'Corsi 方块 · 正序/倒序', seed: 1314, ratio: '1/1' },
+    { id: 'frog-memory-leap', cat: 'games', group: '🧩 脑力训练场', name: '青蛙记忆跳跃', src: 'games/ff/frog-memory-leap/index.html',
+      color: '#8fe0a0', glyph: 'snake', desc: '荷叶跳跃顺序 · 闯关', seed: 1315, ratio: '1/1' },
+    { id: 'short-term-memory', cat: 'games', group: '🧩 脑力训练场', name: '短期记忆测试', src: 'games/ff/short-term-memory/index.html',
+      color: '#f2a0c0', glyph: 'cards', desc: '12 物品回忆 · 自测评分', seed: 1316, ratio: '9/16' },
+    { id: 'counting-boxes', cat: 'games', group: '🧩 脑力训练场', name: '数箱子', src: 'games/ff/counting-boxes/index.html',
+      color: '#f6c177', glyph: 'tetris', desc: '3D 立方体短暂呈现 · 计数', seed: 1317, ratio: '1/1' },
+    { id: 'resonance-breathing', cat: 'games', group: '🧩 脑力训练场', name: '共振呼吸', src: 'games/ff/resonance-breathing/index.html',
+      color: '#7fd8c8', glyph: 'noise', desc: '4-6 呼吸 · 莲花引导', seed: 1318, ratio: '9/16' },
+    { id: 'box-breathing', cat: 'games', group: '🧩 脑力训练场', name: '箱式呼吸', src: 'games/ff/box-breathing/index.html',
+      color: '#8fd8ff', glyph: 'noise', desc: '4-4-4-4 方块呼吸', seed: 1319, ratio: '9/16' },
+    { id: '478-breathing', cat: 'games', group: '🧩 脑力训练场', name: '4-7-8 呼吸', src: 'games/ff/478-breathing/index.html',
+      color: '#c0a5ff', glyph: 'noise', desc: '4-7-8 助眠呼吸', seed: 1320, ratio: '9/16' },
+    { id: 'focus-sudoku', cat: 'games', group: '🧩 脑力训练场', name: '专注数独', src: 'games/ff/focus-sudoku/index.html',
+      color: '#f2cc60', glyph: 'n2048', desc: '9 宫格 · 笔记模式 · 三档', seed: 1321, ratio: '1/1' },
+    { id: 'sbti-test', cat: 'games', group: '🧩 脑力训练场', name: 'SBTI 人格测试', src: 'games/ff/sbti-test/index.html',
+      color: '#ff9fc0', glyph: 'cards', desc: '16 题梗系人格 · 娱乐向', seed: 1322, ratio: '9/16' },
+    { id: 'bamboo-cicada', cat: 'games', group: '🧩 脑力训练场', name: '竹知了', src: 'games/ff/bamboo-cicada/index.html',
+      color: '#a8d86a', glyph: 'arcade', desc: '画圈甩动 · 哇哇声 · 惯性', seed: 1323, ratio: '9/16' },
+    /* ---- 🌐 联机对战（同一套房间服务；建房拿 5 位房号，朋友输号进来） ---- */
+    { id: 'p-bounce', cat: 'games', group: '🌐 联机对战', name: '咱俩碰碰',
+      src: 'games/party/index.html?game=bounce',
+      color: '#ff7a7a', glyph: 'arcade', desc: '3 张场地 · 4 种道具 · 冲刺撞人', seed: 1221, ratio: '16/9' },
+    { id: 'p-balloon', cat: 'games', group: '🌐 联机对战', name: '泡泡堂',
+      src: 'games/party/index.html?game=balloon',
+      color: '#7ec8ff', glyph: 'arcade', desc: '3 套迷宫 · 炸箱掉道具', seed: 1222, ratio: '16/9' },
+    { id: 'p-tank', cat: 'games', group: '🌐 联机对战', name: '坦克大战',
+      src: 'games/party/index.html?game=tank',
+      color: '#ffd166', glyph: 'arcade', desc: '3 张战场 · 砖墙可碎 · 补给', seed: 1223, ratio: '16/9' },
+    { id: 'p-snakebattle', cat: 'games', group: '🌐 联机对战', name: '贪吃蛇大作战',
+      src: 'games/party/index.html?game=snakebattle',
+      color: '#8ff0b5', glyph: 'snake', desc: '金果加速果 · 烧身长冲刺', seed: 1224, ratio: '16/9' },
+    { id: 'p-quiz', cat: 'games', group: '🌐 联机对战', name: '抢答赛',
+      src: 'games/party/index.html?game=quiz',
+      color: '#c0a5ff', glyph: 'links', desc: '108 题 · 10 分类 · 连对加成', seed: 1225, ratio: '16/9' },
+    { id: 'p-draw', cat: 'games', group: '🌐 联机对战', name: '你画我猜',
+      src: 'games/party/index.html?game=draw',
+      color: '#ff9f9f', glyph: 'cards', desc: '画板传话 · 96 个词 · 越快分越高', seed: 1227, ratio: '16/9' },
+    { id: 'party', cat: 'games', group: '🌐 联机对战', name: '联机大厅',
+      src: 'games/party/index.html',
+      color: '#f0a76e', glyph: 'gate', desc: '建房 / 输房号进房', seed: 1226, ratio: '16/9' }
   ];
 
   /* 动态计数：避免文案把数字写死（区块/游戏数量随内容增减） */
-  var ZONE_COUNT = ITEMS.length;                                                    // 16 个区块
-  var GAME_COUNT = ITEMS.filter(function (i) { return i.cat === 'games'; }).length; // 13 款小游戏
+  var ZONE_COUNT = ITEMS.length;                                                    // 区块数随内容表增减
+  var GAME_COUNT = ITEMS.filter(function (i) { return i.cat === 'games'; }).length; // 小游戏数随内容表增减
 
   /* HUD 标题里的区块数随内容走（首屏 HTML 里是兜底值） */
   var _hudP = document.querySelector('.hud-title p');
@@ -213,6 +291,7 @@
       lines: [
         '……又一位旅行者。欢迎来到中心广场。',
         '这里不再是一条直路。左右各有一座总门，路只留着三屏。',
+        '我在这盏灯下守了很久：看过有人第一次来，也看过有人很多年后又站回这里。',
         '往左走，是工具总门：听风、计时、找网站、留句话。',
         '往右走，是游戏总门：' + GAME_COUNT + ' 款小游戏都在那后面。',
         '站到门前按 E，会列出那一整排区块，选一个就能直接传过去。',
@@ -226,6 +305,7 @@
       line1: '嘘——听风。',
       lines: [
         '嘘——我在听这一屏的风。',
+        '听久了会发现，风里有雨、有雪，也有别人没说出口的话。',
         '这是白噪音：棕噪音打底，声音厚实，不刺耳，写东西的时候开它就对了。',
         '中间那个大按钮点开就响；下面两条滑条，一条调音量，一条调「温暖度」，往右越闷。',
         '旁边还有 25 / 50 分钟的计时和一张便签，便签关掉浏览器也还在。',
@@ -237,10 +317,22 @@
       line1: '别催，钟在走。',
       lines: [
         '别催，钟在走。',
+        '这钟是上一任守钟人留下的，他走的时候只说：慢一点，钟会替你数。',
         '这是番茄钟：25 分钟专注，5 分钟休息，一轮一轮来。',
         '点 Start 开始，Pause 暂停，Reset 归零；右上角那几只猫会一直陪着你。',
         '想听点雨声，就把下面的环境音打开。',
         '走出画面边缘，就回广场了。'
+      ]
+    },
+    focus: {
+      name: '守静人',
+      line1: '灯亮着，风也停了。',
+      lines: [
+        '灯亮着，风也停了——这屏是给要做事的人留的。',
+        '专注模式：选好 25 / 50 / 90 分钟，按一下就开始，计时和棕噪音一起走。',
+        '下面那行便签写本轮要做的那一件小事，关掉页面再回来还在。',
+        '钟走到零会轻响一声，然后自己安静下来。',
+        '想回广场，从画面边缘走出去就行。'
       ]
     },
     links: {
@@ -258,6 +350,7 @@
       line1: '这条蛇通了灵。',
       lines: [
         '这条蛇通了灵——会吃经验豆长本事，还有人机对手追着你咬。',
+        '它是别人托我养的，留下话只有一句：它认路，不认人。',
         '贪吃蛇（脑力街机版）：地图没有边界，吃掉经验豆升级，别被人机蛇咬到。',
         '手机上直接点屏幕或滑方向键就能玩，不用额外按键；需要联网才能进。',
         '从画面边缘走出去，就回广场了。'
@@ -348,6 +441,7 @@
       line1: '脚步轻点。',
       lines: [
         '这片地底下埋着东西，脚步轻点。',
+        '以前这儿是仓库，后来没人来搬货，只剩下底下的响动。',
         '扫雷：左键翻格，右键插旗，格子上的数字是周围八格的地雷数。',
         '第一次点不会踩雷；把所有不是雷的格子翻完就算赢。',
         '边缘一走，回广场。'
@@ -388,9 +482,21 @@
       line1: '石板闲着也是闲着。',
       lines: [
         '这块石板空了几百年了。',
+        '上面刻过的字一层压着一层，像没人扫过的雪。',
         '留言板：谁路过都能刻一句话，所有人都看得见。',
         '署名最多十个字，留言一百二十个字，别写隐私。',
         '联网时写进云端，断了网先替你刻在本机。'
+      ]
+    },
+    dandandao: {
+      name: '岛主',
+      line1: '看风，再开炮。',
+      lines: [
+        '这片海上散着六座岛，一座比一座难打。',
+        '弹弹岛：你守左岸，敌人守右岸，轮流开炮。角度和力度决定抛物线，风会把炮弹吹偏。',
+        '↑↓ 调角度，←→ 调力度，空格开火；手机上往想打的方向拖一下，松手就发射。',
+        '炮弹会把岛炸出坑，站不住的人会掉进海里——把他打下来也算赢。',
+        '1/2/3 换弹：三连散一次三枚打面，重弹炸得深、专拆地形。'
       ]
     },
     memory: {
@@ -451,6 +557,79 @@
         '算术挑战：加减乘除轮流上，连对越多题越难、分越高。',
         '连对五个开始翻倍，答错降一档。',
         '手机上用下面那个小键盘，点着比打字快。'
+      ]
+    },
+    'p-bounce': {
+      name: '碰碰车司机',
+      line1: '撞一下试试？',
+      lines: [
+        '车是弹的，人是软的，撞狠了会掉血。',
+        '咱俩碰碰：2–4 人在同一块场地推着车互撞，撞得越猛伤害越高，血空了就出局。',
+        'WASD 或摇杆推方向，加速撞上去；撞墙会反弹，别把自己弹进死角。',
+        '联机玩法要先建房：房主拿一个 5 位数字房号，把号发给朋友就能进。'
+      ]
+    },
+    'p-balloon': {
+      name: '泡泡工',
+      line1: '别站在水泡上。',
+      lines: [
+        '水泡两秒多就炸，炸成一朵十字水花。',
+        '泡泡堂：格子迷宫里放水泡，水柱能炸掉木箱，也能炸掉对手。',
+        '按住方向就能一直走，空格放泡，放完赶紧跑开。',
+        '木箱炸开有 55% 几率掉道具：泡泡 +1、火力 +1、或者加速鞋。',
+        '有三套迷宫随局切换，别记死路线。'
+      ]
+    },
+    'p-tank': {
+      name: '车长',
+      line1: '炮口对着我干嘛。',
+      lines: [
+        '四角出生，炮口一转就是敌人。',
+        '坦克大战：前后走、左右转，空格开炮，先拿 5 分的人赢。',
+        '炮弹打中对手扣血，击毁一次多拿 3 分。',
+        '砖墙两发就能打碎，打穿之后多一条射击线。',
+        '场上会刷加速 / 护盾 / 连发补给，捡到就能翻盘。'
+      ]
+    },
+    'p-snakebattle': {
+      name: '蛇倌',
+      line1: '长不是本事，活着才是。',
+      lines: [
+        '头撞头，短的那条先死。',
+        '贪吃蛇大作战：吃光点变长，让对手一头撞上你的身体。',
+        '←→ 转向，穿墙会从另一边出来；不能 180 度直接掉头。',
+        '金果 +3 节还加分，蓝色加速果能快 5 秒。',
+        '空格是冲刺：烧掉两节身体换 1.2 秒爆发，逃命和抢食都好用。'
+      ]
+    },
+    'p-quiz': {
+      name: '出题人',
+      line1: '敢抢吗？',
+      lines: [
+        '同一道题，四个人一起抢。',
+        '抢答赛：108 道题、10 个分类，每题 7 秒，答对得 100 分，越往后答分越低。',
+        '答错扣 20 并锁本题；连续答对每题再加 15，最多加 45。',
+        '按 1 / 2 / 3 / 4 或者直接点选项，共 12 题。'
+      ]
+    },
+    'p-draw': {
+      name: '画师',
+      line1: '别写字啊。',
+      lines: [
+        '轮到你的时候，你是唯一能看到词的人。',
+        '你画我猜：轮流当画者，每轮 70 秒，96 个词随机抽。',
+        '别人猜中你就加分，猜得越快他分越高；全都猜中你还能多拿 30。',
+        '剩一半时间会露一个字，剩三成再露一个，画得清楚比画得好看重要。'
+      ]
+    },
+    party: {
+      name: '团长',
+      line1: '房号报一下。',
+      lines: [
+        '联机得先有房间，房间号必须是 1 到 5 位数字。',
+        '建房：选玩法、设 4 位密码（可不设）、把房号发给朋友。',
+        '进房：在大厅填房号，房间有密码就再填密码。',
+        '联机需要一台 WebSocket 服务，自建也行，部署到 Cloudflare 也行。'
       ]
     }
   };
@@ -555,7 +734,7 @@
             w: 104, h: 190,
             isGate: false, cat: cat,
             name: it.name, desc: it.desc,
-            color: it.color, glyph: it.glyph, src: it.src
+            color: it.color, glyph: it.glyph, src: it.src, ratio: it.ratio
           }
         });
       }
@@ -1679,7 +1858,8 @@
         from: this.scene ? this.scene.id : 'plaza',
         px: this.player ? this.player.x : 0,
         pf: this.player ? this.player.facing : 1,
-        cross: d.cross === true
+        cross: d.cross === true,
+        ratio: d.ratio
       });
     } else if (global.HUD) {
       global.HUD.toast('场景壳（iframeScene.js）没加载，进不去');
@@ -2718,4 +2898,19 @@
   WorldScene.indexOf = sceneIndexById;
 
   global.WorldScene = WorldScene;
+
+  /* ---------------- 竖屏触屏「最近来过」快捷区 ----------------
+     DOM 与显隐都在 js/quickRecent.js 里，这里只做依赖注入：
+     区块表、目录开关状态、直达入口都从源工程内部拿，不经过全局探测。
+     注：本文件先于 quickRecent.js 执行（构建顺序固定），所以这里不自调 init，
+     统一由 boot.js 在 WorldScene 就绪后调用 QuickRecent.init()。 */
+  /* 场景切换：SceneManager 写完 body.dataset.scene 后由这里同步一次 */
+  if (global.SceneManager && global.SceneManager.change) {
+    var _smChange = global.SceneManager.change;
+    global.SceneManager.change = function (name, params) {
+      var sc = _smChange.call(this, name, params);
+      if (global.QuickRecent) global.QuickRecent.sync(name);
+      return sc;
+    };
+  }
 })(window);

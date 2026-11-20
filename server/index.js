@@ -244,11 +244,20 @@ function attach(conn) {
         var target = dir.get(code);
         if (!target) return err('NO_ROOM');
         if (target.pass && String(d.pass || '') !== target.pass) return err('PASS_WRONG');
+        /* 断线续房：客户端重连时带上上次的 pid + token。
+           对得上就复用原 id —— 否则每次 WiFi 抖动都会被当成「新玩家加入」：
+           原来的座位、分数、游戏内的坦克全留在原地，自己反而变成旁观者。
+           实测重连后 you 从 ua2t2q 变成 ucfshx，界面上自己的坦克不见了。 */
+        var wantPid = String(d.pid || '');
+        var wantTok = String(d.token || '');
+        var back = (wantPid && wantTok) ? target.player(wantPid) : null;
+        if (back && (!back.token || back.token !== wantTok)) back = null;
         var same = target.player(pid);
-        if (!same && target.isFull()) return err('ROOM_FULL');
+        if (!same && !back && target.isFull()) return err('ROOM_FULL');
         if (currentRoom() && currentRoom() !== target) { currentRoom().remove(pid); }
+        if (back) pid = back.id;   /* 复用原 id：座位、分数、游戏状态全部接上 */
         joinedCode = target.code;
-        target.add(pid, cleanName(d.name), sender, 'tok' + Math.random().toString(36).slice(2, 10));
+        target.add(pid, cleanName(d.name), sender, back ? wantTok : ('tok' + Math.random().toString(36).slice(2, 10)));
         dir.bind(pid, target.code);
         return;
       }
