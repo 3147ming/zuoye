@@ -43,6 +43,13 @@
   .wp small{display:block;font-size:.72em;color:var(--dim)}
   .wp.sel{border-color:var(--gold);background:rgba(255,209,102,.18);box-shadow:0 0 0 1px rgba(255,209,102,.35) inset}
   .wp.empty{opacity:.4;cursor:not-allowed}
+  /* 移动按钮：只在触屏显示，按住持续走位 */
+  #move{position:absolute;left:50%;bottom:1.6vmin;transform:translateX(-50%);display:none;gap:1.2vmin;z-index:6}
+  #move button{pointer-events:auto;font:inherit;font-size:clamp(18px,3.4vmin,38px);font-weight:700;color:var(--ink);
+      background:var(--panel);border:1px solid var(--line);border-radius:1.2vmin;width:clamp(46px,8vmin,96px);
+      height:clamp(38px,7vmin,84px);cursor:pointer;touch-action:none}
+  #move button:active{border-color:var(--gold);background:rgba(255,209,102,.22)}
+  @media (pointer:coarse){ #move{display:flex} }
   #right{display:flex;align-items:flex-end;gap:1.2vmin}
   #gauge{text-align:right;font-variant-numeric:tabular-nums}
   #gauge .row{font-size:clamp(10px,1.4vmin,18px);white-space:nowrap;margin-top:.2vmin}
@@ -142,6 +149,11 @@
       </div>
       <button id="fire" type="button">开 火</button>
     </div>
+  </div>
+
+  <div id="move">
+    <button id="mvL" type="button" aria-label="向左移动">◀</button>
+    <button id="mvR" type="button" aria-label="向右移动">▶</button>
   </div>
 
   <div id="ov" class="on"><div class="box" id="box"></div></div>

@@ -59,7 +59,7 @@ try {
   await page.waitForTimeout(300);
 
   console.log('\nA. 菜单与解锁');
-  ok('标题与六关都在', (await page.locator('#levels .lv').count()) === 6);
+  ok('标题与十关都在', (await page.locator('#levels .lv').count()) === 10);
   ok('只有第一关可点', (await page.locator('#levels .lv:not(.lock)').count()) === 1);
   ok('初始 phase=menu', (await snap()).phase === 'menu');
   const box = await page.locator('#box').boundingBox();
@@ -88,6 +88,19 @@ try {
   ok('数字键切到重弹', (await page.locator('.wp.sel').getAttribute('data-w')) === '2');
   await page.keyboard.press('1');
   ok('数字键切回标准弹', (await page.locator('.wp.sel').getAttribute('data-w')) === '0');
+
+  console.log('\nC2. 玩家在岛上走位（新）');
+  const px0 = await page.evaluate(() => WH_DANDADAO.playerX);
+  await page.keyboard.down('d'); await page.waitForTimeout(240); await page.keyboard.up('d');
+  const px1 = await page.evaluate(() => WH_DANDADAO.playerX);
+  ok('D 键向右走位', px1 > px0 + 8, px0 + '→' + px1);
+  await page.keyboard.down('a'); await page.waitForTimeout(240); await page.keyboard.up('a');
+  const px2 = await page.evaluate(() => WH_DANDADAO.playerX);
+  ok('A 键向左走位', px2 < px1 - 8, px1 + '→' + px2);
+  const range = await page.evaluate(() => WH_DANDADAO.playerRange);
+  ok('走位被限制在岛的范围内', !!range && px2 >= range.lo - 1 && px2 <= range.hi + 1,
+     JSON.stringify({ px2, range }));
+  ok('走位不消耗回合', (await snap()).turn === 1, String((await snap()).turn));
 
   console.log('\nD. 拖拽开火、回合轮换与弹药');
   /* 故意往右下拖：低平弹打不到远处敌人，保证后面几段不会被提前通关跳过 */
@@ -178,6 +191,24 @@ try {
   }
   ok('第三关敌人会挪窝', moved);
   ok('敌人没把自己炸死', (await snap()).foes[0].alive, JSON.stringify((await snap()).foes[0]));
+
+  console.log('\nI2. AI 朝玩家开火 + 巡逻气球（新）');
+  /* 敌人应当朝左（玩家在左岸）射击，vx 必须为负——这是「朝身后射击」bug 的核心断言 */
+  const foeVx = await page.evaluate(() => WH_DANDADAO.lastFoeVx);
+  ok('敌人朝玩家开火（vx<0）', typeof foeVx === 'number' && foeVx < 0, String(foeVx));
+  /* 第 7 关有巡逻气球，位置会随时间左右变化 */
+  await page.evaluate(() => WH_DANDADAO.start(6));
+  await page.waitForTimeout(150);
+  const ob0 = await page.evaluate(() => WH_DANDADAO.obstacles);
+  ok('第七关有巡逻气球', ob0.length >= 1, JSON.stringify(ob0));
+  await page.waitForTimeout(700);
+  const ob1 = await page.evaluate(() => WH_DANDADAO.obstacles);
+  const obMoved = ob0.some((o, i) => ob1[i] && Math.abs(ob1[i].x - o.x) > 4);
+  ok('气球会左右巡逻', obMoved, JSON.stringify({ ob0, ob1 }));
+  ok('十关全部可进入不报错', await page.evaluate(async () => {
+    for (let i = 0; i < 10; i++) { WH_DANDADAO.start(i); if (WH_DANDADAO.phase !== 'aim') return false; }
+    return true;
+  }));
 
   console.log('\nJ. 手机竖屏');
   const m = await browser.newContext({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true });

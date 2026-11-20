@@ -1,7 +1,7 @@
 {
   "name": "worldhub",
   "private": true,
-  "version": "1.25.0",
+  "version": "1.26.0",
   "description": "世界大厅 —— 2D 横版探索式游戏合集入口（构建期用 esbuild，运行期零依赖）",
   "scripts": {
     "build": "node tools/build.mjs",
@@ -19,7 +19,8 @@
     "party:local": "node tools/tunnel.mjs --local",
     "party:standalone": "node tools/make-standalone-server.mjs",
     "test:party:all": "node tools/e2e-party-all.mjs",
-    "test:dandandao": "node tools/e2e-dandandao.mjs"
+    "test:dandandao": "node tools/e2e-dandandao.mjs",
+    "test:duel": "node tools/e2e-duel.mjs"
   },
   "dependencies": {
     "ws": "^8.23.0"

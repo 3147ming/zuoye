@@ -35,7 +35,8 @@
   };
 
   /* ---------------- 关卡 ---------------- */
-  /* isles: [中心x, 顶面y, 半宽]；foes: [x, 血量] */
+  /* isles: [中心x, 顶面y, 半宽]；foes: [x, 血量]
+     obstacles: [中心x, y, 半径, 左右摆幅, 摆动速度] —— 空中左右巡逻的障碍气球 */
   var LEVELS = [
     { name: '新兵海湾', wind: 20, skill: 0.42,
       isles: [[170, 470, 150], [1070, 455, 150]],
@@ -52,9 +53,29 @@
     { name: '强风岬', wind: 72, skill: 0.72,
       isles: [[170, 500, 142], [980, 424, 122], [1190, 510, 78]],
       foes: [[980, 88], [1190, 80]], hint: '风大了就别硬瞄：顺风加力度，逆风减力度。' },
-    { name: '终局 · 落日要塞', wind: 64, skill: 0.82,
+    { name: '落日要塞', wind: 64, skill: 0.76,
       isles: [[150, 520, 130], [640, 382, 100], [640, 546, 72], [1070, 430, 152]],
-      foes: [[1000, 82], [1080, 82], [1160, 82]], hint: '重弹的爆炸半径最大，一发能掀掉半座岛。' }
+      foes: [[1000, 82], [1080, 82], [1160, 82]], hint: '重弹的爆炸半径最大，一发能掀掉半座岛。' },
+    { name: '巡逻气球', wind: 40, skill: 0.74,
+      isles: [[160, 490, 138], [1080, 468, 148]],
+      foes: [[1040, 90], [1150, 90]],
+      obstacles: [[620, 300, 26, 150, 0.9]],
+      hint: '新东西：巡逻气球会左右飘，撞上就把炮弹弹开——找准它移开的空档。' },
+    { name: '双球走廊', wind: 56, skill: 0.79,
+      isles: [[160, 500, 136], [620, 470, 96], [1080, 460, 142]],
+      foes: [[1020, 96], [1120, 96]],
+      obstacles: [[480, 250, 24, 110, 1.2], [800, 330, 26, 130, 0.8]],
+      hint: '两颗气球一高一低来回飘。低抛走下路，或等它们错开。' },
+    { name: '风暴群岛', wind: 86, skill: 0.83,
+      isles: [[150, 510, 132], [560, 400, 88], [900, 440, 92], [1120, 500, 100]],
+      foes: [[540, 92], [900, 102], [1120, 88]],
+      obstacles: [[700, 285, 28, 170, 1.05]],
+      hint: '狂风 + 三个移动靶 + 一颗巡逻球。先算风，再算落点。' },
+    { name: '终局 · 海上霸主', wind: 78, skill: 0.9,
+      isles: [[150, 520, 128], [600, 380, 86], [600, 548, 70], [1080, 430, 150]],
+      foes: [[1010, 90], [1090, 90], [1170, 90], [640, 110]],
+      obstacles: [[440, 250, 24, 120, 1.3], [820, 320, 28, 150, 0.95]],
+      hint: '最后一座要塞：四个敌人、两颗气球、大风。把重弹留给关键时刻。' }
   ];
 
   var WEAPONS = [
@@ -83,7 +104,7 @@
   var terrainDirty = true;
 
   var level = 0, lv = LEVELS[0];
-  var player = null, foes = [], shots = [], parts = [], floats = [], rings = [];
+  var player = null, foes = [], shots = [], parts = [], floats = [], rings = [], obstacles = [];
   var weapon = 0, ammo = [0, 3, 2];
   var angle = 45, power = 0.7;
   var wind = 0, turn = 0;
@@ -296,10 +317,14 @@
   }
 
   /* ---------------- 单位 ---------------- */
-  function makeUnit(x, hp, isFoe) {
+  function makeUnit(x, hp, isFoe, lo, hi) {
     var top = topAt(x);
     return {
       x: x, y: top - 19, vy: 0, hp: hp, max: hp, foe: !!isFoe,
+      /* 朝向：玩家在左岸朝右(+1)，敌人在右岸朝左(-1)。这是弹道水平分量的符号 */
+      dir: isFoe ? -1 : 1,
+      /* 每回合可在这段 x 范围内左右挪动（在岛上走位，不消耗回合） */
+      lo: lo == null ? x - 46 : lo, hi: hi == null ? x + 46 : hi,
       alive: true, aiAng: 45, aiPow: 0.7, recoil: 0, hurt: 0, dead: 0
     };
   }
@@ -328,10 +353,11 @@
   }
 
   /* ---------------- 弹道：AI 与瞄准线共用同一套积分 ---------------- */
-  function launchVec(x, y, angDeg, pow, spd) {
+  function launchVec(x, y, angDeg, pow, spd, dir) {
+    dir = dir || 1;
     var a = angDeg * Math.PI / 180;
-    return { x: x + Math.cos(a) * 34, y: y - Math.sin(a) * 34,
-             vx: Math.cos(a) * spd * pow, vy: -Math.sin(a) * spd * pow };
+    return { x: x + dir * Math.cos(a) * 34, y: y - Math.sin(a) * 34,
+             vx: dir * Math.cos(a) * spd * pow, vy: -Math.sin(a) * spd * pow };
   }
   function stepShot(s, dt) {
     s.vx += wind * dt;
@@ -342,13 +368,18 @@
   }
   /* 模拟落点：返回「炮弹最终落点到目标」的距离。
      爆炸只发生在撞地形 / 撞人 / 出界的那一刻，拿轨迹最近点当指标会选错解。 */
-  function simulate(x, y, angDeg, pow, spd, target, maxSteps, avoid) {
-    var s = launchVec(x, y, angDeg, pow, spd);
+  function simulate(x, y, angDeg, pow, spd, target, maxSteps, avoid, dir, obs) {
+    var s = launchVec(x, y, angDeg, pow, spd, dir);
     var n = maxSteps || 520;
+    var ob = obs || obstacles;
     for (var i = 0; i < n; i++) {
       stepShot(s, DT);
       if (s.y > H + 40 || s.x < -60 || s.x > W + 60) break;
       if (solidPx(s.x, s.y)) break;
+      /* 撞上巡逻气球也算落点 */
+      for (var q = 0; q < ob.length; q++) {
+        if (Math.hypot(s.x - ob[q].x, s.y - ob[q].y) < ob[q].r + 6) { i = n; break; }
+      }
     }
     /* AI 不许选「炸自己脚下」的解：落点离发射者太近就判为无效 */
     if (avoid && Math.hypot(s.x - avoid.x, s.y - avoid.y) < 130) return 1e9;
@@ -359,10 +390,11 @@
     var sp = 1060;
     var best = null, bestD = 1e9;
     var a, p, d;
-    /* 粗搜 */
+    var ox = u.x, oy = u.y - 13, dir = u.dir;
+    /* 粗搜：按自己的朝向打（玩家 dir=+1 朝右，敌人 dir=-1 朝左） */
     for (a = 18; a <= 82; a += 4) {
       for (p = 0.34; p <= 1.001; p += 0.055) {
-        d = simulate(u.x, u.y - 13, a, p, sp, target, 520, u);
+        d = simulate(ox, oy, a, p, sp, target, 520, u, dir);
         if (d < bestD) { bestD = d; best = { a: a, p: p }; }
       }
     }
@@ -370,7 +402,7 @@
     if (best) {
       for (a = Math.max(8, best.a - 5); a <= Math.min(88, best.a + 5); a += 1) {
         for (p = Math.max(0.2, best.p - 0.07); p <= Math.min(1, best.p + 0.07); p += 0.018) {
-          d = simulate(u.x, u.y - 13, a, p, sp, target, 520, u);
+          d = simulate(ox, oy, a, p, sp, target, 520, u, dir);
           if (d < bestD) { bestD = d; best = { a: a, p: p }; }
         }
       }
@@ -387,7 +419,7 @@
   function shoot(angDeg, pow, wIdx, owner) {
     var u = owner || player;
     var w = WEAPONS[wIdx];
-    var base = launchVec(u.x, u.y - 13, angDeg, pow, w.speed);
+    var base = launchVec(u.x, u.y - 13, angDeg, pow, w.speed, u.dir);
     var a = angDeg * Math.PI / 180;
     for (var i = 0; i < w.count; i++) {
       var off = w.count === 1 ? 0 : (i - (w.count - 1) / 2) * w.spread;
@@ -441,6 +473,7 @@
 
   /* ---------------- 回合流程 ---------------- */
   var foeQueue = [], foeIdx = 0, flySettle = 0, flyOwner = 'player';
+  var lastFoeVx = null;   /* 探针：敌人最近一次开炮的水平速度，负=朝玩家(左) */
 
   function toast(text, ms) {
     el.toast.textContent = text;
@@ -487,21 +520,27 @@
     return false;
   }
 
-  /* 后几关敌人会在自己岛上挪窝，玩家得重新瞄——别让对射变成背答案 */
+  /* 敌人会在自己岛上来回走位，玩家得重新瞄——别让对射变成背答案 */
+  function moveUnit(u, nx) {
+    if (!u || !u.alive) return false;
+    nx = Math.max(u.lo, Math.min(u.hi, nx));
+    var top = topAt(nx);
+    if (top > H - 40 || !solidPx(nx, top + 6)) return false;
+    u.x = nx; u.y = top - 19; u.vy = 0;
+    return true;
+  }
   function shuffleFoes() {
-    if (level < 2) return;
     for (var i = 0; i < foes.length; i++) {
       var f = foes[i];
-      if (!f.alive) continue;
-      var nx = lv.foes[i][0] + (Math.random() * 2 - 1) * 72;
-      nx = Math.max(70, Math.min(W - 70, nx));
-      var top = topAt(nx);
-      if (top > H - 40 || !solidPx(nx, top + 6)) continue;
-      f.x = nx; f.y = top - 19; f.vy = 0;
-      for (var k = 0; k < 7; k++) {
-        parts.push({ x: nx, y: top - 2, vx: (Math.random() - 0.5) * 90,
-                     vy: -20 - Math.random() * 50, life: 0.4 + Math.random() * 0.4,
-                     max: 0.8, size: 3 + Math.random() * 4, color: '#c9ad86', g: 320 });
+      if (!f.alive || f.hi - f.lo < 6) continue;
+      var span = f.hi - f.lo;
+      var nx = f.lo + Math.random() * span;
+      if (moveUnit(f, nx)) {
+        for (var k = 0; k < 7; k++) {
+          parts.push({ x: f.x, y: f.y + 19, vx: (Math.random() - 0.5) * 90,
+                       vy: -20 - Math.random() * 50, life: 0.4 + Math.random() * 0.4,
+                       max: 0.8, size: 3 + Math.random() * 4, color: '#c9ad86', g: 320 });
+        }
       }
     }
   }
@@ -544,6 +583,7 @@
     if (!u.alive) { nextFoe(); return; }
     aiSolve(u, player);
     shoot(u.aiAng, u.aiPow, 0, u);
+    lastFoeVx = shots.length ? shots[shots.length - 1].vx : null;
     phase = 'fly'; flyOwner = 'foe'; flySettle = 0;
     syncUI();
   }
@@ -600,6 +640,22 @@
   });
   document.addEventListener('keyup', function (e) { keys[e.key] = false; });
 
+  (function bindMove() {
+    var pairs = [['mvL', 'a'], ['mvR', 'd']];
+    for (var i = 0; i < pairs.length; i++) {
+      (function (id, key) {
+        var b = document.getElementById(id);
+        if (!b) return;
+        var down = function (e) { keys[key] = true; e.preventDefault(); };
+        var up = function (e) { keys[key] = false; if (e) e.preventDefault(); };
+        b.addEventListener('pointerdown', down);
+        b.addEventListener('pointerup', up);
+        b.addEventListener('pointercancel', up);
+        b.addEventListener('pointerleave', up);
+      })(pairs[i][0], pairs[i][1]);
+    }
+  })();
+
   el.fire.addEventListener('click', playerFire);
   for (var wi = 0; wi < el.wps.length; wi++) {
     (function (i) {
@@ -648,8 +704,9 @@
     ov('<h1>弹 弹 岛</h1>' +
        '<p class="tip">调好角度和力度，让炮弹划过海风砸向对岸。<br>炸开的坑会让整座岛塌进海里——把敌人打下来也算赢。</p>' +
        '<div id="levels">' + cards + '</div>' +
-       '<p><span class="kbd">↑↓</span> 角度　<span class="kbd">←→</span> 力度　<span class="kbd">空格</span> 开火　<span class="kbd">1/2/3</span> 换弹<br>' +
-       '手机上直接在画面里往想打的方向拖，松手就开火。</p>' +
+       '<p><span class="kbd">↑↓</span> 角度　<span class="kbd">←→</span> 力度　<span class="kbd">A / D</span> 左右走位<br>' +
+       '<span class="kbd">空格</span> 开火　<span class="kbd">1/2/3</span> 换弹　<span class="kbd">G</span> 瞄准线<br>' +
+       '手机上用底部的 ◀ ▶ 走位，在画面里往想打的方向拖，松手就开火。</p>' +
        '<button class="btn" id="goFirst" type="button">从第一关开始</button>');
     var bs = el.box.querySelectorAll('.lv:not(.lock)');
     for (var j = 0; j < bs.length; j++) {
@@ -661,7 +718,7 @@
     var last = level >= LEVELS.length - 1;
     ov('<h2>这一关，拿下了！</h2><div class="star">' + stars(st) + '</div>' +
        '<p>剩余血量 ' + Math.max(0, Math.round(player.hp)) + ' / ' + player.max + '　·　用了 ' + turn + ' 回合</p>' +
-       (last ? '<p class="tip">六座岛全部清空，你就是这片海的老大。</p>' : '') +
+       (last ? '<p class="tip">十座岛全部清空，你就是这片海的老大。</p>' : '') +
        '<button class="btn" id="nextLv" type="button">' + (last ? '再打一轮' : '下一关') + '</button>' +
        '<button class="btn ghost" id="backMenu" type="button">关卡选择</button>');
     document.getElementById('nextLv').addEventListener('click', function () { startLevel(last ? 0 : level + 1); });
@@ -680,9 +737,11 @@
     var prev = phase;
     ov('<h2>怎么玩</h2>' +
        '<p class="tip">你从左岸开炮，敌人从右岸回击，轮流来。<br>每发炮弹都受<b>重力</b>和<b>风力</b>影响，不是直线飞的。</p>' +
-       '<p><b>标准弹</b>：无限发，稳。<br><b>三连散</b>：一发三枚扇形散开，打面。<br><b>重弹</b>：炸得又大又深，专拆地形。<br>后两种是<b>整关总量</b>，用完就没了，留到关键回合。</p>' +
+       '<p><b>走位</b>：<span class="kbd">A / D</span>（手机用底部 ◀ ▶）在岛上左右挪，<b>不消耗回合</b>；敌人也会走位。<br>' +
+       '<b>标准弹</b>：无限发，稳。<br><b>三连散</b>：一发三枚扇形散开，打面。<br><b>重弹</b>：炸得又大又深，专拆地形。<br>后两种是<b>整关总量</b>，用完就没了。</p>' +
        '<p class="tip">把敌人血打光，或者把他脚下的岛炸塌让他落海，都算赢。<br>' +
-       '<span class="kbd">G</span> 可以开关那条虚线瞄准辅助。</p>' +
+       '<b>巡逻气球</b>会左右飘，炮弹撞上就炸——等它让开再开火。<br>' +
+       '<span class="kbd">G</span> 可以开关炮口那小段虚线瞄准辅助。</p>' +
        '<button class="btn" id="okHelp" type="button">知道了</button>');
     document.getElementById('okHelp').addEventListener('click', function () {
       ovOff();
@@ -691,13 +750,33 @@
     });
   }
 
+  /* 找出 x 所在的岛，给出这段岛上能站立的 x 范围（留出边距，别走出岛就掉海） */
+  function islandRange(x) {
+    var best = null, bd = 1e9;
+    for (var i = 0; i < lv.isles.length; i++) {
+      var s = lv.isles[i];
+      var d = Math.abs(x - s[0]);
+      if (d <= s[2] + 4 && d < bd) { bd = d; best = s; }
+    }
+    if (!best) return null;
+    return { lo: Math.max(24, best[0] - best[2] + 24), hi: Math.min(W - 24, best[0] + best[2] - 24) };
+  }
+
   function startLevel(i) {
     clearPending();
     level = Math.max(0, Math.min(LEVELS.length - 1, i));
     lv = LEVELS[level];
     makeTerrain();
-    player = makeUnit(lv.isles[0][0], 100, false);
-    foes = lv.foes.map(function (f) { return makeUnit(f[0], f[1], true); });
+    var pr = islandRange(lv.isles[0][0]);
+    player = makeUnit(lv.isles[0][0], 100, false, pr && pr.lo, pr && pr.hi);
+    foes = lv.foes.map(function (f) {
+      var r = islandRange(f[0]);
+      return makeUnit(f[0], f[1], true, r && r.lo, r && r.hi);
+    });
+    /* 巡逻气球：baseX 是中心，x 会随 t 做 sin 摆动 */
+    obstacles = (lv.obstacles || []).map(function (o) {
+      return { bx: o[0], x: o[0], y: o[1], r: o[2], amp: o[3], spd: o[4], ph: Math.random() * 6.28 };
+    });
     shots = []; parts = []; floats = []; rings = [];
     weapon = 0; ammo = [0, 3, 2];
     angle = 45; power = 0.7; turn = 0; wind = 0;
@@ -789,6 +868,28 @@
     ctx.lineTo(fx, fy + 15); ctx.closePath(); ctx.fill();
   }
 
+  function drawObstacles(t) {
+    for (var i = 0; i < obstacles.length; i++) {
+      var o = obstacles[i];
+      ctx.save();
+      ctx.translate(o.x, o.y);
+      var bob = Math.sin(t * 2 + i) * 2;
+      /* 系绳 */
+      ctx.strokeStyle = 'rgba(255,255,255,.35)'; ctx.lineWidth = 1.5;
+      ctx.beginPath(); ctx.moveTo(0, o.r); ctx.lineTo(3, o.r + 16 + bob); ctx.stroke();
+      /* 气球本体 */
+      var g = ctx.createRadialGradient(-o.r * 0.3, -o.r * 0.35, 2, 0, 0, o.r * 1.2);
+      g.addColorStop(0, '#fff0f0'); g.addColorStop(0.45, '#ff8f7a'); g.addColorStop(1, '#c0392b');
+      ctx.fillStyle = g;
+      ctx.beginPath(); ctx.ellipse(0, bob, o.r, o.r * 1.12, 0, 0, 7); ctx.fill();
+      ctx.fillStyle = '#a93226';
+      ctx.beginPath(); ctx.moveTo(-4, o.r * 0.95 + bob); ctx.lineTo(4, o.r * 0.95 + bob); ctx.lineTo(0, o.r * 1.2 + bob); ctx.closePath(); ctx.fill();
+      ctx.fillStyle = 'rgba(255,255,255,.55)';
+      ctx.beginPath(); ctx.ellipse(-o.r * 0.35, -o.r * 0.4 + bob, o.r * 0.16, o.r * 0.3, -0.5, 0, 7); ctx.fill();
+      ctx.restore();
+    }
+  }
+
   function drawUnit(u, t) {
     if (!u) return;
     var a = u.foe ? (u.aiAng || 45) : angle;
@@ -811,10 +912,12 @@
     ctx.beginPath(); ctx.moveTo(-20, 6); ctx.lineTo(-14, -9); ctx.lineTo(14, -9); ctx.lineTo(21, 6); ctx.closePath(); ctx.fill();
     ctx.fillStyle = dark;
     ctx.fillRect(-11, -18, 22, 10);
-    /* 炮管（后坐时缩一点） */
+    /* 炮管（后坐时缩一点）：敌人在右岸，炮管要朝左上方 */
     var recoil = (u.recoil || 0) * 7;
+    var face = u.foe ? -1 : 1;
     ctx.save();
     ctx.translate(0, -13);
+    ctx.scale(face, 1);
     ctx.rotate(-rad);
     ctx.translate(-recoil, 0);
     ctx.fillStyle = '#3c4a5c';
@@ -848,34 +951,24 @@
 
   function drawGuide() {
     if (!showGuide || phase !== 'aim' || !player || !player.alive) return;
-    /* 用与实际飞行完全相同的步长推演，一路画到落点，别在半路淡掉 */
-    var s = launchVec(player.x, player.y - 13, angle, power, WEAPONS[weapon].speed);
-    var pts = [], land = null;
-    for (var i = 0; i < 520; i++) {
+    /* 只要炮口周围一小段辅助线（约 25 步），不画完整抛物线，也不标落点 */
+    var s = launchVec(player.x, player.y - 13, angle, power, WEAPONS[weapon].speed, player.dir);
+    var pts = [];
+    for (var i = 0; i < 25; i++) {
       stepShot(s, DT);
-      if (i % 4 === 0) pts.push({ x: s.x, y: s.y });
-      if (solidPx(s.x, s.y)) { land = { x: s.x, y: s.y }; break; }
-      if (s.y > H || s.x < -20 || s.x > W + 20) break;
+      if (i % 2 === 0) pts.push({ x: s.x, y: s.y });
+      if (solidPx(s.x, s.y) || s.y > H || s.x < -20 || s.x > W + 20) break;
     }
     if (pts.length < 2) return;
     ctx.save();
     ctx.lineWidth = 2.4;
-    ctx.strokeStyle = 'rgba(255,255,255,.80)';
+    ctx.strokeStyle = 'rgba(255,255,255,.85)';
     ctx.setLineDash([5, 8]);
     ctx.beginPath();
     ctx.moveTo(pts[0].x, pts[0].y);
     for (var j = 1; j < pts.length; j++) ctx.lineTo(pts[j].x, pts[j].y);
     ctx.stroke();
     ctx.setLineDash([]);
-    if (land && land.x > 0 && land.x < W && land.y > 0 && land.y < H) {
-      ctx.strokeStyle = '#ffd166'; ctx.lineWidth = 2.5;
-      ctx.beginPath(); ctx.arc(land.x, land.y, 9, 0, 7); ctx.stroke();
-      ctx.beginPath();
-      ctx.moveTo(land.x - 17, land.y); ctx.lineTo(land.x - 11, land.y);
-      ctx.moveTo(land.x + 11, land.y); ctx.lineTo(land.x + 17, land.y);
-      ctx.moveTo(land.x, land.y - 17); ctx.lineTo(land.x, land.y - 11);
-      ctx.stroke();
-    }
     ctx.restore();
   }
 
@@ -929,6 +1022,7 @@
     if (terrainDirty) paintTerrain();
     ctx.drawImage(terrain, 0, 0);
     drawWindFlag(t);
+    drawObstacles(t);
     drawGuide();
     drawUnit(player, t);
     for (var i = 0; i < foes.length; i++) drawUnit(foes[i], t);
@@ -949,14 +1043,32 @@
     lastT = t;
     frameNo++;
 
-    /* 键盘连续调整 */
-    if (phase === 'aim') {
+    /* 巡逻气球：按正弦左右飘 */
+    for (var oi = 0; oi < obstacles.length; oi++) {
+      var ob = obstacles[oi];
+      ob.x = ob.bx + Math.sin(t * ob.spd + ob.ph) * ob.amp;
+    }
+
+    /* 键盘连续调整：↑↓ 角度 · ←→ 力度 · A/D 左右走位 */
+    if (phase === 'aim' && player && player.alive) {
       var spdA = (keys.ArrowUp || keys.w || keys.W ? 1 : 0) - (keys.ArrowDown || keys.s || keys.S ? 1 : 0);
-      var spdP = (keys.ArrowRight || keys.d || keys.D ? 1 : 0) - (keys.ArrowLeft || keys.a || keys.A ? 1 : 0);
+      var spdP = (keys.ArrowRight ? 1 : 0) - (keys.ArrowLeft ? 1 : 0);
+      var spdM = (keys.d || keys.D ? 1 : 0) - (keys.a || keys.A ? 1 : 0);
       if (spdA || spdP) {
         angle = Math.max(8, Math.min(88, angle + spdA * 46 * dt));
         power = Math.max(0.2, Math.min(1, power + spdP * 0.48 * dt));
         syncUI();
+      }
+      if (spdM) {
+        var nx = player.x + spdM * 130 * dt;
+        if (moveUnit(player, nx)) {
+          for (var mk = 0; mk < 2; mk++) {
+            parts.push({ x: player.x, y: player.y + 19, vx: (Math.random() - 0.5) * 60,
+                         vy: -15 - Math.random() * 40, life: 0.3 + Math.random() * 0.3,
+                         max: 0.6, size: 2 + Math.random() * 3, color: '#c9ad86', g: 320 });
+          }
+          syncUI();
+        }
       }
     }
 
@@ -993,6 +1105,10 @@
           continue;
         }
         if (solidPx(b.x, b.y)) boom = true;
+        /* 撞上巡逻气球也炸 */
+        if (!boom) for (var q = 0; q < obstacles.length; q++) {
+          if (Math.hypot(b.x - obstacles[q].x, b.y - obstacles[q].y) < obstacles[q].r + b.r * 0.4) { boom = true; break; }
+        }
         var units = [player].concat(foes);
         for (var k = 0; k < units.length; k++) {
           var u2 = units[k];
@@ -1050,10 +1166,16 @@
     get hp() { return player ? player.hp : 0; },
     get foes() { return foes.map(function (f) { return { hp: f.hp, alive: f.alive, x: f.x, y: f.y }; }); },
     get shots() { return shots.length; },
+    get obstacles() { return obstacles.map(function (o) { return { x: o.x, y: o.y, r: o.r }; }); },
+    get foeVx() { return shots.filter(function (b) { return b.owner && b.owner.foe; }).map(function (b) { return b.vx; }); },
+    get lastFoeVx() { return lastFoeVx; },
+    get playerX() { return player ? player.x : 0; },
+    get playerRange() { return player ? { lo: player.lo, hi: player.hi } : null; },
     solid: function (x, y) { return solidPx(x, y); },
     start: startLevel,
     fire: playerFire,
     aim: function (a, p) { angle = a; power = p; syncUI(); },
+    move: function (dir) { if (moveUnit(player, player.x + dir * 20)) syncUI(); return player.x; },
     /* 用与 AI 相同的弹道推演，给自动化测试一个稳定命中解 */
     suggest: function () {
       var t = null;
@@ -1062,7 +1184,7 @@
       var best = null, bd = 1e9;
       for (var a = 15; a <= 85; a += 2) {
         for (var p = 0.3; p <= 1.001; p += 0.025) {
-          var d = simulate(player.x, player.y - 13, a, p, 1060, t);
+          var d = simulate(player.x, player.y - 13, a, p, 1060, t, 520, null, player.dir);
           if (d < bd) { bd = d; best = { a: a, p: p, miss: d }; }
         }
       }

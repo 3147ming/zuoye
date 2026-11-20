@@ -105,13 +105,13 @@ if (fs.existsSync(assetsDir)) {
 const partyHtml = path.join(DIST, 'games/party/index.html');
 if (isFile(partyHtml)) {
   const html = fs.readFileSync(partyHtml, 'utf8');
-  /* games.js 拆过：公共底座 + 七个玩法各一个文件。少一个玩法文件就等于少一个玩法，
+  /* games.js 拆过：公共底座 + 八个玩法各一个文件。少一个玩法文件就等于少一个玩法，
      而且因为 K.register 没执行，界面上那张卡点了会真的开不出局，所以逐个查。 */
   const PARTY_JS = [
     'js/party/net.js', 'js/party/kit.js', 'js/party/lobby.js',
     'js/party/games.js', 'js/party/games.bounce.js', 'js/party/games.balloon.js',
     'js/party/games.tank.js', 'js/party/games.snake.js', 'js/party/games.quiz.js',
-    'js/party/games.draw.js', 'js/party/games.pitch.js'
+    'js/party/games.draw.js', 'js/party/games.pitch.js', 'js/party/games.duel.js'
   ];
   for (const f of PARTY_JS) {
     if (!html.includes('/' + f)) problems.push('联机页缺少引用：' + f);

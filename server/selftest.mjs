@@ -200,6 +200,15 @@ group('4. 玩法模拟（各跑 30 秒，4 人）');
       if (f % 3 === 0) gs.onAction(ps[0], { a: 'draw', pts: [[120 + (f % 400), 200 + (f % 240)]], c: 1, w: 1, ns: f % 24 === 0 });
       if (f % 70 === 0) gs.onAction(ps[1], { a: 'guess', text: '猜不到' });
       if (f === 40) gs.onAction(ps[2], { a: 'redraw' });
+    },
+    duel: (gs, ps, f) => {
+      /* 轮到谁谁开炮：读到 act 后给该玩家发 fire，角度力度随机 */
+      const s = gs.snapshot(f) || {};
+      if (s.ph !== 'aim' || !s.act) return;
+      const p = ps.find((x) => x.id === s.act);
+      if (!p) return;
+      gs.onInput(p, { angle: 30 + (f * 7 % 50), power: 0.5 + (f % 5) * 0.1 });
+      if (f % 6 === 0) gs.onAction(p, { a: 'fire' });
     }
   };
 
@@ -336,10 +345,10 @@ group('7. 客户端预测 · 接线检查');
     /* 玩法文件必须在底座之后、lobby 之前：lobby 的 GAMES 表一渲染就会用到它们 */
     const lobbyAt = html.indexOf('js/party/lobby.js');
     const gCoreAt = html.indexOf('/js/party/games.js');
-    const perGame = ['bounce', 'balloon', 'tank', 'snake', 'quiz', 'draw', 'pitch']
+    const perGame = ['bounce', 'balloon', 'tank', 'snake', 'quiz', 'draw', 'pitch', 'duel']
       .map((id) => ({ id, at: html.indexOf('/js/party/games.' + id + '.js') }));
     ok(perGame.every((x) => x.at > gCoreAt && x.at < lobbyAt),
-      '七个玩法脚本都在底座之后、lobby 之前',
+      '八个玩法脚本都在底座之后、lobby 之前',
       perGame.filter((x) => !(x.at > gCoreAt && x.at < lobbyAt)).map((x) => x.id).join(','));
     ok(/WH_PREDICT/.test(gs) && /WH_SHARED/.test(gs), 'games.js 取用 WH_PREDICT / WH_SHARED');
     ok(!/var SH = global.WH_SHARED/.test(gs), '物理引用没有用 SH 这个名字（贪吃蛇场地高 SH 会撞名）');
