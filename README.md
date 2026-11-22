@@ -25,9 +25,14 @@ python -m http.server 5350
 # 浏览器打开 http://127.0.0.1:5350/
 ```
 
-### 要联机，多跑一条命令
+### 要联机
 
-单机内容在 `file://` 下就能玩，**联机对战需要房间服务**（它得有个地方转发消息）。
+**线上版（1.27.0 起）直接就能联**：打开 `https://zuoye-e0c.pages.dev` → 联机大厅 → 建房拿房号，
+朋友输号进房。房间服务跑在 Cloudflare Worker（`wss://worldhub-ws.3147456217.workers.dev/ws`），
+玩家**不需要**装 Node、不需要起隧道、不需要填地址。
+
+下面这段是**本地开发/离线内网**时才需要 —— 单机内容在 `file://` 下就能玩，
+只有想在本地起一套房间服务时才用：
 
 **最省事：把 `开服.mjs` 放到任意一个文件夹，`node 开服.mjs`。**
 它是一个零依赖单文件，不需要 `tools/`、不需要 `npm install`、不需要在项目目录里：
@@ -970,6 +975,42 @@ const m = clean.match(/https:\/\/[a-z0-9-]+\.(?:app\.lhr\.life|lhr\.life)/i);
 | 抢答专测 | 答对 +100（记分条同步）、答错 -20（100→80）、即时反馈文案正确 |
 | 七玩法全量 | 逐个双会话：说明条存在/可收起、画布未溢出视口、真实按键有位移、0 报错 |
 | 回归 | 自测 126 项、`verify-dist` 通过、单文件版 `开服.mjs` 启动后前端为最新 |
+
+---
+
+### 1.27.0 · 联机全靠 Cloudflare 跑，玩家不用再本地开服
+
+之前联机虽然把「服务端权威 + Durable Object」的代码写好了（见 1.19.2 节），
+但 Worker 一直没真正部署，前端 `<meta name="wh-net">` 还是空的——线上页面只能去连同源 `/ws`，
+而 Pages 是纯静态没有 WebSocket，所以**线上联机实际不可用**，只能靠房主本地 `node 开服.mjs`
++ 公网隧道绕。这一版把它接上了。
+
+| 项 | 结果 |
+| --- | --- |
+| Worker 名 | `worldhub-ws` |
+| 地址 | `wss://worldhub-ws.3147456217.workers.dev/ws` |
+| 存储 | Durable Object `Rooms`（SQLite 后端，命名空间 `93a5362c…`） |
+| 打包 | `node tools/build-ws.mjs` → 78.4 KB（gzip 36.8 KB），自检过 `Rooms` 导出 + `fetch` 入口 |
+| 部署 | `wrangler deploy --config wrangler.ws.jsonc`，Worker 启动 18 ms，版本 `b8cfc0e2` |
+| 前端 | `games/party/index.html` 的 meta 指向上面这个地址 |
+
+**玩家视角的变化**：打开 `zuoye-e0c.pages.dev` → 联机大厅 → 建房拿 5 位房号 → 朋友输号进房。
+**再也不用**装 Node、不用起隧道、不用手填服务地址。
+
+**架构一点没动**：还是服务端权威 + 30Hz 快照 + 客户端预测 + pid/token 续房 + 15 秒掉线宽限，
+八个联机玩法（碰碰 / 泡泡堂 / 坦克 / 贪吃蛇 / 抢答 / 你画我猜 / 球场 / 弹弹岛对战）原样搬运。
+
+**顺手修的坑**：推送时发现远端仓库一直缺 `js/party/predict.js` 与 `js/party/shared.js`
+（只在本地存在），线上联机页因此 404 白屏——已一并补上，并加了
+`tools/e2e-online.mjs` 专门查「线上页面引用的每个 js/css 远端是否真的存在」。
+
+**候选地址仍然保留**：meta 里的地址排在同源之前，4 秒握手超时 + 失败地址降权
+（`net.js` 的 `_dead` 表），所以某个域名被 DNS 污染时会自动回落而不是卡在「连接中」；
+本地开发照旧 `?ws=ws://127.0.0.1:8787/ws` 覆盖。
+
+> 注意：`*.workers.dev` 在国内被 DNS 污染是常态（本机解析到 `face:b00c::` 的 Facebook 段）。
+> 如果玩家普遍连不上，在 Cloudflare 上给该 Worker 绑一个自定义域名（如 `ws.你的域名/ws`），
+> 然后把 meta 换成它即可，前端不用改代码。
 
 ---
 
