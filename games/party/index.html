@@ -8,8 +8,11 @@
 <meta name="theme-color" content="#0b0817">
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='7' fill='%230b0817'/><circle cx='11' cy='12' r='3.4' fill='%23ffd166'/><circle cx='21' cy='12' r='3.4' fill='%237ec8ff'/><path d='M6 24c2-4 8-4 10 0M16 24c2-4 8-4 10 0' fill='none' stroke='%23ffd9a8' stroke-width='2' stroke-linecap='round'/></svg>">
 <!-- 联机服务地址由部署配置 / 网址参数提供，不在页面展示。
-     meta 留空表示默认同源 /ws（本地服务、局域网、Cloudflare 隧道均自动可用）。 -->
-<meta name="wh-net" content="">
+     线上写 Worker 地址（1.27.0 起）：wss://worldhub-ws.<子域>.workers.dev/ws
+     留空则退回同源 /ws——本地服务、局域网、Cloudflare 隧道仍然自动可用；
+     net.js 会把 meta 里的地址排在同源之前先试，所以本地开发不受影响。
+     想临时换地址：网址加 ?ws=wss://.../ws 即可，优先级最高。 -->
+<meta name="wh-net" content="wss://worldhub-ws.3147456217.workers.dev/ws">
 <link rel="stylesheet" href="/games/party/party.css">
 </head>
 <body>
