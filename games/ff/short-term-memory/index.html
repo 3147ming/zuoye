@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="zh-CN"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<link rel="icon" href="data:,"><title>短期记忆测试</title>
+<style>
+:root{--sans:"PingFang SC","Microsoft YaHei",system-ui,sans-serif;--gold:#f6c177;--ink:#f3e9da;--dim:rgba(243,233,218,.55);--teal:#7fd8c8}
+*{box-sizing:border-box}html,body{height:100%;margin:0}
+body{background:#0b0914;color:var(--ink);font-family:var(--sans);display:flex;align-items:center;justify-content:center;padding:2vmin;overflow:hidden;user-select:none;-webkit-user-select:none}
+#app{width:min(100%,560px);height:100%;max-height:800px;display:flex;flex-direction:column;align-items:center;gap:clamp(8px,2vmin,14px);border:1px solid rgba(246,193,119,.18);border-radius:18px;background:radial-gradient(120% 90% at 50% -10%,rgba(246,193,119,.08),transparent 55%),#100d1c;padding:clamp(12px,3vmin,20px)}
+h1{margin:0;font-size:clamp(16px,3.2vmin,22px);letter-spacing:.06em}h1 b{color:var(--gold)}
+.phase{color:var(--teal);font-size:clamp(12px,2.1vmin,15px)}
+.words{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;width:100%;flex:1 1 auto;align-content:center;min-height:0}
+.word{background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.1);border-radius:10px;padding:clamp(8px,2vmin,14px) 6px;text-align:center;font-size:clamp(12px,2.4vmin,17px)}
+.inputs{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;width:100%;flex:1 1 auto;align-content:center;min-height:0}
+.inputs input{width:100%;min-height:44px;border-radius:9px;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.14);color:var(--ink);padding:0 10px;font-size:clamp(12px,2.1vmin,15px);font-family:inherit}
+.inputs input:focus{outline:none;border-color:var(--gold)}
+.result{color:var(--teal);font-size:clamp(12px,2.2vmin,16px);line-height:1.8;text-align:center;flex:1 1 auto;display:flex;flex-direction:column;justify-content:center}
+.meta{display:flex;gap:10px;align-items:center;color:var(--dim);font-size:clamp(11px,2vmin,14px)}
+.meta select{background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.14);color:var(--ink);border-radius:8px;padding:6px;font-family:inherit;font-size:inherit}
+.bigbtn{min-height:46px;padding:0 20px;border-radius:11px;border:1px solid transparent;cursor:pointer;font-size:clamp(13px,2.2vmin,16px);font-weight:600;background:linear-gradient(160deg,#ffd89a,#f0a94f);color:#2a1a06}
+</style></head><body><div id="app">
+<h1>短期 <b>记忆测试</b></h1>
+<div class="phase" id="phase">记住 12 个常见物品</div>
+<div class="words" id="words"></div>
+<div class="inputs" id="inputs" style="display:none"></div>
+<div class="result" id="result" style="display:none"></div>
+<div class="meta" id="meta"><span>年龄</span><select id="age"><option>18-29</option><option>30-44</option><option>45-59</option><option>60+</option></select><span>性别</span><select id="sex"><option>女</option><option>男</option></select></div>
+<div><button class="bigbtn" id="btn">我准备好了 · 开始回忆</button></div>
+</div>
+<script>(function(){
+'use strict';var $=function(i){return document.getElementById(i)};var ITEMS=['枕头','瓶子','鞋子','笔记本电脑','刀子','杯子','镜子','钥匙','椅子','勺子','钱包','手机'];var phase='learn',inputs=[];
+var w=$('words');ITEMS.forEach(function(t){var d=document.createElement('div');d.className='word';d.textContent=t;w.appendChild(d)});
+var ib=$('inputs');for(let i=0;i<12;i++){var inp=document.createElement('input');inp.placeholder='第 '+(i+1)+' 个';inp.dataset.i=i;ib.appendChild(inp);inputs.push(inp)}
+function recall(){phase='recall';$('phase').textContent='按任意顺序输入你记住的物品（12 格）';w.style.display='none';ib.style.display='grid';$('meta').style.display='flex';$('btn').textContent='提交答案'}
+function submit(){var vals=inputs.map(function(i){return i.value.trim()}).filter(Boolean);var got=0,used={};vals.forEach(function(v){for(var k=0;k<ITEMS.length;k++){if(!used[k]&&(v===ITEMS[k]||v.indexOf(ITEMS[k])>=0||ITEMS[k].indexOf(v)>=0&&v.length>=2)){got++;used[k]=true;break}}});
+var base=Math.round(got/12*100);var age=$('age').value,sex=$('sex').value;var adj=base;if(age==='60+')adj=Math.min(100,base+6);else if(age==='45-59')adj=Math.min(100,base+3);else if(age==='18-29')adj=Math.max(0,base-2);if(sex==='男')adj=Math.max(0,adj-2);
+var level=adj>=85?'优秀':adj>=70?'良好':adj>=55?'中等':'可继续练习';
+phase='result';ib.style.display='none';$('meta').style.display='none';$('result').style.display='flex';$('phase').textContent='测试结果';$('result').innerHTML='记对 <b style="color:var(--gold)">'+got+'/12</b> 个<br>得分 <b>'+adj+'</b> · '+level+'<br><span style="font-size:.85em;opacity:.75">参考区间（'+age+' / '+sex+'），仅供自测娱乐</span>';$('btn').textContent='再测一次'}
+function restart(){phase='learn';$('phase').textContent='记住 12 个常见物品';w.style.display='grid';ib.style.display='none';$('meta').style.display='flex';$('result').style.display='none';$('btn').textContent='我准备好了 · 开始回忆';inputs.forEach(function(i){i.value=''})}
+$('btn').addEventListener('click',function(){if(phase==='learn')recall();else if(phase==='recall')submit();else restart()});
+document.addEventListener('keydown',function(e){if(e.key==='Escape'){try{parent.postMessage({type:'exit'},'*')}catch(_){}}});
+window.__STM={recall:recall,submit:submit,restart:restart,setVals:function(a){inputs.forEach(function(i,k){i.value=a[k]||''})},get phase(){return phase},get items(){return ITEMS.slice()}};
+})();</script></body></html>

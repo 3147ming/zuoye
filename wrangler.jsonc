@@ -1,0 +1,24 @@
+{
+  // ============================================================
+  // wrangler.jsonc —— Cloudflare 部署配置（含联机 Durable Object）
+  // ------------------------------------------------------------
+  // 纯静态部署不需要这个文件；要用「联机对战」需要它。
+  //   npx wrangler pages deploy .
+  // 说明：
+  //   · /ws 由 functions/api/net.js 接管，浏览器同源直连即可，前端无需改地址
+  //   · ROOMS 是 Durable Object 命名空间；本地 `wrangler pages dev .` 也会起一个本地 DO
+  //   · BOARD_KV 是留言板用的 KV，没有可以不配（留言板会返回 503，不影响其它功能）
+  // ============================================================
+  "name": "worldhub",
+  "compatibility_date": "2025-01-15",
+  "compatibility_flags": ["nodejs_compat"],
+  "durable_objects": {
+    "bindings": [
+      { "name": "ROOMS", "class_name": "Rooms" }
+    ]
+  },
+  "migrations": [
+    { "tag": "v1", "new_sqlite_classes": ["Rooms"] }
+  ],
+  "observability": { "enabled": true }
+}

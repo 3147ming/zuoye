@@ -1,0 +1,17 @@
+{
+  "name": "worldhub-ws",
+  "private": true,
+  "version": "1.0.0",
+  "description": "世界大厅 · 联机房间服务（只含 server/ 与 ws，不含前端页面；供 Render/Koyeb/Fly 等免费 Node 托管部署）",
+  "main": "server/index.js",
+  "scripts": {
+    "start": "node server/index.js",
+    "test": "node server/selftest.mjs"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {
+    "ws": "^8.23.0"
+  }
+}

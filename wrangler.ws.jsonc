@@ -1,0 +1,30 @@
+{
+  // ============================================================
+  // wrangler.ws.jsonc —— 联机房间服务（独立 Worker + Durable Object）
+  // ------------------------------------------------------------
+  // 与 Pages 站点的关系：
+  //   · Pages（zuoye-e0c.pages.dev）只放静态页面
+  //   · 本 Worker（worldhub-ws.<子域>.workers.dev）只跑 /ws 房间服务
+  //   · 前端默认连同源 /ws；线上由 games/party/index.html 的
+  //     <meta name="wh-net" content="wss://.../ws"> 指定到本 Worker
+  //
+  // 部署：
+  //   node tools/build-ws.mjs
+  //   npx wrangler deploy --config wrangler.ws.jsonc
+  // 本地：
+  //   npx wrangler dev --config wrangler.ws.jsonc
+  // ============================================================
+  "name": "worldhub-ws",
+  "main": "dist/ws-worker.js",
+  "compatibility_date": "2025-01-15",
+  "compatibility_flags": ["nodejs_compat"],
+  "durable_objects": {
+    "bindings": [
+      { "name": "ROOMS", "class_name": "Rooms" }
+    ]
+  },
+  "migrations": [
+    { "tag": "v1", "new_sqlite_classes": ["Rooms"] }
+  ],
+  "observability": { "enabled": true }
+}

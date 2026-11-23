@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="zh-CN"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<link rel="icon" href="data:,"><title>CPS 点击速度</title>
+<style>
+:root{--sans:"PingFang SC","Microsoft YaHei",system-ui,sans-serif;--gold:#f6c177;--ink:#f3e9da;--dim:rgba(243,233,218,.55);--teal:#7fd8c8}
+*{box-sizing:border-box}html,body{height:100%;margin:0}
+body{background:#0b0914;color:var(--ink);font-family:var(--sans);display:flex;align-items:center;justify-content:center;padding:2vmin;overflow:hidden;user-select:none;-webkit-user-select:none;touch-action:manipulation}
+#app{width:min(100%,540px);height:100%;max-height:760px;display:flex;flex-direction:column;align-items:center;gap:clamp(10px,2.4vmin,18px);border:1px solid rgba(246,193,119,.18);border-radius:18px;background:radial-gradient(120% 90% at 50% -10%,rgba(246,193,119,.08),transparent 55%),#100d1c;padding:clamp(14px,3.4vmin,26px)}
+h1{margin:0;font-size:clamp(17px,3.4vmin,24px);letter-spacing:.08em}h1 b{color:var(--gold)}
+.segs{display:flex;gap:8px;flex-wrap:wrap;justify-content:center}
+.seg{min-height:42px;min-width:56px;padding:0 14px;border-radius:10px;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.12);color:rgba(243,233,218,.72);cursor:pointer;font-size:clamp(12px,2vmin,15px)}
+.seg.on{background:rgba(246,193,119,.2);border-color:var(--gold);color:var(--gold)}
+.pad{flex:1 1 auto;width:100%;min-height:0;border-radius:16px;background:linear-gradient(160deg,#1c1730,#151126);border:1px solid rgba(255,255,255,.1);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;cursor:pointer;transition:background 70ms,transform 60ms;overflow:hidden}
+.pad.hit{background:linear-gradient(160deg,#2a2148,#1e1838)}.pad:active{transform:scale(.995)}
+.pad .big{font-size:clamp(40px,11vmin,70px);font-weight:700;color:var(--gold);font-variant-numeric:tabular-nums;line-height:1}
+.pad .unit{color:var(--dim);font-size:clamp(12px,2vmin,15px);letter-spacing:.1em}
+.pad .sm{color:var(--dim);font-size:clamp(11px,1.9vmin,13px);font-variant-numeric:tabular-nums}
+.pad .go{color:var(--teal);font-size:clamp(13px,2.2vmin,16px);min-height:1.4em}
+.foot{display:flex;justify-content:space-between;width:100%;color:var(--dim);font-size:clamp(11px,1.9vmin,13px);font-variant-numeric:tabular-nums}
+.foot b{color:var(--ink)}
+</style></head><body><div id="app">
+<h1>CPS <b>点击速度</b></h1>
+<div class="segs" id="durs"><button class="seg" data-v="1">1 秒</button><button class="seg on" data-v="5">5 秒</button><button class="seg" data-v="10">10 秒</button><button class="seg" data-v="30">30 秒</button></div>
+<div class="pad" id="pad"><div class="big" id="count">0</div><div class="unit">次点击</div><div class="sm" id="clock">等待第一次点击</div><div class="go" id="msg">点这里开始</div></div>
+<div class="foot"><span>速度 <b id="cps">0.0</b> CPS</span><span>本地最佳 <b id="best">—</b></span></div>
+</div>
+<script>(function(){
+'use strict';var $=function(i){return document.getElementById(i)};var dur=5,count=0,startAt=0,timer=null,running=false,raf=0;
+var best=(function(){try{return Number(localStorage.getItem('ff_cps_best')||0)}catch(e){return 0}})();
+function fmtBest(){return best?best.toFixed(1):'—'}
+$('best').textContent=fmtBest();
+var segs=$('durs').querySelectorAll('.seg');for(var i=0;i<segs.length;i++)segs[i].addEventListener('click',function(){for(var j=0;j<segs.length;j++)segs[j].classList.remove('on');this.classList.add('on');dur=Number(this.getAttribute('data-v'));reset()});
+function reset(){count=0;running=false;if(timer)clearTimeout(timer);if(raf)cancelAnimationFrame(raf);$('count').textContent='0';$('cps').textContent='0.0';$('clock').textContent='等待第一次点击';$('msg').textContent='点这里开始';$('pad').classList.remove('hit')}
+function tick(){if(!running)return;var el=(performance.now()-startAt)/1000;var left=Math.max(0,dur-el);$('clock').textContent=left.toFixed(2)+'s 剩余';$('cps').textContent=(count/Math.max(0.01,el)).toFixed(1);if(left<=0){finish();return}raf=requestAnimationFrame(tick)}
+function hit(){if(!running){running=true;count=1;startAt=performance.now();$('msg').textContent='';$('clock').textContent=dur.toFixed(2)+'s 剩余';raf=requestAnimationFrame(tick)}else{count++}$('count').textContent=count;$('pad').classList.add('hit');setTimeout(function(){$('pad').classList.remove('hit')},70)}
+function finish(){running=false;if(raf)cancelAnimationFrame(raf);var cps=count/dur;$('cps').textContent=cps.toFixed(1);$('clock').textContent='结束';$('msg').textContent=cps.toFixed(1)+' CPS · '+(cps>=10?'职业级':cps>=6.5?'高于平均':'继续练');if(cps>best){best=cps;try{localStorage.setItem('ff_cps_best',String(best))}catch(e){}$('best').textContent=fmtBest()}}
+$('pad').addEventListener('pointerdown',function(e){e.preventDefault();hit()});
+document.addEventListener('keydown',function(e){if(e.repeat)return;if(e.key==='Escape'){try{parent.postMessage({type:'exit'},'*')}catch(_){}}});
+window.__CPS={hit:hit,reset:reset,finish:finish,get count(){return count},get running(){return running},get dur(){return dur}};
+})();</script></body></html>

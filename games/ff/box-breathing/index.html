@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="zh-CN"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<link rel="icon" href="data:,"><title>箱式呼吸法</title>
+<style>
+:root{--sans:"PingFang SC","Microsoft YaHei",system-ui,sans-serif;--gold:#f6c177;--ink:#f3e9da;--dim:rgba(243,233,218,.55);--teal:#7fd8c8}
+*{box-sizing:border-box}html,body{height:100%;margin:0}
+body{background:radial-gradient(120% 100% at 50% 0%,#101a2e,#08070f 75%);color:var(--ink);font-family:var(--sans);display:flex;align-items:center;justify-content:center;padding:2vmin;overflow:hidden;user-select:none;-webkit-user-select:none}
+#app{width:min(100%,520px);height:100%;max-height:800px;display:flex;flex-direction:column;align-items:center;gap:clamp(8px,2vmin,16px);border:1px solid rgba(127,216,200,.2);border-radius:18px;background:rgba(8,12,22,.7);padding:clamp(12px,3vmin,20px)}
+h1{margin:0;font-size:clamp(15px,3vmin,21px);letter-spacing:.06em}h1 b{color:var(--teal)}
+.tabs{display:flex;gap:6px}.tab{min-height:36px;padding:0 10px;border-radius:9px;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.12);color:rgba(243,233,218,.7);cursor:pointer;font-size:clamp(11px,1.9vmin,13px)}
+.tab.on{background:rgba(127,216,200,.18);border-color:var(--teal);color:var(--teal)}
+.stage{flex:1 1 auto;width:100%;min-height:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px}
+.lotus{width:min(52vmin,280px);height:min(52vmin,280px);display:flex;align-items:center;justify-content:center}
+.lotus svg{width:100%;height:100%;transition:transform linear}
+.phase{font-size:clamp(20px,5vmin,32px);color:var(--gold);font-weight:600;min-height:1.3em}
+.count{font-size:clamp(13px,2.4vmin,17px);color:var(--teal);font-variant-numeric:tabular-nums}
+.top{display:flex;gap:clamp(14px,4vmin,28px);color:var(--dim);font-size:clamp(11px,2vmin,14px);font-variant-numeric:tabular-nums}
+.top b{color:var(--ink)}
+.bigbtn{min-height:46px;padding:0 22px;border-radius:11px;border:1px solid transparent;cursor:pointer;font-size:clamp(13px,2.2vmin,16px);font-weight:600;background:linear-gradient(160deg,#9fe8dc,#4fc4b0);color:#06231d}
+.tip{color:var(--dim);font-size:clamp(11px,1.9vmin,13px);text-align:center;line-height:1.6}
+</style></head><body><div id="app">
+<h1>箱式 <b>呼吸法</b></h1>
+<div class="tabs" id="tabs"><button class="tab" data-v="resonance">共振 4-6</button><button class="tab on" data-v="box">箱式 4-4-4-4</button><button class="tab" data-v="478">4-7-8</button></div>
+<div class="stage">
+<div class="lotus"><svg id="lotus" viewBox="0 0 200 200"><g id="petals"></g><circle cx="100" cy="100" r="16" fill="#ffe9a8" opacity=".9"/></svg></div>
+<div class="phase" id="phase">准备</div><div class="count" id="count">—</div>
+<div class="top"><span>周期 <b id="cycles">0</b></span><span>已用 <b id="elapsed">0:00</b></span><span>目标 <b id="goal">5:00</b></span></div>
+</div>
+<div class="tip" id="tip">莲花展开时吸气，收拢时呼气。用鼻子呼吸，让腹部自然起伏。</div>
+<div><button class="bigbtn" id="btn">开始呼吸</button></div>
+</div>
+<script>(function(){
+'use strict';var $=function(i){return document.getElementById(i)};var lotus=$('lotus'),petals=$('petals');
+/* 生成莲花花瓣 */
+for(let ring=0;ring<3;ring++){var n=8+ring*4;for(let i=0;i<n;i++){var a=i*Math.PI*2/n;var el=document.createElementNS('http://www.w3.org/2000/svg','ellipse');el.setAttribute('cx',100+Math.cos(a)*(26+ring*22));el.setAttribute('cy',100+Math.sin(a)*(26+ring*22));el.setAttribute('rx',20);el.setAttribute('ry',9);el.setAttribute('transform','rotate('+(a*180/Math.PI)+' '+(100+Math.cos(a)*(26+ring*22))+' '+(100+Math.sin(a)*(26+ring*22))+')');el.setAttribute('fill',ring===0?'rgba(127,216,200,.55)':ring===1?'rgba(127,216,200,.35)':'rgba(246,193,119,.28)');petals.appendChild(el)}}
+var MODES={resonance:{phases:[{name:'吸气',dur:4,scale:1.35},{name:'呼气',dur:6,scale:.72}],goal:300,tip:'每分钟约 6 次呼吸 · 莲花展开吸气、收拢呼气'},box:{phases:[{name:'吸气',dur:4,scale:1.35},{name:'屏息',dur:4,scale:1.35},{name:'呼气',dur:4,scale:.72},{name:'屏息',dur:4,scale:.72}],goal:300,tip:'4-4-4-4 方块呼吸 · 吸气4 / 屏4 / 呼4 / 屏4'},'478':{phases:[{name:'吸气',dur:4,scale:1.35},{name:'屏息',dur:7,scale:1.35},{name:'呼气',dur:8,scale:.72}],goal:300,tip:'4-7-8 助眠呼吸 · 吸气4 / 屏7 / 呼8'}};
+var mode='box',running=false,cycles=0,startAt=0,raf=0,phaseIdx=0,phaseStart=0;
+var tabs=$('tabs').querySelectorAll('.tab');for(var i=0;i<tabs.length;i++)tabs[i].addEventListener('click',function(){for(var j=0;j<tabs.length;j++)tabs[j].classList.remove('on');this.classList.add('on');mode=this.getAttribute('data-v');reset()});
+function fmt(s){return Math.floor(s/60)+':'+String(Math.floor(s%60)).padStart(2,'0')}
+function reset(){running=false;if(raf)cancelAnimationFrame(raf);cycles=0;phaseIdx=0;$('phase').textContent='准备';$('count').textContent='—';$('cycles').textContent='0';$('elapsed').textContent='0:00';$('goal').textContent=fmt(MODES[mode].goal);$('tip').textContent=MODES[mode].tip;lotus.style.transform='scale(.85)';$('btn').textContent='开始呼吸'}
+function loop(ts){if(!running)return;var el=(performance.now()-startAt)/1000;if(el>=MODES[mode].goal){finish();return}$('elapsed').textContent=fmt(el);
+var ph=MODES[mode].phases[phaseIdx];var pEl=(performance.now()-phaseStart)/1000;if(pEl>=ph.dur){phaseIdx=(phaseIdx+1)%MODES[mode].phases.length;if(phaseIdx===0)cycles++;phaseStart=performance.now();pEl=0;ph=MODES[mode].phases[phaseIdx];$('cycles').textContent=cycles}
+$('phase').textContent=ph.name;$('count').textContent=Math.ceil(ph.dur-pEl)+'s';
+/* 平滑缩放：从上一阶段末值过渡到当前目标值 */
+var prev=MODES[mode].phases[(phaseIdx-1+MODES[mode].phases.length)%MODES[mode].phases.length];var from=prev.scale,to=ph.scale;var t=Math.min(1,pEl/ph.dur);var scale=from+(to-from)*t;lotus.style.transform='scale('+scale.toFixed(3)+')';
+raf=requestAnimationFrame(loop)}
+function start(){reset();running=true;startAt=performance.now();phaseStart=startAt;$('btn').textContent='暂停';raf=requestAnimationFrame(loop)}
+function pause(){running=false;if(raf)cancelAnimationFrame(raf);$('btn').textContent='继续'}
+function resume(){running=true;var now=performance.now();startAt=now-(Number($('elapsed').textContent.split(':')[0])*60+Number($('elapsed').textContent.split(':')[1]))*1000;phaseStart=now;$('btn').textContent='暂停';raf=requestAnimationFrame(loop)}
+function finish(){running=false;if(raf)cancelAnimationFrame(raf);$('phase').textContent='完成';$('count').textContent='✓';$('btn').textContent='再来一次';$('tip').textContent='完成 '+cycles+' 个呼吸周期，做得好。'}
+$('btn').addEventListener('click',function(){var t=$('btn').textContent;if(t==='开始呼吸'||t==='再来一次')start();else if(t==='暂停')pause();else if(t==='继续')resume()});
+document.addEventListener('keydown',function(e){if(e.key==='Escape'){try{parent.postMessage({type:'exit'},'*')}catch(_){}}});
+window.__BREATH={start:start,pause:pause,resume:resume,reset:reset,setMode:function(m){mode=m},get mode(){return mode},get cycles(){return cycles},get phaseIdx(){return phaseIdx}};
+reset();})();</script></body></html>

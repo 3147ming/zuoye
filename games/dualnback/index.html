@@ -1,0 +1,489 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<link rel="icon" href="data:,">
+<title>双重 N-Back</title>
+<style>
+  :root{
+    --sans:"PingFang SC","Microsoft YaHei",system-ui,-apple-system,sans-serif;
+    --gold:#f6c177; --teal:#7fd8c8; --bad:#ff9f9f;
+    --ink:#f3e9da; --dim:rgba(243,233,218,.55);
+  }
+  *{box-sizing:border-box}
+  html,body{height:100%;margin:0}
+  body{
+    background:#0b0914;color:var(--ink);font-family:var(--sans);
+    display:flex;align-items:center;justify-content:center;
+    padding:clamp(8px,2vmin,20px);overflow:hidden;
+    user-select:none;-webkit-user-select:none;-webkit-touch-callout:none;
+  }
+  button{font-family:inherit;-webkit-tap-highlight-color:transparent}
+
+  #app{
+    width:min(100%,560px);height:100%;max-height:760px;
+    display:flex;flex-direction:column;
+    border:1px solid rgba(246,193,119,.18);border-radius:18px;
+    background:radial-gradient(120% 90% at 50% -10%,rgba(246,193,119,.08),transparent 55%),#100d1c;
+    box-shadow:0 20px 60px rgba(0,0,0,.5);
+    overflow:hidden;position:relative;
+  }
+
+  /* ---------- 顶栏 ---------- */
+  .top{
+    display:flex;align-items:center;justify-content:space-between;
+    padding:clamp(10px,2.2vmin,18px) clamp(14px,3vmin,24px);
+    border-bottom:1px solid rgba(255,255,255,.06);flex:0 0 auto;
+  }
+  .brand{font-size:clamp(13px,2.4vmin,17px);letter-spacing:.14em;color:rgba(243,233,218,.8)}
+  .brand b{color:var(--gold);font-weight:600}
+  .top-btns{display:flex;gap:8px}
+  .icon-btn{
+    min-width:44px;min-height:44px;padding:0 12px;
+    border-radius:11px;background:rgba(255,255,255,.05);
+    border:1px solid rgba(255,255,255,.12);color:rgba(243,233,218,.75);
+    font-size:clamp(12px,2vmin,15px);cursor:pointer;letter-spacing:.06em;
+  }
+  .icon-btn:active{background:rgba(255,255,255,.12)}
+
+  /* ---------- 主体 ---------- */
+  .main{flex:1 1 auto;display:flex;flex-direction:column;align-items:center;
+        justify-content:center;gap:clamp(8px,1.8vmin,16px);padding:clamp(8px,2vmin,18px);
+        min-height:0}
+  .round{font-size:clamp(12px,2.2vmin,16px);color:var(--dim);letter-spacing:.12em;
+         font-variant-numeric:tabular-nums}
+  .round b{color:var(--gold);font-weight:600}
+
+  .grid{
+    display:grid;grid-template-columns:repeat(3,1fr);grid-template-rows:repeat(3,1fr);
+    gap:clamp(5px,1.1vmin,9px);
+    width:min(60vmin,330px);height:min(60vmin,330px);
+  }
+  .cell{
+    border-radius:clamp(8px,1.6vmin,13px);
+    background:rgba(255,255,255,.055);
+    border:1px solid rgba(255,255,255,.045);
+    display:flex;align-items:center;justify-content:center;
+    transition:background 90ms linear,box-shadow 90ms linear,transform 90ms linear;
+  }
+  .cell.on{
+    background:linear-gradient(160deg,#ffd89a,#f0a94f);
+    box-shadow:0 0 22px rgba(246,193,119,.5);
+    transform:scale(.96);
+  }
+  /* 中心格固定显示字母 */
+  .cell.center{
+    background:rgba(127,216,200,.06);
+    border-color:rgba(127,216,200,.16);
+  }
+  .letter{
+    font-size:clamp(34px,9vmin,64px);font-weight:700;letter-spacing:.02em;
+    color:var(--teal);line-height:1;min-height:1em;
+  }
+  .letter.show{color:var(--teal)}
+  .letter.dim{opacity:.18}
+
+  /* ---------- 响应按钮 ---------- */
+  .respond{display:flex;gap:clamp(8px,2vmin,16px);width:100%;justify-content:center}
+  .rbtn{
+    flex:1 1 0;max-width:200px;min-height:52px;
+    border-radius:14px;cursor:pointer;font-size:clamp(13px,2.3vmin,17px);
+    letter-spacing:.05em;display:flex;align-items:center;justify-content:center;gap:8px;
+    transition:background 90ms,transform 90ms,border-color 90ms;
+    border:1px solid transparent;
+  }
+  .rbtn small{font-size:.72em;opacity:.7}
+  .rbtn-pos{background:rgba(127,216,200,.12);border-color:rgba(127,216,200,.42);color:#d8fff5}
+  .rbtn-snd{background:rgba(246,193,119,.12);border-color:rgba(246,193,119,.42);color:#ffe9c7}
+  .rbtn-pos:active,.rbtn-snd:active{transform:scale(.96)}
+  .rbtn.armed-pos{background:rgba(127,216,200,.32);box-shadow:0 0 16px rgba(127,216,200,.4)}
+  .rbtn.armed-snd{background:rgba(246,193,119,.32);box-shadow:0 0 16px rgba(246,193,119,.4)}
+
+  /* ---------- 实时统计 ---------- */
+  .stats{display:flex;gap:clamp(10px,2.4vmin,22px);font-size:clamp(11px,1.9vmin,14px);
+         color:var(--dim);font-variant-numeric:tabular-nums;flex-wrap:wrap;justify-content:center}
+  .stats b{font-weight:600}
+  .stats .hit{color:#7fd8a8}.stats .miss{color:var(--gold)}.stats .fa{color:var(--bad)}
+
+  /* ---------- 覆盖面板（教程/设置/结算） ---------- */
+  .overlay{position:absolute;inset:0;z-index:10;display:none;
+           align-items:center;justify-content:center;padding:clamp(14px,3vmin,28px);
+           background:rgba(8,6,16,.9);backdrop-filter:blur(4px)}
+  .overlay.on{display:flex}
+  .panel{width:100%;max-width:400px;max-height:100%;overflow-y:auto;
+         border-radius:16px;border:1px solid rgba(246,193,119,.24);
+         background:linear-gradient(155deg,#1b1430,#120d22);
+         padding:clamp(18px,4vmin,30px)}
+  .panel h2{margin:0 0 4px;font-size:clamp(18px,3.4vmin,24px);color:var(--gold);
+            letter-spacing:.08em;font-weight:600}
+  .panel .sub{margin:0 0 18px;font-size:clamp(12px,2vmin,14px);color:var(--dim);line-height:1.6}
+  .panel p{margin:0 0 12px;font-size:clamp(12px,2.1vmin,14px);line-height:1.75;color:rgba(243,233,218,.82)}
+  .panel ol{margin:0 0 16px;padding-left:20px;font-size:clamp(12px,2.1vmin,14px);line-height:1.9;color:rgba(243,233,218,.82)}
+  .panel .k{display:inline-block;padding:1px 7px;border-radius:5px;background:rgba(246,193,119,.16);
+            border:1px solid rgba(246,193,119,.35);color:var(--gold);font-size:.9em}
+
+  .field{margin-bottom:16px}
+  .field label{display:block;font-size:clamp(12px,2vmin,14px);color:rgba(243,233,218,.72);margin-bottom:8px}
+  .segs{display:flex;gap:8px;flex-wrap:wrap}
+  .seg{flex:1 1 auto;min-width:52px;min-height:44px;padding:0 10px;border-radius:10px;cursor:pointer;
+       background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.12);
+       color:rgba(243,233,218,.7);font-size:clamp(12px,2vmin,14px)}
+  .seg.on{background:rgba(246,193,119,.2);border-color:var(--gold);color:var(--gold)}
+  .toggle{display:flex;align-items:center;justify-content:space-between;
+          min-height:44px;font-size:clamp(12px,2vmin,14px);color:rgba(243,233,218,.78)}
+  .switch{width:48px;height:28px;border-radius:99px;background:rgba(255,255,255,.12);
+          position:relative;cursor:pointer;transition:background 120ms;flex:0 0 auto}
+  .switch::after{content:"";position:absolute;top:3px;left:3px;width:22px;height:22px;border-radius:50%;
+                 background:#fff;transition:transform 120ms}
+  .switch.on{background:rgba(127,216,200,.5)}
+  .switch.on::after{transform:translateX(20px)}
+
+  .actions{display:flex;gap:10px;margin-top:8px}
+  .bigbtn{flex:1;min-height:50px;border-radius:12px;cursor:pointer;border:1px solid transparent;
+          font-size:clamp(14px,2.4vmin,17px);letter-spacing:.06em;font-weight:600}
+  .bigbtn.primary{background:linear-gradient(160deg,#ffd89a,#f0a94f);color:#2a1a06}
+  .bigbtn.ghost{background:rgba(255,255,255,.06);border-color:rgba(255,255,255,.16);color:rgba(243,233,218,.8)}
+  .bigbtn:active{transform:scale(.98)}
+
+  .result-score{display:flex;gap:12px;margin:6px 0 18px}
+  .score-box{flex:1;border-radius:12px;background:rgba(255,255,255,.05);
+             border:1px solid rgba(255,255,255,.08);padding:12px;text-align:center}
+  .score-box .num{font-size:clamp(26px,6vmin,40px);font-weight:700;color:var(--gold);font-variant-numeric:tabular-nums}
+  .score-box .lab{font-size:clamp(10px,1.7vmin,12px);color:var(--dim);margin-top:2px}
+  .breakdown{font-size:clamp(11px,1.9vmin,13px);line-height:1.9;color:rgba(243,233,218,.7);
+             font-variant-numeric:tabular-nums}
+  .breakdown b{color:var(--ink)}
+  .advice{margin:14px 0 0;padding:10px 12px;border-radius:10px;
+          background:rgba(127,216,200,.09);border:1px solid rgba(127,216,200,.24);
+          font-size:clamp(11px,1.9vmin,13px);line-height:1.6;color:#d8fff5}
+
+  .hint{font-size:clamp(10px,1.7vmin,12px);color:rgba(243,233,218,.38);text-align:center;
+        letter-spacing:.08em;flex:0 0 auto;padding-bottom:2px}
+  @media (max-width:480px){
+    .grid{width:min(78vmin,320px);height:min(78vmin,320px)}
+  }
+</style>
+</head>
+<body>
+<div id="app">
+  <div class="top">
+    <div class="brand">双重 · <b>N-Back</b></div>
+    <div class="top-btns">
+      <button class="icon-btn" id="btnHelp" aria-label="玩法说明">? 玩法</button>
+      <button class="icon-btn" id="btnSet" aria-label="设置">⚙ 设置</button>
+    </div>
+  </div>
+
+  <div class="main">
+    <div class="round" id="round">准备开始 · <b>1-back</b></div>
+    <div class="grid" id="grid"></div>
+    <div class="respond">
+      <button class="rbtn rbtn-pos" id="btnPos"><small>A</small> 位置匹配</button>
+      <button class="rbtn rbtn-snd" id="btnSnd"><small>L</small> 声音匹配</button>
+    </div>
+    <div class="stats" id="stats">
+      <span>位置 <b class="hit" id="pHit">0</b>/<b class="miss" id="pMiss">0</b>/<b class="fa" id="pFa">0</b></span>
+      <span>字母 <b class="hit" id="lHit">0</b>/<b class="miss" id="lMiss">0</b>/<b class="fa" id="lFa">0</b></span>
+    </div>
+  </div>
+  <div class="hint">命中 / 漏报 / 误报 · 按 A 或 L 响应</div>
+
+  <!-- 教程 -->
+  <div class="overlay on" id="ovHelp">
+    <div class="panel">
+      <h2>双重 N-Back 怎么玩</h2>
+      <p class="sub">同时盯住"位置"和"字母"两条信息流，训练工作记忆。</p>
+      <ol>
+        <li>网格里有个亮块在移动，中心会显示一个字母。</li>
+        <li>当<b>亮块位置</b>和 <b>N 步之前</b>一样时，按 <span class="k">A</span>（位置匹配）。</li>
+        <li>当<b>字母</b>和 <b>N 步之前</b>一样时，按 <span class="k">L</span>（声音匹配）。</li>
+        <li>两条流各自独立判断，可同时按。先稳再快。</li>
+      </ol>
+      <p style="opacity:.7;font-size:.92em">从 1-back 起步；连续几轮稳定到 80%–85% 再升一级。每次练 15–20 分钟即可。</p>
+      <div class="actions">
+        <button class="bigbtn ghost" id="helpSet">改设置</button>
+        <button class="bigbtn primary" id="helpStart">我懂了，开始</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 设置 -->
+  <div class="overlay" id="ovSet">
+    <div class="panel">
+      <h2>设置</h2>
+      <p class="sub">调好难度与节奏，再开始训练。</p>
+      <div class="field">
+        <label>N-Back 级别</label>
+        <div class="segs" id="segN">
+          <button class="seg on" data-v="1">1-back</button>
+          <button class="seg" data-v="2">2-back</button>
+          <button class="seg" data-v="3">3-back</button>
+          <button class="seg" data-v="4">4-back</button>
+        </div>
+      </div>
+      <div class="field">
+        <label>回合数</label>
+        <div class="segs" id="segRounds">
+          <button class="seg" data-v="10">10</button>
+          <button class="seg on" data-v="20">20</button>
+          <button class="seg" data-v="30">30</button>
+          <button class="seg" data-v="40">40</button>
+        </div>
+      </div>
+      <div class="field">
+        <label>节奏</label>
+        <div class="segs" id="segSpeed">
+          <button class="seg" data-v="slow">慢</button>
+          <button class="seg on" data-v="mid">中</button>
+          <button class="seg" data-v="fast">快</button>
+        </div>
+      </div>
+      <div class="field">
+        <div class="toggle"><span>显示字母（无音频也能玩）</span>
+          <div class="switch on" id="swLetter" role="switch" aria-checked="true"></div></div>
+        <div class="toggle"><span>朗读字母</span>
+          <div class="switch on" id="swVoice" role="switch" aria-checked="true"></div></div>
+      </div>
+      <div class="actions">
+        <button class="bigbtn ghost" id="setBack">返回</button>
+        <button class="bigbtn primary" id="setStart">开始训练</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 结算 -->
+  <div class="overlay" id="ovResult">
+    <div class="panel">
+      <h2>本轮结束</h2>
+      <p class="sub" id="resSub">回合完成，看看表现。</p>
+      <div class="result-score">
+        <div class="score-box"><div class="num" id="resPos">0%</div><div class="lab">位置准确率</div></div>
+        <div class="score-box"><div class="num" id="resLet">0%</div><div class="lab">字母准确率</div></div>
+        <div class="score-box"><div class="num" id="resAll">0%</div><div class="lab">综合</div></div>
+      </div>
+      <div class="breakdown" id="resBreak"></div>
+      <div class="advice" id="resAdvice"></div>
+      <div class="actions">
+        <button class="bigbtn ghost" id="resSet">改设置</button>
+        <button class="bigbtn primary" id="resAgain">再来一轮</button>
+      </div>
+      <div class="actions" id="adviceRow" style="display:none">
+        <button class="bigbtn ghost" id="resUp" style="flex:1">↑ 升一级再练</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+(function(){
+  'use strict';
+  var LETTERS = ['C','F','H','J','K','L','P','R'];   /* 8 个不易混淆的字母 */
+  var POSITIONS = [0,1,2,4,5,6,7,8];                 /* 3×3 去掉中心，8 个周边格 */
+  var SPEED = { slow:{on:1100,off:1300}, mid:{on:850,off:1050}, fast:{on:620,off:780} };
+
+  var cfg = { n:1, rounds:20, speed:'mid', showLetter:true, voice:true, matchRate:0.3 };
+  var state = {
+    phase:'idle', idx:0, trials:[], timers:[],
+    stats:{ pos:{hit:0,miss:0,fa:0,cr:0}, letter:{hit:0,miss:0,fa:0,cr:0} }
+  };
+
+  var $ = function(id){ return document.getElementById(id); };
+  var cells = [], letterEl, roundEl;
+
+  function buildGrid(){
+    var g = $('grid'); g.innerHTML=''; cells=[]; roundEl = $('round');
+    for (var i=0;i<9;i++){
+      var d=document.createElement('div');
+      d.className='cell'+(i===4?' center':'');
+      if (i===4){ letterEl=document.createElement('div'); letterEl.className='letter show'; letterEl.textContent='·'; d.appendChild(letterEl); }
+      g.appendChild(d); cells.push(d);
+    }
+  }
+
+  /* ---------- 判定：核心纯函数 ---------- */
+  function judge(isMatch, responded){
+    if (isMatch && responded) return 'hit';
+    if (isMatch && !responded) return 'miss';
+    if (!isMatch && responded) return 'fa';
+    return 'cr';
+  }
+  function pickDifferent(pool, prev){
+    var v;
+    do { v = pool[Math.floor(Math.random()*pool.length)]; } while (pool.length>1 && v===prev);
+    return v;
+  }
+  function makeTrial(i){
+    var n=cfg.n, canMatch=i>=n, prev=state.trials[i-1]||null;
+    var pos, letter;
+    if (canMatch && Math.random()<cfg.matchRate) pos = state.trials[i-n].pos;
+    else pos = pickDifferent(POSITIONS, prev?prev.pos:-1);
+    if (canMatch && Math.random()<cfg.matchRate) letter = state.trials[i-n].letter;
+    else letter = pickDifferent(LETTERS, prev?prev.letter:'');
+    return { pos:pos, letter:letter, respPos:false, respLetter:false, settled:false };
+  }
+
+  /* ---------- 语音 ---------- */
+  function speak(ch){
+    if (!cfg.voice) return;
+    try {
+      if (!('speechSynthesis' in window)) return;
+      window.speechSynthesis.cancel();
+      var u = new SpeechSynthesisUtterance(ch);
+      u.lang='en-US'; u.rate=0.9; u.pitch=1;
+      window.speechSynthesis.speak(u);
+    } catch(e){}
+  }
+
+  function renderStimulus(t){
+    for (var i=0;i<9;i++) cells[i].classList.toggle('on', i===t.pos);
+    letterEl.textContent = t.letter;
+    letterEl.className = 'letter ' + (cfg.showLetter?'show':'dim');
+    speak(t.letter);
+  }
+  function clearStimulus(){
+    for (var i=0;i<9;i++) cells[i].classList.remove('on');
+    letterEl.textContent='·'; letterEl.className='letter dim';
+  }
+  function updateRound(){
+    if (state.idx < cfg.n) roundEl.innerHTML='准备 · <b>'+cfg.n+'-back</b>';
+    else roundEl.innerHTML='回合 <b>'+Math.min(state.idx-cfg.n+1,cfg.rounds)+'</b> / '+cfg.rounds+' · '+cfg.n+'-back';
+  }
+  function updateStats(){
+    var p=state.stats.pos,l=state.stats.letter;
+    $('pHit').textContent=p.hit;$('pMiss').textContent=p.miss;$('pFa').textContent=p.fa;
+    $('lHit').textContent=l.hit;$('lMiss').textContent=l.miss;$('lFa').textContent=l.fa;
+  }
+  function later(fn,ms){ var id=setTimeout(fn,ms); state.timers.push(id); return id; }
+  function clearTimers(){ state.timers.forEach(clearTimeout); state.timers=[]; }
+
+  function runTrial(){
+    if (state.phase!=='play') return;
+    if (state.idx>=state.trials.length){ finish(); return; }
+    var t=state.trials[state.idx];
+    updateRound();
+    renderStimulus(t);
+    var sp=SPEED[cfg.speed];
+    later(function(){ clearStimulus(); }, sp.on);
+    later(function(){
+      settle(state.idx);
+      state.idx++;
+      updateStats();
+      runTrial();
+    }, sp.on+sp.off);
+  }
+  function settle(i){
+    if (i<cfg.n) return;                    /* 前 N 个是预热，不计分 */
+    var cur=state.trials[i], old=state.trials[i-cfg.n];
+    if (!cur || !old || cur.settled) return;
+    cur.settled=true;
+    var pj=judge(cur.pos===old.pos, cur.respPos);
+    var lj=judge(cur.letter===old.letter, cur.respLetter);
+    state.stats.pos[pj]++; state.stats.letter[lj]++;
+  }
+
+  function respond(dim){
+    if (state.phase!=='play') return;
+    var t=state.trials[state.idx];
+    if (!t) return;
+    if (dim==='pos' && !t.respPos){ t.respPos=true; flash($('btnPos'),'armed-pos'); }
+    if (dim==='snd' && !t.respLetter){ t.respLetter=true; flash($('btnSnd'),'armed-snd'); }
+  }
+  function flash(el,cls){ el.classList.add(cls); later(function(){ el.classList.remove(cls); },140); }
+
+  function start(){
+    clearTimers();
+    state.phase='play'; state.idx=0; state.trials=[];
+    state.stats={ pos:{hit:0,miss:0,fa:0,cr:0}, letter:{hit:0,miss:0,fa:0,cr:0} };
+    for (var i=0;i<cfg.rounds+cfg.n;i++) state.trials.push(makeTrial(i));
+    updateStats(); closeAll(); runTrial();
+  }
+  function finish(){
+    state.phase='done'; clearStimulus(); clearTimers();
+    try{ if ('speechSynthesis' in window) window.speechSynthesis.cancel(); }catch(e){}
+    var p=state.stats.pos,l=state.stats.letter;
+    function acc(s){ var tot=s.hit+s.miss+s.fa+s.cr; return tot?Math.round((s.hit+s.cr)/tot*100):0; }
+    var ap=acc(p),al=acc(l),aa=Math.round((ap+al)/2);
+    $('resPos').textContent=ap+'%';$('resLet').textContent=al+'%';$('resAll').textContent=aa+'%';
+    $('resBreak').innerHTML=
+      '位置：命中 <b>'+p.hit+'</b> · 漏报 <b>'+p.miss+'</b> · 误报 <b>'+p.fa+'</b> · 正确拒绝 <b>'+p.cr+'</b><br>'+
+      '字母：命中 <b>'+l.hit+'</b> · 漏报 <b>'+l.miss+'</b> · 误报 <b>'+l.fa+'</b> · 正确拒绝 <b>'+l.cr+'</b>';
+    var advice, showUp=false;
+    if (aa>=80 && cfg.n<4){ advice='综合准确率 '+aa+'%，稳！可以试试升到 '+(cfg.n+1)+'-back。'; showUp=true; }
+    else if (aa<50 && cfg.n>1){ advice='综合准确率 '+aa+'%，有点吃力。降回 '+(cfg.n-1)+'-back 打牢基础更好。'; }
+    else if (aa>=80){ advice='综合准确率 '+aa+'%，已经到 4-back 顶配，非常稳。'; }
+    else { advice='综合准确率 '+aa+'%，继续在当前级别练习，稳定到 80% 左右再升级。'; }
+    $('resAdvice').textContent=advice;
+    $('adviceRow').style.display=showUp?'flex':'none';
+    $('resSub').textContent=cfg.rounds+' 回合 · '+cfg.n+'-back 完成';
+    closeAll(); $('ovResult').classList.add('on');
+  }
+
+  /* ---------- 覆盖面板 ---------- */
+  function closeAll(){ ['ovHelp','ovSet','ovResult'].forEach(function(id){ $(id).classList.remove('on'); }); }
+  function openSet(){ closeAll(); syncSetUI(); $('ovSet').classList.add('on'); }
+  function syncSetUI(){
+    function mark(wrap,val){ var bs=$(wrap).querySelectorAll('.seg'); for(var i=0;i<bs.length;i++) bs[i].classList.toggle('on', bs[i].getAttribute('data-v')===String(val)); }
+    mark('segN',cfg.n);mark('segRounds',cfg.rounds);mark('segSpeed',cfg.speed);
+    $('swLetter').classList.toggle('on',cfg.showLetter);$('swLetter').setAttribute('aria-checked',String(cfg.showLetter));
+    $('swVoice').classList.toggle('on',cfg.voice);$('swVoice').setAttribute('aria-checked',String(cfg.voice));
+  }
+  function bindSegs(wrap,key,cast){
+    var bs=$(wrap).querySelectorAll('.seg');
+    for (var i=0;i<bs.length;i++) bs[i].addEventListener('click',function(){
+      for (var j=0;j<bs.length;j++) bs[j].classList.remove('on');
+      this.classList.add('on'); cfg[key]=cast?cast(this.getAttribute('data-v')):this.getAttribute('data-v');
+    });
+  }
+  function bindSwitch(id,key){
+    $(id).addEventListener('click',function(){
+      cfg[key]=!cfg[key]; this.classList.toggle('on',cfg[key]); this.setAttribute('aria-checked',String(cfg[key]));
+    });
+  }
+
+  /* ---------- 事件 ---------- */
+  $('btnPos').addEventListener('click',function(){ respond('pos'); });
+  $('btnSnd').addEventListener('click',function(){ respond('snd'); });
+  document.addEventListener('keydown',function(e){
+    if (e.repeat) return;
+    var k=e.key.toLowerCase();
+    if (k==='a'){ respond('pos'); e.preventDefault(); }
+    else if (k==='l'){ respond('snd'); e.preventDefault(); }
+    else if (k==='escape'){ try{ parent.postMessage({type:'exit'},'*'); }catch(_){} }
+  });
+  $('btnHelp').addEventListener('click',function(){ closeAll(); $('ovHelp').classList.add('on'); });
+  $('btnSet').addEventListener('click',function(){ state.phase='idle'; clearTimers(); openSet(); });
+  $('helpSet').addEventListener('click',openSet);
+  $('helpStart').addEventListener('click',start);
+  $('setBack').addEventListener('click',function(){ closeAll(); if(state.trials.length) $('ovHelp').classList.add('on'); else $('ovHelp').classList.add('on'); });
+  $('setStart').addEventListener('click',start);
+  $('resSet').addEventListener('click',openSet);
+  $('resAgain').addEventListener('click',start);
+  $('resUp').addEventListener('click',function(){ cfg.n=Math.min(4,cfg.n+1); start(); });
+  bindSegs('segN','n',Number);
+  bindSegs('segRounds','rounds',Number);
+  bindSegs('segSpeed','speed');
+  bindSwitch('swLetter','showLetter');
+  bindSwitch('swVoice','voice');
+
+  document.addEventListener('visibilitychange',function(){
+    if (document.hidden && state.phase==='play'){
+      clearTimers(); clearStimulus(); state.phase='paused';
+    } else if (!document.hidden && state.phase==='paused'){
+      state.phase='play'; runTrial();   /* 从当前回合继续，统计不清零 */
+    }
+  });
+
+  /* 测试钩子：供验收脚本驱动判定逻辑，不影响正常游戏 */
+  window.__DNB = {
+    cfg:cfg, state:state, judge:judge, makeTrial:makeTrial,
+    start:start, respond:respond, settle:settle, finish:finish,
+    setConfig:function(o){ for(var k in o) if (k in cfg) cfg[k]=o[k]; },
+    forceSequence:function(arr){ state.trials=arr.map(function(x){ return {pos:x.pos,letter:x.letter,respPos:false,respLetter:false,settled:false}; }); }
+  };
+
+  buildGrid(); updateRound(); updateStats();
+})();
+</script>
+</body>
+</html>

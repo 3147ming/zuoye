@@ -1,0 +1,15 @@
+# Render / Railway / Koyeb 等平台会读这个文件；
+# 不写也行，平台一般能自动识别 Node 项目。写成显式配置更保险。
+services:
+  - type: web
+    name: worldhub-ws
+    runtime: node
+    plan: free
+    buildCommand: npm install --omit=dev
+    startCommand: node server/index.js
+    healthCheckPath: /healthz
+    envVars:
+      - key: HOST
+        value: 0.0.0.0
+      - key: NODE_ENV
+        value: production

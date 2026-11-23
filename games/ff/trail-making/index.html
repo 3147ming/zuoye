@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="zh-CN"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<link rel="icon" href="data:,"><title>连线测试</title>
+<style>
+:root{--sans:"PingFang SC","Microsoft YaHei",system-ui,sans-serif;--gold:#f6c177;--ink:#f3e9da;--dim:rgba(243,233,218,.55);--teal:#7fd8c8;--bad:#ff9f9f}
+*{box-sizing:border-box}html,body{height:100%;margin:0}
+body{background:#0b0914;color:var(--ink);font-family:var(--sans);display:flex;align-items:center;justify-content:center;padding:2vmin;overflow:hidden;user-select:none;-webkit-user-select:none;touch-action:manipulation}
+#app{width:min(100%,600px);height:100%;max-height:800px;display:flex;flex-direction:column;align-items:center;gap:clamp(8px,2vmin,14px);border:1px solid rgba(246,193,119,.18);border-radius:18px;background:radial-gradient(120% 90% at 50% -10%,rgba(246,193,119,.08),transparent 55%),#100d1c;padding:clamp(12px,3vmin,20px)}
+h1{margin:0;font-size:clamp(16px,3.2vmin,22px);letter-spacing:.06em}h1 b{color:var(--gold)}
+.tabs{display:flex;gap:8px}.seg{min-height:38px;padding:0 14px;border-radius:9px;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.12);color:rgba(243,233,218,.72);cursor:pointer;font-size:clamp(11px,2vmin,13px)}
+.seg.on{background:rgba(246,193,119,.2);border-color:var(--gold);color:var(--gold)}
+.top{display:flex;gap:clamp(14px,4vmin,30px);color:var(--dim);font-size:clamp(11px,2vmin,14px);font-variant-numeric:tabular-nums}
+.top b{color:var(--ink)}.top .next b{color:var(--teal)}
+.canv{aspect-ratio:1;width:var(--side,100%);max-width:100%;max-height:100%;margin:auto;position:relative;border-radius:14px;overflow:hidden;background:#f2efe8}
+canvas{width:100%;height:100%;display:block;touch-action:manipulation}
+.msg{color:var(--dim);font-size:clamp(11px,2vmin,14px);text-align:center;min-height:1.4em}
+.bigbtn{min-height:44px;padding:0 20px;border-radius:11px;border:1px solid transparent;cursor:pointer;font-size:clamp(13px,2.2vmin,16px);font-weight:600;background:linear-gradient(160deg,#ffd89a,#f0a94f);color:#2a1a06}
+</style></head><body><div id="app">
+<h1>连线 <b>测试</b></h1>
+<div class="tabs" id="tabs"><button class="seg on" data-v="A">A 部分</button><button class="seg" data-v="B">B 部分</button><button class="seg" data-v="AB">A+B</button></div>
+<div class="top"><span>时间 <b id="clock">0.0s</b></span><span class="next">下一个 <b id="target">1</b></span><span>错误 <b id="err">0</b></span></div>
+<div class="canv"><canvas id="cv"></canvas></div>
+<div class="msg" id="msg">A：按 1→25 顺序点圆点 · B：1→A→2→B…交替</div>
+<div><button class="bigbtn" id="btn">开始</button></div>
+</div>
+<script>(function(){
+'use strict';var $=function(i){return document.getElementById(i)};var cv=$('cv'),ctx=cv.getContext('2d');var mode='A',nodes=[],seq=[],idx=0,errs=0,startAt=0,raf=0,running=false,W=0,H=0,partTimes={};
+function buildSeq(){seq=[];if(mode==='A'||mode==='AB'){for(let i=1;i<=25;i++)seq.push(String(i))}else{for(let i=1;i<=13;i++){seq.push(String(i));if(i<=12)seq.push(String.fromCharCode(64+i))}}}
+function layout(){nodes=[];var n=seq.length,margin=0.1;var cols=Math.ceil(Math.sqrt(n*1.3)),rows=Math.ceil(n/cols);
+for(let i=0;i<n;i++){var x=W*(margin+(1-2*margin)*((i%cols)+0.5)/cols)+(Math.random()-0.5)*W*0.04;var y=H*(margin+(1-2*margin)*(Math.floor(i/cols)+0.5)/rows)+(Math.random()-0.5)*H*0.04;nodes.push({label:seq[i],x:x,y:y})}
+/* 打乱位置与标签的绑定，但保持 seq 顺序为点击顺序 */
+var labels=seq.slice();for(let i=labels.length-1;i>0;i--){var j=Math.floor(Math.random()*(i+1));var t=labels[i];labels[i]=labels[j];labels[j]=t}
+nodes.forEach(function(nd,k){nd.label=labels[k]})}
+function fitCanv(){var c=cv.parentNode,app=document.getElementById('app')||c.parentNode;
+  var cs=getComputedStyle(app);
+  var padX=(parseFloat(cs.paddingLeft)||0)+(parseFloat(cs.paddingRight)||0);
+  var padY=(parseFloat(cs.paddingTop)||0)+(parseFloat(cs.paddingBottom)||0);
+  var gap=parseFloat(cs.rowGap)||0;
+  var kids=app.children,otherH=0,count=0;
+  for(var i=0;i<kids.length;i++){if(kids[i]!==c){otherH+=kids[i].offsetHeight;count++}}
+  var availH=app.clientHeight-padY-otherH-gap*(count);
+  var availW=app.clientWidth-padX;
+  var av=Math.min(availW,availH);
+  if(av>0)c.style.setProperty('--side',av+'px')}
+function resize(){fitCanv();var dpr=window.devicePixelRatio||1,r=cv.getBoundingClientRect();W=r.width;H=r.height;cv.width=W*dpr;cv.height=H*dpr;ctx.setTransform(dpr,0,0,dpr,0,0);draw()}
+function draw(){ctx.clearRect(0,0,W,H);ctx.fillStyle='#f2efe8';ctx.fillRect(0,0,W,H);
+/* 已连的线 */
+ctx.strokeStyle='#4a90d9';ctx.lineWidth=2;ctx.beginPath();for(let i=1;i<idx;i++){var a=nodeOf(seq[i-1]),b=nodeOf(seq[i]);if(a&&b){ctx.moveTo(a.x,a.y);ctx.lineTo(b.x,b.y)}}ctx.stroke();
+nodes.forEach(function(nd){var done=seq.indexOf(nd.label)<idx;ctx.beginPath();ctx.arc(nd.x,nd.y,Math.min(W,H)*0.032,0,Math.PI*2);ctx.fillStyle=done?'#dce9f7':'#fafafa';ctx.fill();ctx.strokeStyle=done?'#4a90d9':'#333';ctx.lineWidth=1.5;ctx.stroke();ctx.fillStyle='#111';ctx.font='600 '+Math.round(Math.min(W,H)*0.03)+'px system-ui';ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText(nd.label,nd.x,nd.y)})}
+function nodeOf(label){for(let i=0;i<nodes.length;i++)if(nodes[i].label===label)return nodes[i];return null}
+function tick(){if(!running)return;$('clock').textContent=((performance.now()-startAt)/1000).toFixed(1)+'s';raf=requestAnimationFrame(tick)}
+function start(){reset();buildSeq();layout();resize();running=true;startAt=performance.now();$('btn').textContent='重新开始';$('msg').textContent='从 '+seq[0]+' 开始';raf=requestAnimationFrame(tick)}
+function reset(){running=false;if(raf)cancelAnimationFrame(raf);idx=0;errs=0;partTimes={};$('clock').textContent='0.0s';$('err').textContent='0';$('target').textContent=seq[0]||'1'}
+function pointer(e){if(!running)return;var r=cv.getBoundingClientRect(),x=e.clientX-r.left,y=e.clientY-r.top;var hit=null,bd=1e9;
+nodes.forEach(function(nd){var d=Math.hypot(x-nd.x,y-nd.y);if(d<bd){bd=d;hit=nd}});
+if(!hit||bd>Math.min(W,H)*0.05)return;
+if(hit.label===seq[idx]){idx++;if(idx>=seq.length){finish();return}$('target').textContent=seq[idx];draw()}else{errs++;$('err').textContent=errs}}
+function finish(){running=false;if(raf)cancelAnimationFrame(raf);var t=(performance.now()-startAt)/1000;$('msg').textContent='完成！用时 '+t.toFixed(1)+'s · 错误 '+errs+' 次';$('btn').textContent='再测一次';draw()}
+cv.addEventListener('pointerdown',function(e){e.preventDefault();pointer(e)});
+var segs=$('tabs').querySelectorAll('.seg');for(var i=0;i<segs.length;i++)segs[i].addEventListener('click',function(){for(var j=0;j<segs.length;j++)segs[j].classList.remove('on');this.classList.add('on');mode=this.getAttribute('data-v');reset();buildSeq();$('target').textContent=seq[0];$('msg').textContent=mode==='A'?'A：按 1→25 顺序点':mode==='B'?'B：1→A→2→B 交替':'A+B 两部分'});
+$('btn').addEventListener('click',start);window.addEventListener('resize',resize);
+document.addEventListener('keydown',function(e){if(e.key==='Escape'){try{parent.postMessage({type:'exit'},'*')}catch(_){}}});
+window.__TMT={start:start,reset:reset,pointer:pointer,setMode:function(m){mode=m;buildSeq();reset()},get seq(){return seq.slice()},get idx(){return idx},get errs(){return errs},get running(){return running}};
+buildSeq();resize();})();</script></body></html>

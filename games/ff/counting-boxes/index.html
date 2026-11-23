@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="zh-CN"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<link rel="icon" href="data:,"><title>数箱子游戏</title>
+<style>
+:root{--sans:"PingFang SC","Microsoft YaHei",system-ui,sans-serif;--gold:#f6c177;--ink:#f3e9da;--dim:rgba(243,233,218,.55);--teal:#7fd8c8;--bad:#ff9f9f}
+*{box-sizing:border-box}html,body{height:100%;margin:0}
+body{background:#0b0914;color:var(--ink);font-family:var(--sans);display:flex;align-items:center;justify-content:center;padding:2vmin;overflow:hidden;user-select:none;-webkit-user-select:none;touch-action:manipulation}
+#app{width:min(100%,560px);height:100%;max-height:780px;display:flex;flex-direction:column;align-items:center;gap:clamp(8px,2vmin,14px);border:1px solid rgba(246,193,119,.18);border-radius:18px;background:radial-gradient(120% 90% at 50% -10%,rgba(246,193,119,.08),transparent 55%),#100d1c;padding:clamp(12px,3vmin,20px);justify-content:center}
+h1{margin:0;font-size:clamp(16px,3.2vmin,22px);letter-spacing:.06em}h1 b{color:var(--gold)}
+.top{display:flex;gap:clamp(14px,4vmin,30px);color:var(--dim);font-size:clamp(11px,2vmin,14px);font-variant-numeric:tabular-nums}
+.top b{color:var(--ink)}.top .lvl b{color:var(--gold)}
+.canv{aspect-ratio:1;width:var(--side,100%);max-width:100%;max-height:100%;margin:auto;border-radius:14px;overflow:hidden;background:linear-gradient(180deg,#1b1730,#100d1c)}
+canvas{width:100%;height:100%;display:block}
+.msg{color:var(--teal);font-size:clamp(12px,2.1vmin,15px);min-height:1.4em;text-align:center}
+.answer{display:flex;gap:8px;align-items:center;justify-content:center}
+.answer input{width:90px;min-height:48px;border-radius:10px;background:rgba(255,255,255,.06);border:1px solid rgba(246,193,119,.4);color:var(--ink);text-align:center;font-size:clamp(20px,4vmin,28px);font-family:inherit;font-variant-numeric:tabular-nums}
+.answer input:focus{outline:none;border-color:var(--gold)}
+.bigbtn{min-height:46px;padding:0 18px;border-radius:11px;border:1px solid transparent;cursor:pointer;font-size:clamp(13px,2.2vmin,16px);font-weight:600;background:linear-gradient(160deg,#ffd89a,#f0a94f);color:#2a1a06}
+</style></head><body><div id="app">
+<h1>数 <b>箱子</b></h1>
+<div class="top"><span class="lvl">关卡 <b id="lvl">1</b></span><span>本关 <b id="cnt">3</b> 箱</span><span>最佳 <b id="best">—</b></span></div>
+<div class="canv"><canvas id="cv"></canvas></div>
+<div class="msg" id="msg">记住短暂出现的立方体数量</div>
+<div class="answer"><input id="ans" type="number" min="0" placeholder="?" inputmode="numeric"><button class="bigbtn" id="submit">提交</button></div>
+<div><button class="bigbtn" id="btn" style="background:rgba(255,255,255,.08);color:var(--ink);border:1px solid rgba(255,255,255,.14)">开始</button></div>
+</div>
+<script>
+function fitSide(el){var app=document.getElementById('app')||el.parentNode;
+  var cs=getComputedStyle(app);
+  var padX=(parseFloat(cs.paddingLeft)||0)+(parseFloat(cs.paddingRight)||0);
+  var padY=(parseFloat(cs.paddingTop)||0)+(parseFloat(cs.paddingBottom)||0);
+  var gap=parseFloat(cs.rowGap)||0;
+  var kids=app.children,otherH=0,count=0;
+  for(var i=0;i<kids.length;i++){if(kids[i]!==el&&kids[i].offsetParent!==null){otherH+=kids[i].offsetHeight;count++}}
+  var availH=app.clientHeight-padY-otherH-gap*count;
+  var availW=app.clientWidth-padX;
+  var av=Math.min(availW,availH);
+  if(av>0)el.style.setProperty('--side',av+'px');else el.style.removeProperty('--side')}
+(function(){
+'use strict';var $=function(i){return document.getElementById(i)};var cv=$('cv'),ctx=cv.getContext('2d');var lvl=1,count=3,W=0,H=0,phase='idle',positions=[];
+var best=(function(){try{return Number(localStorage.getItem('ff_boxes_best')||0)}catch(e){return 0}})();function showBest(){$('best').textContent=best?('第 '+best+' 关'):'—'}showBest();
+function resize(){var dpr=window.devicePixelRatio||1,r=cv.getBoundingClientRect();W=r.width;H=r.height;cv.width=W*dpr;cv.height=H*dpr;ctx.setTransform(dpr,0,0,dpr,0,0)}
+function cube(x,y,s){var h=s*0.5;ctx.beginPath();ctx.moveTo(x,y-h);ctx.lineTo(x+s,y-h+s*0.5);ctx.lineTo(x+s,y+h+s*0.5);ctx.lineTo(x,y+h);ctx.closePath();ctx.fillStyle='#f0a94f';ctx.fill();ctx.strokeStyle='#ffe0b0';ctx.lineWidth=1.5;ctx.stroke();
+ctx.beginPath();ctx.moveTo(x,y-h);ctx.lineTo(x-s,y-h+s*0.5);ctx.lineTo(x-s,y+h+s*0.5);ctx.lineTo(x,y+h);ctx.closePath();ctx.fillStyle='#d98a35';ctx.fill();ctx.stroke();
+ctx.beginPath();ctx.moveTo(x,y+h);ctx.lineTo(x+s,y+h+s*0.5);ctx.lineTo(x,y+h+s*1.0);ctx.lineTo(x-s,y+h+s*0.5);ctx.closePath();ctx.fillStyle='#b56e28';ctx.fill();ctx.stroke()}
+function drawBoxes(){ctx.clearRect(0,0,W,H);ctx.fillStyle='#1b1730';ctx.fillRect(0,0,W,H);var s=Math.min(W,H)*0.07;positions.forEach(function(p){cube(p.x,p.y,s)})}
+function clear(){ctx.clearRect(0,0,W,H);ctx.fillStyle='#100d1c';ctx.fillRect(0,0,W,H)}
+async function present(){phase='show';count=2+lvl;$('cnt').textContent=count;$('lvl').textContent=lvl;$('msg').textContent='数一数有几个箱子…';resize();positions=[];var pad=Math.min(W,H)*0.12;for(let i=0;i<count;i++){positions.push({x:pad+Math.random()*(W-2*pad),y:pad+Math.random()*(H-2*pad)})}drawBoxes();
+var showMs=Math.max(350,1000-lvl*60);await new Promise(function(r){setTimeout(r,showMs)});clear();phase='answer';$('msg').textContent='有几个箱子？输入数量';$('ans').value='';$('ans').focus()}
+function check(){if(phase!=='answer')return;var v=Number($('ans').value);if(v===count){if(lvl>best){best=lvl;try{localStorage.setItem('ff_boxes_best',String(best))}catch(e){}showBest()}lvl++;phase='done';$('msg').textContent='✓ 正确！进入第 '+lvl+' 关';$('btn').textContent='下一关'}else{phase='done';$('msg').textContent='✗ 实际是 '+count+' 个箱子';$('btn').textContent='重新开始'}}
+function start(){lvl=1;$('btn').textContent='重新开始';present()}
+$('submit').addEventListener('click',check);$('ans').addEventListener('keydown',function(e){if(e.key==='Enter')check()});
+$('btn').addEventListener('click',function(){if($('btn').textContent==='下一关')present();else start()});
+window.addEventListener('resize',function(){resize();if(phase==='show')drawBoxes();else if(phase!=='answer')clear()});
+document.addEventListener('keydown',function(e){if(e.key==='Escape'){try{parent.postMessage({type:'exit'},'*')}catch(_){}}});
+window.__BOX={start:start,present:present,check:check,setAnswer:function(v){$('ans').value=v},get count(){return count},get lvl(){return lvl},get phase(){return phase}};
+resize();clear();})();window.addEventListener('resize',function(){fitSide(document.getElementById('cv'))});try{fitSide(document.getElementById('cv'))}catch(_){}
+</script></body></html>

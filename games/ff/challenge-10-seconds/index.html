@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="zh-CN"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<link rel="icon" href="data:,"><title>10 秒挑战</title>
+<style>
+:root{--sans:"PingFang SC","Microsoft YaHei",system-ui,sans-serif;--gold:#f6c177;--ink:#f3e9da;--dim:rgba(243,233,218,.55);--teal:#7fd8c8}
+*{box-sizing:border-box}html,body{height:100%;margin:0}
+body{background:#0b0914;color:var(--ink);font-family:var(--sans);display:flex;align-items:center;justify-content:center;padding:2vmin;overflow:hidden;user-select:none;-webkit-user-select:none}
+#app{width:min(100%,520px);height:100%;max-height:720px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:clamp(12px,3vmin,24px);border:1px solid rgba(246,193,119,.18);border-radius:18px;background:radial-gradient(120% 90% at 50% -10%,rgba(246,193,119,.08),transparent 55%),#100d1c;padding:clamp(16px,4vmin,30px);text-align:center}
+h1{margin:0;font-size:clamp(17px,3.4vmin,24px);letter-spacing:.08em}h1 b{color:var(--gold)}
+.sub{color:var(--dim);font-size:clamp(12px,2.1vmin,15px)}
+.segs{display:flex;gap:8px}.seg{min-height:42px;padding:0 16px;border-radius:10px;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.12);color:rgba(243,233,218,.72);cursor:pointer;font-size:clamp(12px,2vmin,14px)}
+.seg.on{background:rgba(127,216,200,.18);border-color:var(--teal);color:var(--teal)}
+.timer{font-size:clamp(38px,12vmin,84px);font-weight:700;font-variant-numeric:tabular-nums;color:var(--gold);min-height:1.2em;letter-spacing:.02em}
+.timer.hidden-t{color:transparent;position:relative}.timer.hidden-t::after{content:"•••";position:absolute;left:0;right:0;color:var(--dim)}
+.result{font-size:clamp(13px,2.4vmin,17px);min-height:1.6em;color:var(--teal)}
+.result.great{color:#7fe0a8}.result.mid{color:var(--gold)}
+.bigbtn{min-height:54px;padding:0 32px;border-radius:13px;border:1px solid transparent;cursor:pointer;font-size:clamp(15px,2.6vmin,18px);font-weight:600}
+.bigbtn.primary{background:linear-gradient(160deg,#ffd89a,#f0a94f);color:#2a1a06}.bigbtn.stop{background:linear-gradient(160deg,#ff9a9a,#ef6a6a);color:#2a0606}
+.best{color:var(--dim);font-size:clamp(11px,1.9vmin,13px);font-variant-numeric:tabular-nums}
+</style></head><body><div id="app">
+<h1>10 秒 <b>挑战</b></h1>
+<div class="sub">凭感觉，正好停在 10.0000 秒</div>
+<div class="segs" id="modes"><button class="seg on" data-v="show">可见计时</button><button class="seg" data-v="hide">隐藏计时</button></div>
+<div class="timer" id="timer">10.0000</div>
+<div class="result" id="result">准备好就点开始</div>
+<div><button class="bigbtn primary" id="btn">开始挑战</button></div>
+<div class="best" id="best">最佳误差：—</div>
+</div>
+<script>(function(){
+'use strict';var $=function(i){return document.getElementById(i)};var mode='show',running=false,startAt=0,raf=0,elapsed=0;
+var best=(function(){try{return Number(localStorage.getItem('ff_10s_best')||999999)}catch(e){return 999999}})();
+function showBest(){$('best').textContent=best<999999?'最佳误差：'+best.toFixed(4)+'s':'最佳误差：—'}showBest();
+var segs=$('modes').querySelectorAll('.seg');for(var i=0;i<segs.length;i++)segs[i].addEventListener('click',function(){for(var j=0;j<segs.length;j++)segs[j].classList.remove('on');this.classList.add('on');mode=this.getAttribute('data-v');reset()});
+function reset(){running=false;if(raf)cancelAnimationFrame(raf);elapsed=0;$('timer').textContent='10.0000';$('timer').className='timer';$('result').textContent='准备好就点开始';$('result').className='result';$('btn').textContent='开始挑战';$('btn').className='bigbtn primary'}
+function tick(){if(!running)return;elapsed=(performance.now()-startAt)/1000;if(mode==='show'&&elapsed<10.2)$('timer').textContent=elapsed.toFixed(4);raf=requestAnimationFrame(tick)}
+function action(){if(!running){running=true;startAt=performance.now();elapsed=0;$('result').textContent='盯着时间…凭感觉按停';$('btn').textContent='停止';$('btn').className='bigbtn stop';if(mode==='hide'){$('timer').textContent='';$('timer').className='timer hidden-t'}raf=requestAnimationFrame(tick);return}
+running=false;if(raf)cancelAnimationFrame(raf);var t=elapsed,err=Math.abs(t-10);$('timer').textContent=t.toFixed(4);$('timer').className='timer';
+if(err<0.01){$('result').textContent='误差 '+err.toFixed(4)+'s · 神级！';$('result').className='result great'}
+else if(err<0.1){$('result').textContent='误差 '+err.toFixed(4)+'s · 很准';$('result').className='result mid'}
+else{$('result').textContent='误差 '+err.toFixed(4)+'s · 再试试';$('result').className='result'}
+if(err<best){best=err;try{localStorage.setItem('ff_10s_best',String(best))}catch(e){}showBest()}
+$('btn').textContent='再来一次';$('btn').className='bigbtn primary'}
+$('btn').addEventListener('click',action);
+document.addEventListener('keydown',function(e){if(e.repeat)return;if(e.code==='Space'){e.preventDefault();action()}else if(e.key==='Escape'){try{parent.postMessage({type:'exit'},'*')}catch(_){}}});
+window.__TEN={action:action,reset:reset,setTime:function(ms){startAt=performance.now()-ms*1000;elapsed=ms},mode:function(){return mode},get running(){return running},get elapsed(){return elapsed}};
+})();</script></body></html>

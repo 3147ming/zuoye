@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="zh-CN"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<link rel="icon" href="data:,"><title>SBTI 人格测试</title>
+<style>
+:root{--sans:"PingFang SC","Microsoft YaHei",system-ui,sans-serif;--gold:#f6c177;--ink:#f3e9da;--dim:rgba(243,233,218,.55);--teal:#7fd8c8}
+*{box-sizing:border-box}html,body{height:100%;margin:0}
+body{background:#0b0914;color:var(--ink);font-family:var(--sans);display:flex;align-items:center;justify-content:center;padding:2vmin;overflow:hidden;user-select:none;-webkit-user-select:none}
+#app{width:min(100%,540px);height:100%;max-height:800px;display:flex;flex-direction:column;align-items:center;gap:clamp(10px,2.4vmin,18px);border:1px solid rgba(246,193,119,.18);border-radius:18px;background:radial-gradient(120% 90% at 50% -10%,rgba(246,193,119,.08),transparent 55%),#100d1c;padding:clamp(14px,3.4vmin,24px);text-align:center}
+h1{margin:0;font-size:clamp(17px,3.4vmin,24px);letter-spacing:.06em}h1 b{color:var(--gold)}
+.sub{color:var(--dim);font-size:clamp(11px,2vmin,14px)}
+.progress{width:100%;height:8px;border-radius:99px;background:rgba(255,255,255,.08);overflow:hidden}.bar{height:100%;background:linear-gradient(90deg,#7fd8c8,#f6c177);width:0;transition:width 200ms}
+.qbox{flex:1 1 auto;width:100%;min-height:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:clamp(14px,3vmin,24px)}
+.qtext{font-size:clamp(17px,4vmin,26px);line-height:1.6;min-height:2em}
+.opts{display:flex;flex-direction:column;gap:10px;width:100%}
+.opt{min-height:56px;padding:10px 18px;border-radius:13px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.14);color:var(--ink);cursor:pointer;font-size:clamp(13px,2.4vmin,17px);line-height:1.5;transition:background 100ms,transform 80ms}
+.opt:hover{background:rgba(246,193,119,.12)}.opt:active{transform:scale(.98)}
+.result{flex:1 1 auto;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px}
+.code{font-size:clamp(34px,9vmin,60px);font-weight:800;letter-spacing:.06em;color:var(--gold)}
+.persona{font-size:clamp(22px,5vmin,34px);font-weight:700;color:var(--teal)}
+.desc{color:rgba(243,233,218,.8);font-size:clamp(13px,2.4vmin,16px);line-height:1.8;max-width:40ch;white-space:pre-line}
+.bigbtn{min-height:48px;padding:0 24px;border-radius:12px;border:1px solid transparent;cursor:pointer;font-size:clamp(13px,2.4vmin,16px);font-weight:600;background:linear-gradient(160deg,#ffd89a,#f0a94f);color:#2a1a06}
+.disclaimer{color:rgba(243,233,218,.35);font-size:clamp(10px,1.7vmin,12px)}
+</style></head><body><div id="app">
+<h1><b>SBTI</b> 人格测试</h1>
+<div class="sub" id="sub">16 道题 · 娱乐向梗系人格 · 仅供一乐</div>
+<div class="progress"><div class="bar" id="bar"></div></div>
+<div class="qbox" id="qbox"><div class="qtext" id="qtext"></div><div class="opts" id="opts"></div></div>
+<div class="result" id="result" style="display:none"><div class="code" id="code"></div><div class="persona" id="persona"></div><div class="desc" id="desc"></div><button class="bigbtn" id="again">再测一次</button></div>
+<div class="disclaimer">非专业心理测评，结果不可用于任何严肃用途</div>
+</div>
+<script>(function(){
+'use strict';var $=function(i){return document.getElementById(i)};
+/* 每题两个选项，各自给 6 个维度加分：卷/躺/社/独/浪/稳 */
+var Q=[
+{q:'周五晚上，你的首选是？',a:['出门social到半夜','+社+浪'],b:['窝家追剧躺平','+躺+稳']},
+{q:'deadline 前一小时，你？',a:['瞬间爆发疯狂赶','+卷+浪'],b:['早已做完在摸鱼','+稳+独']},
+{q:'群里突然被 @，你？',a:['秒回且带三个表情','+社'],b:['假装没看到先缓缓','+独+躺']},
+{q:'旅行你更倾向？',a:['说走就走不规划','+浪'],b:['攻略做到Excel','+稳+卷']},
+{q:'朋友夸你，你通常？',a:['大方收下并回夸','+社+浪'],b:['嘴上说没有心里偷笑','+独+稳']},
+{q:'周一的你，精神状态？',a:['已经准备好卷了','+卷'],b:['还在加载中…','+躺']},
+{q:'遇到计划被打乱，你？',a:['随机应变无所谓','+浪+社'],b:['浑身难受想重排','+稳+卷']},
+{q:'你更喜欢的团队角色？',a:['活跃气氛那个','+社+浪'],b:['默默把活干完那个','+独+稳']},
+{q:'深夜emo时你？',a:['找人倾吐到天亮','+社'],b:['自己写小作文消化','+独+躺']},
+{q:'看到别人内卷，你？',a:['我也不能输','+卷'],b:['卷吧我躺会儿','+躺+稳']},
+{q:'新认识的人，你多久能放开？',a:['三分钟自来熟','+社+浪'],b:['三次见面才敢说话','+独+稳']},
+{q:'你的购物车更像？',a:['奇奇怪怪的新鲜玩意','+浪'],b:['实用且用了很久的','+稳']},
+{q:'被安排一堆事，你？',a:['边做边嗨停不下来','+卷+社'],b:['列清单逐个击破','+稳+独']},
+{q:'理想的周末节奏？',a:['排满约满才充实','+卷+社'],b:['一整天什么都不干','+躺+独']},
+{q:'你做决定主要靠？',a:['直觉，先冲再说','+浪'],b:['权衡利弊列pros&cons','+稳+卷']},
+{q:'如果有个隐藏人格分支，你猜自己是？',a:['社牛本牛','+社+浪'],b:['深藏不露','+独+躺']}
+];
+var PERSONA=[
+{code:'卷王',need:{卷:3},desc:'你的字典里没有"差不多"。别人在躺，你在偷偷进化。注意：偶尔也要记得喘口气。'},
+{code:'躺平大师',need:{躺:3},desc:'你把"降低期待"活成了一门艺术。世界很吵，你自有一方安宁。'},
+{code:'社牛本牛',need:{社:3},desc:'哪里有你，哪里就有场子。陌生人三分钟变老友，你天生自带破冰buff。'},
+{code:'独行侠',need:{独:3},desc:'独处是你的充电方式。你不需要热闹，也能把日子过得有滋有味。'},
+{code:'浪里白条',need:{浪:3},desc:'计划？不存在的。你随性、自由、永远在路上，惊喜总比意外先到。'},
+{code:'稳健先生',need:{稳:3},desc:'靠谱是你的代名词。你把这个世界打理得井井有条，是大家心中的定海神针。'},
+{code:'卷躺 enzymes 混合体',need:{卷:2,躺:2},desc:'你在卷与躺之间反复横跳，既能爆发也能摆烂，属于高级自适应形态。'},
+{code:'社恐卷王',need:{卷:2,独:2},desc:'你独自默默努力，热闹是别人的，你只和自己的目标较劲。'},
+{code:'快乐浪人',need:{浪:2,社:2},desc:'你把每一天都过成段子，朋友多、故事多，你是人群里的快乐发动机。'},
+{code:'佛系稳者',need:{稳:2,躺:2},desc:'不争不抢，稳稳当当。你的从容，是很多人修炼很久才有的境界。'},
+{code:'深藏不露',need:{独:2,浪:2},desc:'表面安静，内心戏丰富。你的脑内世界，比任何综艺都精彩。'},
+{code:'全能六边形',need:{卷:2,社:2,稳:2},desc:'卷得起、放得下、聊得来、稳得住。你就是传说中的六边形战士。'}
+];
+var i=0,score={卷:0,躺:0,社:0,独:0,浪:0,稳:0};
+function renderQ(){if(i>=Q.length){showResult();return}$('qtext').textContent=Q[i].q;var o=$('opts');o.innerHTML='';[['a',Q[i].a],['b',Q[i].b]].forEach(function(pair){var b=document.createElement('button');b.className='opt';b.textContent=pair[1][0];b.addEventListener('click',function(){choose(pair[1][1])});o.appendChild(b)});$('bar').style.width=(i/Q.length*100)+'%'}
+function choose(tags){tags.replace('+','').split('+').forEach(function(t){if(t in score)score[t]++});i++;renderQ()}
+function showResult(){ $('bar').style.width='100%';$('qbox').style.display='none';$('result').style.display='flex';
+var best=PERSONA[0],bestN=0;PERSONA.forEach(function(p){var n=0;for(var k in p.need)if((score[k]||0)>=p.need[k])n++;if(n>bestN){bestN=n;best=p}});
+$('code').textContent=best.code.substring(0,8);$('persona').textContent=best.code;$('desc').textContent=best.desc+'\n\n你的倾向：卷'+score.卷+' 躺'+score.躺+' 社'+score.社+' 独'+score.独+' 浪'+score.浪+' 稳'+score.稳}
+function restart(){i=0;score={卷:0,躺:0,社:0,独:0,浪:0,稳:0};$('qbox').style.display='flex';$('result').style.display='none';$('bar').style.width='0';renderQ()}
+$('again').addEventListener('click',restart);
+document.addEventListener('keydown',function(e){if(e.key==='Escape'){try{parent.postMessage({type:'exit'},'*')}catch(_){}}});
+window.__SBTI={choose:choose,restart:restart,get i(){return i},get score(){return {...score}}};
+renderQ();})();</script></body></html>

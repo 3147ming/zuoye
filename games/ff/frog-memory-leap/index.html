@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="zh-CN"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<link rel="icon" href="data:,"><title>青蛙记忆跳跃</title>
+<style>
+:root{--sans:"PingFang SC","Microsoft YaHei",system-ui,sans-serif;--gold:#f6c177;--ink:#f3e9da;--dim:rgba(243,233,218,.55);--green:#7fd88a;--bad:#ff9f9f}
+*{box-sizing:border-box}html,body{height:100%;margin:0}
+body{background:radial-gradient(120% 100% at 50% 0%,#0d2818,#080f12 70%);color:var(--ink);font-family:var(--sans);display:flex;align-items:center;justify-content:center;padding:2vmin;overflow:hidden;user-select:none;-webkit-user-select:none;touch-action:manipulation}
+#app{width:min(100%,540px);height:100%;max-height:780px;display:flex;flex-direction:column;align-items:center;gap:clamp(10px,2.6vmin,18px);border:1px solid rgba(127,216,138,.22);border-radius:18px;background:rgba(9,20,14,.75);padding:clamp(14px,3.4vmin,24px);justify-content:center}
+h1{margin:0;font-size:clamp(16px,3.2vmin,22px);letter-spacing:.06em}h1 b{color:var(--green)}
+.top{display:flex;gap:clamp(14px,4vmin,30px);color:var(--dim);font-size:clamp(11px,2vmin,14px);font-variant-numeric:tabular-nums}
+.top b{color:var(--ink)}.top .lvl b{color:var(--green)}
+.pond{position:relative;aspect-ratio:1;width:var(--side,100%);max-width:100%;max-height:100%;margin:auto;border-radius:16px;background:radial-gradient(80% 80% at 50% 50%,#164030,#0a1c16);border:1px solid rgba(127,216,138,.12)}
+.pad{position:absolute;width:19%;height:19%;border-radius:50%;background:radial-gradient(circle at 35% 30%,#4f9a5e,#2d6b40);border:2px solid rgba(127,216,138,.35);display:flex;align-items:center;justify-content:center;cursor:pointer;transform:translate(-50%,-50%);transition:transform 100ms,box-shadow 100ms}
+.pad:active{transform:translate(-50%,-50%) scale(.9)}.pad.jump{box-shadow:0 0 24px rgba(127,216,138,.8);transform:translate(-50%,-50%) scale(1.08)}
+.pad.bad{box-shadow:0 0 24px rgba(255,159,159,.8)}.frog{font-size:clamp(20px,5vmin,32px);transition:left 300ms,top 300ms;pointer-events:none;position:absolute;transform:translate(-50%,-60%)}
+.msg{color:var(--green);font-size:clamp(12px,2.1vmin,15px);min-height:1.4em;text-align:center}
+.bigbtn{min-height:44px;padding:0 20px;border-radius:11px;border:1px solid transparent;cursor:pointer;font-size:clamp(13px,2.2vmin,16px);font-weight:600;background:linear-gradient(160deg,#9fe8a8,#4fc46a);color:#06210d}
+</style></head><body><div id="app">
+<h1>青蛙 <b>记忆跳跃</b></h1>
+<div class="top"><span class="lvl">关卡 <b id="lvl">1</b></span><span>步数 <b id="steps">2</b></span><span>最佳 <b id="best">—</b></span></div>
+<div class="pond" id="pond"><div class="frog" id="frog" style="left:50%;top:50%;display:none">🐸</div></div>
+<div class="msg" id="msg">看青蛙跳，再按同样顺序点荷叶</div>
+<div><button class="bigbtn" id="btn">开始游戏</button></div>
+</div>
+<script>
+function fitSide(el){var app=document.getElementById('app')||el.parentNode;
+  var cs=getComputedStyle(app);
+  var padX=(parseFloat(cs.paddingLeft)||0)+(parseFloat(cs.paddingRight)||0);
+  var padY=(parseFloat(cs.paddingTop)||0)+(parseFloat(cs.paddingBottom)||0);
+  var gap=parseFloat(cs.rowGap)||0;
+  var kids=app.children,otherH=0,count=0;
+  for(var i=0;i<kids.length;i++){if(kids[i]!==el&&kids[i].offsetParent!==null){otherH+=kids[i].offsetHeight;count++}}
+  var availH=app.clientHeight-padY-otherH-gap*count;
+  var availW=app.clientWidth-padX;
+  var av=Math.min(availW,availH);
+  if(av>0)el.style.setProperty('--side',av+'px');else el.style.removeProperty('--side')}
+(function(){
+'use strict';var $=function(i){return document.getElementById(i)};var pond=$('pond'),frog=$('frog'),pads=[],lvl=1,seq=[],player=[],phase='idle';var LILY=[[20,25],[50,18],[80,25],[18,52],[50,50],[82,52],[22,80],[50,84],[80,80]];
+LILY.forEach(function(p,k){var d=document.createElement('div');d.className='pad';d.style.left=p[0]+'%';d.style.top=p[1]+'%';(function(i){d.addEventListener('click',function(){pick(i)})})(k);pond.appendChild(d);pads.push(d)});
+var best=(function(){try{return Number(localStorage.getItem('ff_frog_best')||0)}catch(e){return 0}})();function showBest(){$('best').textContent=best?('第 '+best+' 关'):'—'}showBest();
+function gen(){var n=2+Math.floor(lvl/2);seq=[];for(let i=0;i<n;i++){var k;do{k=Math.floor(Math.random()*9)}while(seq.length&&seq[seq.length-1]===k);seq.push(k)}$('steps').textContent=n}
+function wait(ms){return new Promise(function(r){setTimeout(r,ms)})}
+async function demo(){frog.style.display='block';frog.style.left=LILY[seq[0]][0]+'%';frog.style.top=LILY[seq[0]][1]+'%';await wait(600);
+for(let i=1;i<seq.length;i++){var prev=seq[i-1],cur=seq[i];pads[cur].classList.add('jump');await wait(300);frog.style.left=LILY[cur][0]+'%';frog.style.top=LILY[cur][1]+'%';pads[cur].classList.remove('jump');await wait(420)}
+await wait(300);frog.style.display='none'}
+async function present(){phase='show';player=[];$('lvl').textContent=lvl;gen();$('msg').textContent='记住青蛙的跳跃顺序…';await demo();phase='input';$('msg').textContent='按顺序点荷叶，让青蛙再跳一遍'}
+function pick(k){if(phase!=='input')return;var want=seq[player.length];if(k===want){pads[k].classList.add('jump');frog.style.display='block';frog.style.left=LILY[k][0]+'%';frog.style.top=LILY[k][1]+'%';setTimeout(function(){pads[k].classList.remove('jump')},250);player.push(k);if(player.length===seq.length){if(lvl>best){best=lvl;try{localStorage.setItem('ff_frog_best',String(best))}catch(e){}showBest()}lvl++;phase='done';$('msg').textContent='✓ 全对！进入第 '+lvl+' 关';$('btn').textContent='下一关';setTimeout(present,850)}}else{pads[k].classList.add('bad');setTimeout(function(){pads[k].classList.remove('bad')},350);phase='done';frog.style.display='none';$('msg').textContent='✗ 跳错了。止步第 '+lvl+' 关';$('btn').textContent='重新开始'}}
+function start(){lvl=1;$('btn').textContent='重新开始';present()}
+function reset(){phase='idle';frog.style.display='none';pads.forEach(function(p){p.classList.remove('jump','bad')});$('msg').textContent='看青蛙跳，再按同样顺序点荷叶';$('lvl').textContent='1';$('steps').textContent='2';$('btn').textContent='开始游戏'}
+$('btn').addEventListener('click',function(){if($('btn').textContent.indexOf('下一关')>=0)present();else start()});
+document.addEventListener('keydown',function(e){if(e.key==='Escape'){try{parent.postMessage({type:'exit'},'*')}catch(_){}}});
+window.__FROG={start:start,present:present,pick:pick,gen:gen,get seq(){return seq.slice()},get lvl(){return lvl},get phase(){return phase}};
+reset();})();window.addEventListener('resize',function(){fitSide(document.getElementById('pond'))});try{fitSide(document.getElementById('pond'))}catch(_){}
+</script></body></html>

@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="zh-CN"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<link rel="icon" href="data:,"><title>双重决策</title>
+<style>
+:root{--sans:"PingFang SC","Microsoft YaHei",system-ui,sans-serif;--gold:#f6c177;--ink:#f3e9da;--dim:rgba(243,233,218,.55);--teal:#7fd8c8;--bad:#ff9f9f}
+*{box-sizing:border-box}html,body{height:100%;margin:0}
+body{background:#0b0914;color:var(--ink);font-family:var(--sans);display:flex;align-items:center;justify-content:center;padding:2vmin;overflow:hidden;user-select:none;-webkit-user-select:none;touch-action:manipulation}
+#app{width:min(100%,560px);height:100%;max-height:780px;display:flex;flex-direction:column;align-items:center;gap:clamp(8px,2vmin,14px);border:1px solid rgba(246,193,119,.18);border-radius:18px;background:radial-gradient(120% 90% at 50% -10%,rgba(246,193,119,.08),transparent 55%),#100d1c;padding:clamp(12px,3vmin,20px);justify-content:center}
+h1{margin:0;font-size:clamp(16px,3.2vmin,22px);letter-spacing:.06em}h1 b{color:var(--gold)}
+.top{display:flex;gap:clamp(12px,4vmin,28px);color:var(--dim);font-size:clamp(11px,2vmin,14px);font-variant-numeric:tabular-nums}
+.top b{color:var(--ink)}
+.scene{aspect-ratio:1;width:var(--side,100%);max-width:100%;max-height:100%;margin:auto;position:relative;border-radius:14px;background:linear-gradient(180deg,#1a2740,#0e1626);border:1px solid rgba(255,255,255,.07);overflow:hidden}
+.scene canvas{width:100%;height:100%;display:block}
+.fixdot{position:absolute;left:50%;top:50%;width:12px;height:12px;margin:-6px;border-radius:50%;background:#ff4d4d;box-shadow:0 0 8px #ff4d4d}
+.ask{font-size:clamp(12px,2.1vmin,15px);color:var(--teal);min-height:1.4em;text-align:center}
+.opts{display:flex;gap:8px;flex-wrap:wrap;justify-content:center}
+.opt{min-height:44px;padding:0 14px;border-radius:10px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.14);color:rgba(243,233,218,.82);cursor:pointer;font-size:clamp(12px,2vmin,14px)}
+.opt.sel{background:rgba(246,193,119,.22);border-color:var(--gold);color:var(--gold)}
+.opt.ok{background:rgba(127,216,200,.25);border-color:var(--teal)}.opt.no{background:rgba(255,159,159,.22);border-color:var(--bad)}
+.bigbtn{min-height:44px;padding:0 20px;border-radius:11px;border:1px solid transparent;cursor:pointer;font-size:clamp(13px,2.2vmin,16px);font-weight:600;background:linear-gradient(160deg,#ffd89a,#f0a94f);color:#2a1a06}
+</style></head><body><div id="app">
+<h1>双重 <b>决策</b></h1>
+<div class="top"><span>轮次 <b id="round">1</b></span><span>呈现 <b id="ms">500</b>ms</span><span>视野 <b id="vf">1</b></span><span>正确率 <b id="acc">—</b></span></div>
+<div class="scene" id="scene"><canvas id="cv"></canvas><div class="fixdot" id="fixdot" style="display:none"></div></div>
+<div class="ask" id="ask">盯住中央红点，一次看清车辆和路牌位置</div>
+<div class="opts" id="opts"></div>
+<div><button class="bigbtn" id="btn">开始训练</button></div>
+</div>
+<script>
+function fitSide(el){var app=document.getElementById('app')||el.parentNode;
+  var cs=getComputedStyle(app);
+  var padX=(parseFloat(cs.paddingLeft)||0)+(parseFloat(cs.paddingRight)||0);
+  var padY=(parseFloat(cs.paddingTop)||0)+(parseFloat(cs.paddingBottom)||0);
+  var gap=parseFloat(cs.rowGap)||0;
+  var kids=app.children,otherH=0,count=0;
+  for(var i=0;i<kids.length;i++){if(kids[i]!==el&&kids[i].offsetParent!==null){otherH+=kids[i].offsetHeight;count++}}
+  var availH=app.clientHeight-padY-otherH-gap*count;
+  var availW=app.clientWidth-padX;
+  var av=Math.min(availW,availH);
+  if(av>0)el.style.setProperty('--side',av+'px');else el.style.removeProperty('--side')}
+(function(){
+'use strict';var $=function(i){return document.getElementById(i)};var cv=$('cv'),ctx=cv.getContext('2d');var vehicles=['🚗','🚙','🚐','🚚','🚌','🏎'];var sectors=['左上','上','右上','左','右','左下','下','右下'];var phase='idle',round=0,showMs=500,vf=1,correct=0,total=0,curV=0,curS=0,selV=null,W=0,H=0,streak=0;
+function resize(){var dpr=window.devicePixelRatio||1,r=cv.getBoundingClientRect();W=r.width;H=r.height;cv.width=W*dpr;cv.height=H*dpr;ctx.setTransform(dpr,0,0,dpr,0,0)}
+function drawScene(){ctx.clearRect(0,0,W,H);ctx.fillStyle='#1a2740';ctx.fillRect(0,0,W,H);
+/* 道路 */
+ctx.strokeStyle='rgba(255,255,255,.08)';ctx.lineWidth=2;ctx.beginPath();ctx.moveTo(0,H*.72);ctx.lineTo(W,H*.72);ctx.stroke();ctx.beginPath();ctx.moveTo(0,H*.9);ctx.lineTo(W,H*.9);ctx.stroke();
+/* 中央车辆 */
+ctx.font=Math.round(Math.min(W,H)*0.13)+'px system-ui';ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText(vehicles[curV],W/2,H/2);
+/* 周边路牌 66 */
+var cx=W/2,cy=H/2,rad=Math.min(W,H)*(0.16+vf*0.05);var ang=curS*Math.PI/4-Math.PI/2;var sx=cx+Math.cos(ang)*rad,sy=cy+Math.sin(ang)*rad;
+ctx.fillStyle='#f0f0f0';ctx.strokeStyle='#333';ctx.lineWidth=2;ctx.beginPath();ctx.roundRect?ctx.roundRect(sx-18,sy-14,36,28,4):ctx.rect(sx-18,sy-14,36,28);ctx.fill();ctx.stroke();ctx.fillStyle='#c0392b';ctx.font='700 15px system-ui';ctx.fillText('66',sx,sy);
+/* 干扰路牌 */
+if(vf>=2){for(var k=1;k<=vf;k++){var a=((curS+k*3)%8)*Math.PI/4-Math.PI/2;var dx=cx+Math.cos(a)*rad,dy=cy+Math.sin(a)*rad;ctx.fillStyle='rgba(180,180,180,.6)';ctx.fillRect(dx-12,dy-10,24,20);ctx.fillStyle='#555';ctx.font='11px system-ui';ctx.fillText('??',dx,dy)}}}
+function clearScene(){ctx.clearRect(0,0,W,H);ctx.fillStyle='#0e1626';ctx.fillRect(0,0,W,H);$('fixdot').style.display='block'}
+function present(){curV=Math.floor(Math.random()*vehicles.length);curS=Math.floor(Math.random()*8);phase='mask';$('fixdot').style.display='block';drawScene();setTimeout(function(){clearScene();phase='answer';askV()},showMs)}
+function askV(){round++;$('round').textContent=round;$('ask').textContent='中央是哪辆车？';renderOpts(vehicles.map(function(v,i){return {label:v,val:i}}),function(i){selV=i;askS()})}
+function askS(){$('ask').textContent='66 号路牌在哪个方向？';renderOpts(sectors.map(function(s,i){return {label:s,val:i}}),function(i){judge(i)})}
+function renderOpts(list,cb){var box=$('opts');box.innerHTML='';list.forEach(function(o){var b=document.createElement('button');b.className='opt';b.textContent=o.label;b.addEventListener('click',function(){cb(o.val)});box.appendChild(b)})}
+function judge(s){var vOK=selV===curV,sOK=s===curS;total++;if(vOK&&sOK){correct++;streak++}else streak=0;
+$('acc').textContent=total?Math.round(correct/total*100)+'%':'—';
+var opts=$('opts').querySelectorAll('.opt');opts[selV].classList.add(vOK?'ok':'no');opts[s].classList.add(sOK?'ok':'no');
+if(streak>=3){showMs=Math.max(180,showMs-60);if(streak%4===0&&vf<4)vf++;$('ms').textContent=showMs;$('vf').textContent=vf;streak=0}
+else if(!(vOK&&sOK)){showMs=Math.min(900,showMs+80);$('ms').textContent=showMs}
+$('ask').textContent=(vOK&&sOK?'两项都对了 ✓':'车辆'+(vOK?'✓':'✗')+' · 路牌'+(sOK?'✓':'✗'))+' · 点继续';
+$('btn').textContent='下一轮';phase='done'}
+function start(){round=0;correct=0;total=0;streak=0;showMs=500;vf=1;$('ms').textContent='500';$('vf').textContent='1';$('acc').textContent='—';$('btn').textContent='重新开始';resize();present()}
+$('btn').addEventListener('click',function(){if(phase==='idle'||phase==='done')start()});
+window.addEventListener('resize',resize);
+document.addEventListener('keydown',function(e){if(e.key==='Escape'){try{parent.postMessage({type:'exit'},'*')}catch(_){}}});
+window.__DD={start:start,present:present,judge:judge,get phase(){return phase},get curV(){return curV},get curS(){return curS},get showMs(){return showMs},get vf(){return vf},get correct(){return correct},get total(){return total}};
+resize();})();window.addEventListener('resize',function(){fitSide(document.getElementById('scene')||document.getElementById('cv'))});try{fitSide(document.getElementById('scene')||document.getElementById('cv'))}catch(_){}
+</script></body></html>

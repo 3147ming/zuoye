@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="zh-CN"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<link rel="icon" href="data:,"><title>更大数字挑战</title>
+<style>
+:root{--sans:"PingFang SC","Microsoft YaHei",system-ui,sans-serif;--gold:#f6c177;--ink:#f3e9da;--dim:rgba(243,233,218,.55);--teal:#7fd8c8;--bad:#ff9f9f}
+*{box-sizing:border-box}html,body{height:100%;margin:0}
+body{background:#0b0914;color:var(--ink);font-family:var(--sans);display:flex;align-items:center;justify-content:center;padding:2vmin;overflow:hidden;user-select:none;-webkit-user-select:none;touch-action:manipulation}
+#app{width:min(100%,540px);height:100%;max-height:740px;display:flex;flex-direction:column;align-items:center;gap:clamp(10px,2.6vmin,20px);border:1px solid rgba(246,193,119,.18);border-radius:18px;background:radial-gradient(120% 90% at 50% -10%,rgba(246,193,119,.08),transparent 55%),#100d1c;padding:clamp(14px,3.4vmin,26px)}
+h1{margin:0;font-size:clamp(17px,3.4vmin,24px);letter-spacing:.08em}h1 b{color:var(--gold)}
+.hud{display:flex;gap:clamp(16px,5vmin,40px);color:var(--dim);font-size:clamp(11px,2vmin,14px);font-variant-numeric:tabular-nums;width:100%;justify-content:center}
+.hud b{color:var(--ink)}.hud .lvl b{color:var(--gold)}
+.stage{flex:1 1 auto;width:100%;min-height:0;border-radius:16px;background:linear-gradient(160deg,#1c1730,#151126);border:1px solid rgba(255,255,255,.08);display:flex;align-items:center;justify-content:center}
+.q{font-size:clamp(13px,2.4vmin,17px);color:var(--dim);margin-bottom:12px}
+.pair{display:flex;gap:clamp(12px,3vmin,24px);width:100%;justify-content:center}
+.num{flex:1 1 0;max-width:200px;min-height:clamp(100px,22vmin,160px);border-radius:15px;border:2px solid rgba(255,255,255,.12);background:rgba(255,255,255,.04);display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:clamp(38px,11vmin,72px);font-weight:700;font-variant-numeric:tabular-nums;transition:transform 70ms,background 90ms}
+.num:active{transform:scale(.95)}.num.right{background:rgba(127,216,200,.25);border-color:var(--teal)}.num.wrong{background:rgba(255,159,159,.22);border-color:var(--bad)}
+.fb{min-height:1.4em;font-size:clamp(12px,2.2vmin,16px);color:var(--teal)}
+.bigbtn{min-height:50px;padding:0 26px;border-radius:12px;border:1px solid transparent;cursor:pointer;font-size:clamp(14px,2.4vmin,17px);font-weight:600;background:linear-gradient(160deg,#ffd89a,#f0a94f);color:#2a1a06}
+</style></head><body><div id="app">
+<h1>更大 <b>数字挑战</b></h1>
+<div class="hud"><span class="lvl">等级 <b id="lvl">1</b></span><span>答对 <b id="correct">0</b></span><span>剩余 <b id="time">30s</b></span><span>正确率 <b id="acc">—</b></span></div>
+<div class="stage"><div style="width:100%;text-align:center"><div class="q" id="q">点「开始」，30 秒内点出更大的数字</div><div class="pair" id="pair"><div class="num" data-i="0">—</div><div class="num" data-i="1">—</div></div><div class="fb" id="fb"></div></div></div>
+<div><button class="bigbtn" id="btn">开始挑战</button></div>
+</div>
+<script>(function(){
+'use strict';var $=function(i){return document.getElementById(i)};var nums=$('pair').querySelectorAll('.num');var phase='idle',lvl=1,correct=0,attempts=0,left=30,timer=null,a=0,b=0,ansIdx=0;
+function randDigits(){var digits=2+Math.min(6,lvl);var lo=Math.pow(10,digits-1),hi=Math.pow(10,digits)-1;var x=lo+Math.floor(Math.random()*(hi-lo)),y=lo+Math.floor(Math.random()*(hi-lo));while(x===y)y=lo+Math.floor(Math.random()*(hi-lo));return [x,y]}
+function next(){var p=randDigits();a=p[0];b=p[1];ansIdx=a>b?0:1;nums[0].textContent=a;nums[1].textContent=b;nums[0].className='num';nums[1].className='num';$('fb').textContent=''}
+function tick(){if(phase!=='play')return;left--;$('time').textContent=left+'s';if(left<=0){finish();return}timer=setTimeout(tick,1000)}
+function start(){phase='play';lvl=1;correct=0;attempts=0;left=30;$('lvl').textContent='1';$('correct').textContent='0';$('time').textContent='30s';$('acc').textContent='—';$('q').textContent='点更大的那个';$('btn').textContent='重新开始';next();if(timer)clearTimeout(timer);timer=setTimeout(tick,1000)}
+function pick(i){if(phase!=='play')return;attempts++;var ok=i===ansIdx;if(ok){correct++;nums[i].classList.add('right');$('fb').textContent='✓ 答对，+速度'}else{nums[i].classList.add('wrong');nums[ansIdx].classList.add('right');$('fb').textContent='✗ 更大的是 '+nums[ansIdx].textContent}var acc=Math.round(correct/attempts*100);$('correct').textContent=correct;$('acc').textContent=acc+'%';if(acc>=90&&attempts>=10&&lvl<5){lvl++;$('lvl').textContent=lvl}var delay=ok?260:560;setTimeout(function(){if(phase==='play')next()},delay)}
+function finish(){phase='done';if(timer)clearTimeout(timer);nums[0].textContent='—';nums[1].textContent='—';var acc=attempts?Math.round(correct/attempts*100):0;$('q').textContent='结束 · 答对 '+correct+' 题 · 正确率 '+acc+'%';$('fb').textContent=acc>=90?'达到 90%，很强！':'继续练，先求准再求快';$('btn').textContent='再来一轮'}
+nums[0].addEventListener('click',function(){pick(0)});nums[1].addEventListener('click',function(){pick(1)});
+$('btn').addEventListener('click',start);
+document.addEventListener('keydown',function(e){if(e.repeat)return;if(e.key==='ArrowLeft'||e.key==='a'||e.key==='A')pick(0);else if(e.key==='ArrowRight'||e.key==='d'||e.key==='D')pick(1);else if(e.key==='Escape'){try{parent.postMessage({type:'exit'},'*')}catch(_){}}});
+window.__LARGER={start:start,pick:pick,finish:finish,get phase(){return phase},get a(){return a},get b(){return b},get ansIdx(){return ansIdx},get correct(){return correct},get lvl(){return lvl}};
+})();</script></body></html>

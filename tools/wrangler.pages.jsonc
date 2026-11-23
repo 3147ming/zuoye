@@ -1,0 +1,16 @@
+{
+  // ============================================================
+  // tools/wrangler.pages.jsonc —— 只推静态站时用的精简配置
+  // ------------------------------------------------------------
+  // 为什么不直接用根目录 wrangler.jsonc：
+  //   那份配置声明了 Durable Objects（ROOMS）与 migrations，属于 Workers 能力。
+  //   Pages 项目不支持在配置文件里声明 DO，wrangler pages deploy 会拿它报错或告警。
+  //   本次只推静态站 + 普通 Functions（留言板/友链），所以单独给一份干净的。
+  //
+  // 用法：
+  //   npx wrangler pages deploy deploy --project-name=zuoye-e0c --branch=main \
+  //       --config tools/wrangler.pages.jsonc
+  // ============================================================
+  "name": "zuoye-e0c",
+  "compatibility_date": "2025-01-15"
+}

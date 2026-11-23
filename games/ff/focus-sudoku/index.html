@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="zh-CN"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<link rel="icon" href="data:,"><title>专注数独</title>
+<style>
+:root{--sans:"PingFang SC","Microsoft YaHei",system-ui,sans-serif;--gold:#f6c177;--ink:#f3e9da;--dim:rgba(243,233,218,.55);--teal:#7fd8c8;--bad:#ff9f9f}
+*{box-sizing:border-box}html,body{height:100%;margin:0}
+body{background:#0b0914;color:var(--ink);font-family:var(--sans);display:flex;align-items:center;justify-content:center;padding:2vmin;overflow:hidden;user-select:none;-webkit-user-select:none}
+#app{width:min(100%,520px);height:100%;max-height:720px;display:flex;flex-direction:column;align-items:center;gap:clamp(8px,1.8vmin,14px);border:1px solid rgba(246,193,119,.18);border-radius:18px;background:radial-gradient(120% 90% at 50% -10%,rgba(246,193,119,.08),transparent 55%),#100d1c;padding:clamp(10px,2.6vmin,18px)}
+h1{margin:0;font-size:clamp(15px,3vmin,21px);letter-spacing:.06em}h1 b{color:var(--gold)}
+.top{display:flex;gap:clamp(12px,3vmin,20px);color:var(--dim);font-size:clamp(11px,2vmin,14px);align-items:center;flex-wrap:wrap;justify-content:center}
+.top b{color:var(--ink)}.top .err b{color:var(--bad)}
+.segs{display:flex;gap:6px}.seg{min-height:36px;padding:0 12px;border-radius:9px;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.12);color:rgba(243,233,218,.7);cursor:pointer;font-size:clamp(11px,1.9vmin,13px)}
+.seg.on{background:rgba(246,193,119,.2);border-color:var(--gold);color:var(--gold)}
+.board{display:grid;grid-template-columns:repeat(9,1fr);grid-template-rows:repeat(9,1fr);width:min(80vmin,430px);height:min(80vmin,430px);border:2px solid rgba(246,193,119,.5);border-radius:6px;overflow:hidden}
+.cell{display:flex;align-items:center;justify-content:center;font-size:clamp(13px,3vmin,22px);font-variant-numeric:tabular-nums;cursor:pointer;background:rgba(255,255,255,.03);border-right:1px solid rgba(255,255,255,.07);border-bottom:1px solid rgba(255,255,255,.07);position:relative;color:var(--ink)}
+.cell.br{border-right:2px solid rgba(246,193,119,.4)}.cell.bb{border-bottom:2px solid rgba(246,193,119,.4)}
+.cell.fixed{color:var(--gold);font-weight:700}.cell.sel{background:rgba(246,193,119,.18)}
+.cell.hl{background:rgba(127,216,200,.12)}.cell.bad{color:var(--bad);background:rgba(255,159,159,.15)}
+.cell .notes{position:absolute;top:1px;left:2px;font-size:9px;line-height:1.05;color:var(--dim);text-align:left;white-space:pre}
+.pad{display:flex;gap:4px;flex-wrap:nowrap;justify-content:center;width:100%;max-width:100%}
+.pad button{flex:1 1 0;min-width:0;min-height:44px;border-radius:9px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.14);color:var(--ink);cursor:pointer;font-size:clamp(14px,2.6vmin,20px)}
+.pad button.note-on{background:rgba(127,216,200,.2);border-color:var(--teal);color:var(--teal)}
+.bigbtn{min-height:42px;padding:0 16px;border-radius:10px;border:1px solid rgba(255,255,255,.14);cursor:pointer;font-size:clamp(12px,2vmin,14px);background:rgba(255,255,255,.06);color:var(--ink)}
+</style></head><body><div id="app">
+<h1>专注 <b>数独</b></h1>
+<div class="top"><span class="err">错误 <b id="err">0/3</b></span><span>难度 <b id="diff">简单</b></span><span id="timer">0:00</span>
+<div class="segs" id="diffs"><button class="seg on" data-v="easy">简单</button><button class="seg" data-v="mid">中等</button><button class="seg" data-v="hard">困难</button></div></div>
+<div class="board" id="board"></div>
+<div class="pad" id="pad"></div>
+<div style="display:flex;gap:8px"><button class="bigbtn" id="noteBtn">✎ 笔记模式：关</button><button class="bigbtn" id="newBtn">新一局</button></div>
+</div>
+<script>(function(){
+'use strict';var $=function(i){return document.getElementById(i)};var SOL='534678912672195348198342567859761423426853791713924856961537284287419635345286179';var level='easy',grid=[],fixed=[],notes=[],sel=-1,noteMode=false,errs=0,startAt=0,timer=null;
+var cells=[];for(let i=0;i<81;i++){var d=document.createElement('div');d.className='cell';if(i%3===2&&i%9!==8)d.classList.add('br');if(Math.floor(i/9)%3===2&&Math.floor(i/9)!==8)d.classList.add('bb');(function(k){d.addEventListener('click',function(){select(k)})})(i);$('board').appendChild(d);cells.push(d)}
+for(let n=1;n<=9;n++){(function(v){var b=document.createElement('button');b.textContent=v;b.addEventListener('click',function(){input(v)});$('pad').appendChild(b)})(n)}
+function difficulty(){return {easy:40,mid:50,hard:58}[level]}
+function newGame(){var remove=difficulty();grid=SOL.split('').map(Number);fixed=grid.map(function(){return true});notes=Array.from({length:81},function(){return new Set()});
+var idx=Array.from({length:81},function(_,i){return i});for(let i=idx.length-1;i>0;i--){var j=Math.floor(Math.random()*(i+1));var t=idx[i];idx[i]=idx[j];idx[j]=t}
+idx.slice(0,remove).forEach(function(k){grid[k]=0;fixed[k]=false});errs=0;sel=-1;startAt=performance.now();if(timer)clearInterval(timer);timer=setInterval(function(){var s=Math.floor((performance.now()-startAt)/1000);$('timer').textContent=Math.floor(s/60)+':'+String(s%60).padStart(2,'0')},500);$('err').textContent='0/3';$('diff').textContent={easy:'简单',mid:'中等',hard:'困难'}[level];render()}
+function render(){for(let i=0;i<81;i++){var c=cells[i];c.className='cell';if(i%3===2&&i%9!==8)c.classList.add('br');if(Math.floor(i/9)%3===2&&Math.floor(i/9)!==8)c.classList.add('bb');if(fixed[i])c.classList.add('fixed');if(i===sel)c.classList.add('sel');
+c.textContent=grid[i]||'';var ns=notes[i]&&notes[i].size?'<div class="notes">'+[...notes[i]].sort().join('')+'</div>':'';c.innerHTML=(grid[i]||'')+ns;
+if(sel>=0&&grid[i]===0&&related(sel,i))c.classList.add('hl')}}
+function related(a,b){var ra=Math.floor(a/9),ca=a%9,rb=Math.floor(b/9),cb=b%9;return ra===rb||ca===cb||(Math.floor(ra/3)===Math.floor(rb/3)&&Math.floor(ca/3)===Math.floor(cb/3))}
+function select(k){sel=k;render()}
+function input(v){if(sel<0||fixed[sel])return;if(noteMode){notes[sel].has(v)?notes[sel].delete(v):notes[sel].add(v);render();return}
+grid[sel]=v;notes[sel].clear();if(v!==Number(SOL[sel])){errs++;$('err').textContent=errs+'/3';cells[sel].classList.add('bad');if(errs>=3){if(timer)clearInterval(timer);$('timer').textContent='✗ 错误 3 次 · 本局结束';}}
+else{checkWin()}render()}
+function checkWin(){for(let i=0;i<81;i++)if(grid[i]!==Number(SOL[i]))return false;if(timer)clearInterval(timer);$('timer').textContent=$('timer').textContent+' ✓';return true}
+var segs=$('diffs').querySelectorAll('.seg');for(var i=0;i<segs.length;i++)segs[i].addEventListener('click',function(){for(var j=0;j<segs.length;j++)segs[j].classList.remove('on');this.classList.add('on');level=this.getAttribute('data-v');newGame()});
+$('noteBtn').addEventListener('click',function(){noteMode=!noteMode;this.textContent='✎ 笔记模式：'+(noteMode?'开':'关');this.classList.toggle('note-on',noteMode)});
+$('newBtn').addEventListener('click',newGame);
+document.addEventListener('keydown',function(e){if(e.repeat)return;if(/^[1-9]$/.test(e.key))input(Number(e.key));else if(e.key==='n'||e.key==='N'){$('noteBtn').click()}else if(e.key==='Escape'){try{parent.postMessage({type:'exit'},'*')}catch(_){}}});
+window.__SUDOKU={newGame:newGame,input:input,select:select,get grid(){return grid.slice()},get fixed(){return fixed.slice()},get errs(){return errs},get level(){return level}};
+newGame();})();</script></body></html>

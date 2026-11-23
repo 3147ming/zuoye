@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="zh-CN"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<link rel="icon" href="data:,"><title>动态舒尔特表</title>
+<style>
+:root{--sans:"PingFang SC","Microsoft YaHei",system-ui,sans-serif;--gold:#f6c177;--ink:#f3e9da;--dim:rgba(243,233,218,.55);--teal:#7fd8c8;--bad:#ff9f9f}
+*{box-sizing:border-box}html,body{height:100%;margin:0}
+body{background:#0b0914;color:var(--ink);font-family:var(--sans);display:flex;align-items:center;justify-content:center;padding:2vmin;overflow:hidden;user-select:none;-webkit-user-select:none;touch-action:manipulation}
+#app{width:min(100%,560px);height:100%;max-height:780px;display:flex;flex-direction:column;align-items:center;gap:clamp(8px,2vmin,14px);border:1px solid rgba(246,193,119,.18);border-radius:18px;background:radial-gradient(120% 90% at 50% -10%,rgba(246,193,119,.08),transparent 55%),#100d1c;padding:clamp(12px,3vmin,20px)}
+h1{margin:0;font-size:clamp(16px,3.2vmin,22px);letter-spacing:.06em}h1 b{color:var(--gold)}
+.top{display:flex;gap:clamp(12px,4vmin,28px);color:var(--dim);font-size:clamp(11px,2vmin,14px);font-variant-numeric:tabular-nums}
+.top b{color:var(--ink)}.top .target b{color:var(--teal);font-size:1.3em}
+.canv{aspect-ratio:1;width:var(--side,100%);max-width:100%;max-height:100%;margin:auto;position:relative}
+canvas{width:100%;height:100%;display:block;touch-action:manipulation}
+.msg{color:var(--teal);font-size:clamp(12px,2.1vmin,15px);min-height:1.4em;text-align:center}
+.bigbtn{min-height:46px;padding:0 22px;border-radius:11px;border:1px solid transparent;cursor:pointer;font-size:clamp(13px,2.2vmin,16px);font-weight:600;background:linear-gradient(160deg,#ffd89a,#f0a94f);color:#2a1a06}
+</style></head><body><div id="app">
+<h1>动态 <b>舒尔特表</b></h1>
+<div class="top"><span>时间 <b id="clock">0.0s</b></span><span>错误 <b id="err">0</b></span><span class="target">找 <b id="target">1</b>/42</span><span>最佳 <b id="best">—</b></span></div>
+<div class="canv"><canvas id="cv"></canvas></div>
+<div class="msg" id="msg">三个圆环独立旋转，按 1→42 顺序点击</div>
+<div><button class="bigbtn" id="btn">开始</button></div>
+</div>
+<script>(function(){
+'use strict';var $=function(i){return document.getElementById(i)};var cv=$('cv'),ctx=cv.getContext('2d');var rings=[],target=1,errs=0,startAt=0,raf=0,running=false,angles=[0,0,0],dirs=[1,-1,1],speeds=[0.12,-0.17,0.08];
+var best=(function(){try{return Number(localStorage.getItem('ff_rot_best')||0)}catch(e){return 0}})();
+function showBest(){$('best').textContent=best?(best).toFixed(1)+'s':'—'}showBest();
+function build(){rings=[[],[],[]];for(let r=0;r<3;r++){var cnt=8+r*4;var start=r===0?1:(r===1?9:25);for(let i=0;i<cnt;i++)rings[r].push(start+i)}angles=[0,0,0]}
+function fitCanv(){var c=cv.parentNode,app=document.getElementById('app')||c.parentNode;
+  var cs=getComputedStyle(app);
+  var padX=(parseFloat(cs.paddingLeft)||0)+(parseFloat(cs.paddingRight)||0);
+  var padY=(parseFloat(cs.paddingTop)||0)+(parseFloat(cs.paddingBottom)||0);
+  var gap=parseFloat(cs.rowGap)||0;
+  var kids=app.children,otherH=0,count=0;
+  for(var i=0;i<kids.length;i++){if(kids[i]!==c){otherH+=kids[i].offsetHeight;count++}}
+  var availH=app.clientHeight-padY-otherH-gap*(count);
+  var availW=app.clientWidth-padX;
+  var av=Math.min(availW,availH);
+  if(av>0)c.style.setProperty('--side',av+'px')}
+function resize(){fitCanv();var dpr=window.devicePixelRatio||1;var rect=cv.getBoundingClientRect();cv.width=rect.width*dpr;cv.height=rect.height*dpr;ctx.setTransform(dpr,0,0,dpr,0,0)}
+function draw(){var w=cv.clientWidth,h=cv.clientHeight,cx=w/2,cy=h/2,R=Math.min(w,h)*0.46;ctx.clearRect(0,0,w,h);
+var radii=[R*0.34,R*0.66,R*0.95];for(let r=0;r<3;r++){var arr=rings[r],cnt=arr.length;ctx.beginPath();ctx.arc(cx,cy,radii[r],0,Math.PI*2);ctx.strokeStyle='rgba(255,255,255,.07)';ctx.lineWidth=1;ctx.stroke();
+for(let i=0;i<cnt;i++){var a=angles[r]+i*Math.PI*2/cnt-Math.PI/2;var x=cx+Math.cos(a)*radii[r],y=cy+Math.sin(a)*radii[r];var isT=arr[i]===target;ctx.beginPath();ctx.arc(x,y,isT?18:15,0,Math.PI*2);ctx.fillStyle=isT?'rgba(246,193,119,.28)':'rgba(255,255,255,.06)';ctx.fill();ctx.strokeStyle=isT?'#f6c177':'rgba(255,255,255,.12)';ctx.lineWidth=isT?2:1;ctx.stroke();
+ctx.fillStyle=isT?'#ffe9c7':'rgba(243,233,218,.8)';ctx.font=(isT?'700 ':'600 ')+Math.round(Math.min(w,h)*0.035)+'px system-ui';ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText(String(arr[i]),x,y)}}}
+function loop(ts){if(!running)return;if(!loop.last)loop.last=ts;var dt=(ts-loop.last)/1000;loop.last=ts;for(let r=0;r<3;r++)angles[r]+=dirs[r]*speeds[r]*dt;draw();
+$('clock').textContent=((performance.now()-startAt)/1000).toFixed(1)+'s';raf=requestAnimationFrame(loop)}
+function start(){reset();build();resize();running=true;loop.last=0;startAt=performance.now();$('btn').textContent='重新开始';$('msg').textContent='找 1 —— 点在对应数字上';raf=requestAnimationFrame(loop)}
+function reset(){running=false;if(raf)cancelAnimationFrame(raf);target=1;errs=0;loop.last=0;$('clock').textContent='0.0s';$('err').textContent='0';$('target').textContent='1';$('msg').textContent='三个圆环独立旋转，按 1→42 顺序点击'}
+function pointer(e){if(!running)return;var rect=cv.getBoundingClientRect();var x=e.clientX-rect.left,y=e.clientY-rect.top,cx=rect.width/2,cy=rect.height/2,R=Math.min(rect.width,rect.height)*0.46,radii=[R*0.34,R*0.66,R*0.95];
+var bestD=1e9,hitVal=null;for(let r=0;r<3;r++){var arr=rings[r],cnt=arr.length;for(let i=0;i<cnt;i++){var a=angles[r]+i*Math.PI*2/cnt-Math.PI/2,px=cx+Math.cos(a)*radii[r],py=cy+Math.sin(a)*radii[r],d=Math.hypot(x-px,y-py);if(d<bestD){bestD=d;hitVal=arr[i]}}}
+if(bestD>Math.min(rect.width,rect.height)*0.08)return;
+if(hitVal===target){target++;if(target>42){finish();return}$('target').textContent=target;$('msg').textContent='很好！找 '+target}else{errs++;$('err').textContent=errs;$('msg').textContent='点错了，找 '+target}}
+function finish(){running=false;if(raf)cancelAnimationFrame(raf);var t=(performance.now()-startAt)/1000,pen=errs*2,adj=t+pen;if(!best||adj<best){best=adj;try{localStorage.setItem('ff_rot_best',String(best))}catch(e){}showBest()}$('msg').textContent='完成！'+t.toFixed(1)+'s + 罚时 '+pen+'s = '+adj.toFixed(1)+'s';$('btn').textContent='再玩一次';draw()}
+cv.addEventListener('pointerdown',function(e){e.preventDefault();pointer(e)});
+$('btn').addEventListener('click',start);window.addEventListener('resize',function(){resize();if(!running)draw()});
+document.addEventListener('keydown',function(e){if(e.key==='Escape'){try{parent.postMessage({type:'exit'},'*')}catch(_){}}});
+window.__ROT={start:start,reset:reset,build:build,pointer:pointer,setTarget:function(v){target=v;$('target').textContent=v},get target(){return target},get errs(){return errs},get running(){return running},rings:rings};
+build();resize();draw();})();</script></body></html>

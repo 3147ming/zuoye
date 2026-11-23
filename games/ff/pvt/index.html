@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="zh-CN"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<link rel="icon" href="data:,"><title>精神运动警觉测试 PVT</title>
+<style>
+:root{--sans:"PingFang SC","Microsoft YaHei",system-ui,sans-serif;--gold:#f6c177;--ink:#f3e9da;--dim:rgba(243,233,218,.55);--red:#ff5b5b;--teal:#7fd8c8}
+*{box-sizing:border-box}html,body{height:100%;margin:0}
+body{background:#08060f;color:var(--ink);font-family:var(--sans);display:flex;align-items:center;justify-content:center;padding:2vmin;overflow:hidden;user-select:none;-webkit-user-select:none;touch-action:manipulation}
+#app{width:min(100%,540px);height:100%;max-height:760px;display:flex;flex-direction:column;align-items:center;gap:clamp(10px,2.6vmin,18px);border:1px solid rgba(246,193,119,.16);border-radius:18px;background:#0d0a18;padding:clamp(14px,3.4vmin,24px);text-align:center}
+h1{margin:0;font-size:clamp(15px,3vmin,21px);letter-spacing:.05em}h1 b{color:var(--gold)}
+.segs{display:flex;gap:6px;flex-wrap:wrap;justify-content:center}.seg{min-height:38px;padding:0 12px;border-radius:9px;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.12);color:rgba(243,233,218,.7);cursor:pointer;font-size:clamp(11px,1.9vmin,13px)}
+.seg.on{background:rgba(246,193,119,.2);border-color:var(--gold);color:var(--gold)}
+.stage{flex:1 1 auto;width:100%;min-height:0;border-radius:16px;background:radial-gradient(80% 80% at 50% 50%,#150e22,#0a0712);border:1px solid rgba(255,255,255,.06);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;cursor:pointer}
+.counter{font-size:clamp(36px,10vmin,68px);font-weight:700;font-variant-numeric:tabular-nums;color:var(--red);min-height:1.2em;opacity:.12;transition:opacity 60ms}
+.counter.show{opacity:1;text-shadow:0 0 24px rgba(255,91,91,.5)}
+.status{color:var(--dim);font-size:clamp(12px,2.1vmin,15px);min-height:1.4em}
+.progress{width:80%;height:6px;border-radius:99px;background:rgba(255,255,255,.08);overflow:hidden}.bar{height:100%;background:var(--gold);width:0;transition:width 200ms}
+.res{font-size:clamp(11px,2vmin,14px);color:var(--teal);line-height:1.7;min-height:3em}
+.bigbtn{min-height:44px;padding:0 20px;border-radius:11px;border:1px solid transparent;cursor:pointer;font-size:clamp(13px,2.2vmin,16px);font-weight:600;background:linear-gradient(160deg,#ffd89a,#f0a94f);color:#2a1a06}
+</style></head><body><div id="app">
+<h1>PVT <b>警觉测试</b></h1>
+<div class="segs" id="durs"><button class="seg" data-v="15">演示 15s</button><button class="seg on" data-v="180">3 分钟</button><button class="seg" data-v="600">10 分钟</button></div>
+<div class="stage" id="stage"><div class="counter" id="counter">0</div><div class="status" id="status">点开始，等红色计数器跳动时尽快按停</div><div class="progress"><div class="bar" id="bar"></div></div><div class="res" id="res"></div></div>
+<div><button class="bigbtn" id="btn">开始测试</button></div>
+</div>
+<script>(function(){
+'use strict';var $=function(i){return document.getElementById(i)};var dur=180,phase='idle',rts=[],falseStarts=0,startAt=0,stimAt=0,nextTimer=null,tickRaf=0,lapseTh=500,gapMin=2,gapMax=10;
+var segs=$('durs').querySelectorAll('.seg');for(var i=0;i<segs.length;i++)segs[i].addEventListener('click',function(){for(var j=0;j<segs.length;j++)segs[j].classList.remove('on');this.classList.add('on');dur=Number(this.getAttribute('data-v'));if(dur===15){gapMin=.8;gapMax=2.4;lapseTh=355}else if(dur===180){gapMin=1;gapMax=4;lapseTh=355}else{gapMin=2;gapMax=10;lapseTh=500}});
+function showCounter(){$('counter').classList.add('show');stimAt=performance.now();phase='go';var v=0;var f=function(){if(phase!=='go')return;v=(performance.now()-stimAt);$('counter').textContent=Math.round(v);tickRaf=requestAnimationFrame(f)};f()}
+function schedule(){var gap=(gapMin+Math.random()*(gapMax-gapMin))*1000;nextTimer=setTimeout(showCounter,gap);$('status').textContent='保持注意…计数器会随机出现';$('counter').classList.remove('show')}
+function react(){if(phase==='idle'||phase==='done')return;
+if(phase==='wait'){falseStarts++;$('status').textContent='抢按！计数器还没出现';return}
+if(phase==='go'){var rt=performance.now()-stimAt;if(rafCancel()){} 
+if(rt<100){falseStarts++;$('status').textContent='太快了，算抢按'}else{rts.push(rt);$('status').textContent='反应 '+Math.round(rt)+'ms';}
+$('counter').classList.remove('show');$('counter').textContent=Math.round(rt);phase='wait';setTimeout(function(){if(phase==='wait')schedule()},1000)}}
+function rafCancel(){if(tickRaf)cancelAnimationFrame(tickRaf);return true}
+function tick(){if(phase==='idle'||phase==='done')return;var el=(performance.now()-startAt)/1000;$('bar').style.width=Math.min(100,el/dur*100)+'%';if(el>=dur){finish();return}requestAnimationFrame(tick)}
+function start(){rts=[];falseStarts=0;phase='wait';startAt=performance.now();$('res').textContent='';$('bar').style.width='0';$('btn').textContent='重新开始';$('status').textContent='准备…';$('counter').textContent='0';$('counter').classList.remove('show');schedule();requestAnimationFrame(tick)}
+function finish(){phase='done';if(nextTimer)clearTimeout(nextTimer);rafCancel();$('counter').classList.remove('show');$('status').textContent='测试结束';
+var s=rts.slice().sort(function(a,b){return a-b});var med=s.length?(s.length%2?s[Math.floor(s.length/2)]:(s[Math.floor(s.length/2)-1]+s[Math.floor(s.length/2)])/2):0;var lapses=rts.filter(function(r){return r>=lapseTh}).length;var fastest=s.slice(0,Math.max(1,Math.round(s.length*.1)));var slowest=s.slice(-Math.max(1,Math.round(s.length*.1)));
+$('res').innerHTML='有效反应 '+rts.length+' 次 · 中位数 <b>'+Math.round(med)+'ms</b><br>走神(<span style="opacity:.7">≥'+lapseTh+'ms</span>) '+lapses+' 次 · 抢按 '+falseStarts+' 次<br>最快10% '+Math.round(fastest.reduce(function(a,b){return a+b},0)/fastest.length)+'ms · 最慢10% '+Math.round(slowest.reduce(function(a,b){return a+b},0)/slowest.length)+'ms';
+$('btn').textContent='再测一次'}
+$('stage').addEventListener('pointerdown',function(e){e.preventDefault();react()});
+$('btn').addEventListener('click',function(e){e.stopPropagation();if(phase==='idle'||phase==='done')start()});
+document.addEventListener('keydown',function(e){if(e.repeat)return;if(e.code==='Space'){e.preventDefault();if(phase==='idle'||phase==='done')start();else react()}else if(e.key==='Escape'){try{parent.postMessage({type:'exit'},'*')}catch(_){}}});
+window.__PVT={start:start,react:react,showCounter:showCounter,finish:finish,get phase(){return phase},get rts(){return rts.slice()},get falseStarts(){return falseStarts}};
+})();</script></body></html>

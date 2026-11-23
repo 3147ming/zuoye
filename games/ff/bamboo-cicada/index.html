@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="zh-CN"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<link rel="icon" href="data:,"><title>竹知了</title>
+<style>
+:root{--sans:"PingFang SC","Microsoft YaHei",system-ui,sans-serif;--gold:#f6c177;--ink:#f3e9da;--dim:rgba(243,233,218,.55);--green:#a8d86a}
+*{box-sizing:border-box}html,body{height:100%;margin:0}
+body{background:radial-gradient(120% 100% at 50% 0%,#16220f,#080b06 75%);color:var(--ink);font-family:var(--sans);display:flex;align-items:center;justify-content:center;padding:2vmin;overflow:hidden;user-select:none;-webkit-user-select:none;touch-action:none}
+#app{width:min(100%,540px);height:100%;max-height:800px;display:flex;flex-direction:column;align-items:center;gap:clamp(8px,2vmin,14px);border:1px solid rgba(168,216,106,.22);border-radius:18px;background:rgba(10,16,8,.7);padding:clamp(12px,3vmin,20px)}
+h1{margin:0;font-size:clamp(16px,3.2vmin,22px);letter-spacing:.08em}h1 b{color:var(--green)}
+.top{display:flex;gap:clamp(14px,4vmin,28px);color:var(--dim);font-size:clamp(11px,2vmin,14px);font-variant-numeric:tabular-nums}
+.top b{color:var(--ink)}.top .rpm b{color:var(--gold)}
+.stage{flex:1 1 auto;width:100%;min-height:0;position:relative;border-radius:16px;background:radial-gradient(80% 80% at 50% 40%,#1e3018,#0a1108);border:1px solid rgba(168,216,106,.12);overflow:hidden;cursor:crosshair}
+canvas{width:100%;height:100%;display:block}
+.hint{color:var(--dim);font-size:clamp(11px,2vmin,14px);text-align:center;line-height:1.6}
+.btns{display:flex;gap:8px;flex-wrap:wrap;justify-content:center}
+.bigbtn{min-height:44px;padding:0 16px;border-radius:11px;border:1px solid rgba(255,255,255,.14);cursor:pointer;font-size:clamp(12px,2vmin,15px);background:rgba(255,255,255,.06);color:var(--ink)}
+.bigbtn.on{background:rgba(168,216,106,.22);border-color:var(--green);color:var(--green)}
+</style></head><body><div id="app">
+<h1>竹 <b>知了</b></h1>
+<div class="top"><span class="rpm">转速 <b id="rpm">0</b></span><span>本次圈数 <b id="turns">0</b></span><span>累计 <b id="total">0</b></span></div>
+<div class="stage" id="stage"><canvas id="cv"></canvas></div>
+<div class="hint">在画面里按住画圈，越快越响 · 松手靠惯性慢慢停下</div>
+<div class="btns"><button class="bigbtn" id="auto">自动甩</button><button class="bigbtn" id="mute">🔊 声音：开</button><button class="bigbtn" id="skin">切换外观</button></div>
+</div>
+<script>(function(){
+'use strict';var $=function(i){return document.getElementById(i)};var cv=$('cv'),ctx=cv.getContext('2d'),stage=$('stage');var W=0,H=0,angle=0,omega=0,turns=0,muted=false,auto=false,skin=0,raf=0,last=0,lastAng=null,dragging=false;
+var total=(function(){try{return Number(localStorage.getItem('ff_bamboo_total')||0)}catch(e){return 0}})();function showTotal(){$('total').textContent=total}
+function resize(){var dpr=window.devicePixelRatio||1,r=cv.getBoundingClientRect();W=r.width;H=r.height;cv.width=W*dpr;cv.height=H*dpr;ctx.setTransform(dpr,0,0,dpr,0,0)}
+/* WebAudio 哇哇声 */
+var audioCtx=null,osc=null,gain=null,lfo=null,lfoGain=null;
+function initAudio(){if(audioCtx)return;try{audioCtx=new (window.AudioContext||window.webkitAudioContext)();osc=audioCtx.createOscillator();gain=audioCtx.createGain();lfo=audioCtx.createOscillator();lfoGain=audioCtx.createGain();osc.type='sawtooth';lfo.type='sine';lfo.frequency.value=7;lfoGain.gain.value=18;lfo.connect(lfoGain);lfoGain.connect(osc.frequency);osc.connect(gain);gain.connect(audioCtx.destination);gain.gain.value=0;osc.start();lfo.start()}catch(e){}}
+function sound(){if(!audioCtx||muted)return;var spd=Math.min(1,Math.abs(omega)/14);gain.gain.setTargetAtTime(spd*0.12,audioCtx.currentTime,0.05);osc.frequency.setTargetAtTime(120+spd*180,audioCtx.currentTime,0.05);lfo.frequency.setTargetAtTime(6+spd*22,audioCtx.currentTime,0.05);lfoGain.gain.setTargetAtTime(6+spd*40,audioCtx.currentTime,0.05)}
+function draw(){ctx.clearRect(0,0,W,H);var cx=W/2,cy=H*0.3,len=Math.min(W,H)*0.28;
+/* 竹杆 */
+ctx.strokeStyle='#7a9b52';ctx.lineWidth=8;ctx.beginPath();ctx.moveTo(cx,cy);ctx.lineTo(cx,cy+len*0.4);ctx.stroke();
+/* 绳子 */
+var sx=cx+Math.cos(angle)*len,sy=cy+Math.sin(angle)*len*0.5+len*0.5;
+ctx.strokeStyle='rgba(255,255,255,.5)';ctx.lineWidth=1.5;ctx.beginPath();ctx.moveTo(cx,cy+len*0.4);ctx.lineTo(sx,sy);ctx.stroke();
+/* 竹筒（知了） */
+ctx.save();ctx.translate(sx,sy);ctx.rotate(-angle*2);
+ctx.fillStyle=skin%2?'#d9c07a':'#c8a24a';ctx.beginPath();ctx.roundRect?ctx.roundRect(-22,-12,44,24,6):ctx.rect(-22,-12,44,24);ctx.fill();
+ctx.strokeStyle='#8a6b28';ctx.lineWidth=2;ctx.stroke();
+for(let i=-1;i<=1;i++){ctx.beginPath();ctx.moveTo(i*12,-12);ctx.lineTo(i*12,12);ctx.stroke()}
+ctx.fillStyle='#3a2c10';ctx.beginPath();ctx.arc(-14,0,3,0,Math.PI*2);ctx.fill();ctx.restore();
+/* 速度指示 */
+ctx.fillStyle='rgba(255,255,255,.4)';ctx.font='12px system-ui';ctx.textAlign='center';ctx.fillText('○',cx,cy-16)}
+function loop(ts){if(!last)last=ts;var dt=(ts-last)/1000;last=ts;
+if(auto&&Math.abs(omega)<12)omega+=8*dt;
+omega*=Math.pow(0.55,dt);angle+=omega*dt;
+var turnsNow=Math.floor(Math.abs(angle)/(Math.PI*2));if(turnsNow>turns){total+=turnsNow-turns;turns=turnsNow;try{localStorage.setItem('ff_bamboo_total',String(total))}catch(e){}showTotal();$('turns').textContent=turns}
+$('rpm').textContent=Math.round(Math.abs(omega)*60/(Math.PI*2));sound();draw();raf=requestAnimationFrame(loop)}
+function pointerDown(e){dragging=true;lastAng=null;initAudio();if(audioCtx&&audioCtx.state==='suspended')audioCtx.resume()}
+function pointerMove(e){if(!dragging)return;var r=cv.getBoundingClientRect(),x=e.clientX-r.left-r.width/2,y=e.clientY-r.top-r.height*0.55;var a=Math.atan2(y,x);if(lastAng!==null){var d=a-lastAng;while(d>Math.PI)d-=2*Math.PI;while(d<-Math.PI)d+=2*Math.PI;omega=omega*0.5+d*14;if(Math.abs(omega)>16)omega=16*Math.sign(omega)}lastAng=a}
+function pointerUp(){dragging=false;lastAng=null}
+stage.addEventListener('pointerdown',function(e){e.preventDefault();pointerDown(e)});
+window.addEventListener('pointermove',pointerMove);window.addEventListener('pointerup',pointerUp);
+$('auto').addEventListener('click',function(){auto=!auto;this.classList.toggle('on',auto);this.textContent=auto?'自动甩：开':'自动甩';if(auto)initAudio()});
+$('mute').addEventListener('click',function(){muted=!muted;this.textContent=muted?'🔇 声音：关':'🔊 声音：开';if(gain)gain.gain.value=0});
+$('skin').addEventListener('click',function(){skin++});
+window.addEventListener('resize',resize);
+document.addEventListener('keydown',function(e){if(e.repeat)return;if(e.code==='Space'){e.preventDefault();auto=!auto;$('auto').classList.toggle('on',auto);$('auto').textContent=auto?'自动甩：开':'自动甩';if(auto)initAudio()}else if(e.key==='Escape'){try{parent.postMessage({type:'exit'},'*')}catch(_){}}});
+window.__BAMBOO={get omega(){return omega},get turns(){return turns},get total(){return total},setOmega:function(v){omega=v}};
+resize();draw();showTotal();raf=requestAnimationFrame(loop);})();</script></body></html>
