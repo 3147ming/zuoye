@@ -1085,6 +1085,52 @@ const m = clean.match(/https:\/\/[a-z0-9-]+\.(?:app\.lhr\.life|lhr\.life)/i);
 
 ---
 
+### 1.28.2 · 联机连不上？根因是域名被污染，改走同源 /ws
+
+**问题**：玩家反馈「连不上」。实测下来，卡住的不是代码，是**域名**：
+
+```
+$ dig worldhub-ws.3147456217.workers.dev
+worldhub-ws.3147456217.workers.dev → 2a03:2880:f11b:83:face:b00c:0:25de
+                                    ^^^^^^^^^^^ Facebook 的 IP 段
+```
+
+`*.workers.dev` 在国内被 DNS 污染，解析到 Facebook 的 `face:b00c` 段。
+所以「换个网络就好」这条建议**不成立**——手机流量（4G/5G）同样被污染。
+而 `*.pages.dev` 解析完全正常。
+
+**解法**：把**同一个 Durable Object** 同时挂到 Pages 项目上，前端改连同源 `/ws`。
+
+| 项 | 改前 | 改后 |
+| --- | --- | --- |
+| 前端首选地址 | `wss://worldhub-ws.…workers.dev/ws`（被污染） | `wss://zuoye-e0c.pages.dev/ws`（干净） |
+| 候选顺序 | meta → 同源 | **同源 → meta** |
+| workers.dev 角色 | 主路径 | 备选（挂了就用） |
+
+改动清单：
+- 新增 `functions/ws.js`：Pages Function 入口，把 `/ws` 转给 DO。
+  它 `import` 并复用 `functions/api/net.js` 里的 `Rooms` 类——**不复制房间逻辑**；
+- `functions/api/net.js` 从「历史文件」变成**关键文件**（原先被部署包剔掉了）；
+- 部署包开始携带 `server/`（Functions 构建要解析 `protocol.js` / `room-core.js` / `games/*`）；
+- `_routes.json` 加入 `/ws`（原来只有 `/api/*`）；
+- `net.js` 候选顺序改为「`?ws=` 参数 → 同源 `/ws` → meta」；
+- DO 绑定通过 Cloudflare API 加到 Pages 项目的 `production` 上
+  （namespace `93a5362c…`，与独立 Worker 共用同一个房间表）。
+
+**线上实测**
+
+| 测试 | 结果 |
+| --- | --- |
+| `GET /ws`（无升级头） | 200 `{"ok":true,"hint":"ws 升级端点…"}` |
+| WebSocket 握手 | 成功，收到 `joined` |
+| 建房 → 进房 → 开局 → 快照 | 新增 `tools/ws-online-smoke.mjs`，**6 项全过** |
+| 浏览器端到端（线上真实页面） | `e2e-online` **9 项全过**：建房、2 人进房、开局、血量 100/100 |
+
+**没改的东西**：Worker `worldhub-ws` 照旧部署着，两套地址连的是**同一张房间表**——
+在哪儿建房都能互相看到，workers.dev 在境外或不被污染的网络里反而更近。
+
+---
+
 ### 1.27.0 · 联机全靠 Cloudflare 跑，玩家不用再本地开服
 
 之前联机虽然把「服务端权威 + Durable Object」的代码写好了（见 1.19.2 节），

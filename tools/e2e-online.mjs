@@ -39,7 +39,7 @@ const meta = await A.evaluate(() => {
 });
 ok('meta 指向 Worker', /^wss:\/\/worldhub-ws\.[a-z0-9]+\.workers\.dev\/ws$/.test(meta), meta);
 const ver = await A.evaluate(async () => (await (await fetch('/version.json?t=' + Date.now())).json()).version);
-ok('线上版本 1.28.1', ver === '1.28.1', ver);
+ok('线上版本 1.28.2', ver === '1.28.2', ver);
 
 if (probeOnly) {
   console.log('\n（只校验配置模式，跳过实际连接）');
@@ -55,9 +55,11 @@ const stA = await A.waitForFunction(() => {
   const n = window.PARTY_NET;
   return n && (n.state === 'online' || n.state === 'offline') ? n.state : false;
 }, null, { timeout: 25000 }).then((h) => h.jsonValue()).catch(() => 'timeout');
-ok('会话A 连上 Worker', stA === 'online', stA);
+ok('会话A 连上房间服务', stA === 'online', stA);
 const urlA = await A.evaluate(() => window.PARTY_NET.url);
-ok('连的是 Worker 地址', /workers\.dev/.test(urlA || ''), urlA);
+/* 1.28.2 起：同源 /ws 优先（pages.dev 解析正常），workers.dev 退居备选
+   （它在国内被 DNS 污染）。所以这里断言「连的是同源」，而不是连 Worker 地址。 */
+ok('连的是同源 /ws（绕开 workers.dev 污染）', /\/ws$/.test(urlA || '') && !/workers\.dev/.test(urlA || ''), urlA);
 
 if (stA !== 'online') {
   console.log('\n⚠ 连不上 Worker（沙箱 DNS 污染时属预期），配置校验已通过');

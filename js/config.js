@@ -13,9 +13,9 @@
   'use strict';
 
   var CONFIG = {
-    version: '1.28.1',
+    version: '1.28.2',
     build: '2026-11-23',
-    stage: '第十六批·手机大厅重排 + 联机玩法按需加载',
+    stage: '第十七批·联机改走同源 /ws，绕开 workers.dev 污染',
 
     /* assets/bg/ 下的图片文件名。留空则设置里的下拉只有「默认」。
        例：['plaza.jpg', 'forest.png'] */

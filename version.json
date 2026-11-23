@@ -1,5 +1,5 @@
 {
-  "version": "1.28.1",
+  "version": "1.28.2",
   "build": "2026-11-23",
-  "notes": "两处体验收拾。① 手机大厅重排：上一版把「创建房间」换进首屏了，但玩法选择还排在 658px（首屏外），玩家看到按钮却不知道选哪个玩法；这版把窄屏下的玩法网格改成一行横向滑动的胶囊条（高度 317→63px，顶部 658→151px），并用 placeholder 顶替字段标签再省 96px——现在首屏里能选玩法、建房、进房，大厅总高 1183→847px。② 联机九个玩法客户端改成按需加载：进大厅不再全量下载那 232KB，进对局才拉对应那一份，进大厅下载量 239.6→132.0KB（省 45%）、请求数 17→8。顺带一个只有按需加载才会暴露的 bug：玩法 id snakebattle 与文件名 games.snake.js 对不上，贪吃蛇整个开不出局——已加映射表与兜底重试。"
+  "notes": "联机连不上的根因修掉了。① 根因：`*.workers.dev` 在国内被 DNS 污染（解析到 Facebook 的 face:b00c 段），手机流量同样中招——所以「换网络就好」这条路走不通。② 解法：把同一个 Durable Object 同时挂到 Pages 项目上，新增同源入口 `functions/ws.js`（/ws）与 `functions/api/net.js` 复用同一个 Rooms 类、前端 net.js 的候选顺序改为「?ws= 参数 → 同源 /ws → meta 里的 workers.dev」。`*.pages.dev` 解析正常，主路径彻底绕开污染域名，workers.dev 退居备选。③ 配套：`_routes.json` 加入 /ws；部署包开始携带 server/（Functions 的依赖）与 functions/api/net.js（原先被当历史文件剔掉了）。④ 线上实测：同源 WebSocket 握手成功、建房/进房/开局/快照全通（tools/ws-online-smoke.mjs 6 项），浏览器端到端 9 项全过。"
 }
