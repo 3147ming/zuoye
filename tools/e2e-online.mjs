@@ -39,7 +39,7 @@ const meta = await A.evaluate(() => {
 });
 ok('meta 指向 Worker', /^wss:\/\/worldhub-ws\.[a-z0-9]+\.workers\.dev\/ws$/.test(meta), meta);
 const ver = await A.evaluate(async () => (await (await fetch('/version.json?t=' + Date.now())).json()).version);
-ok('线上版本 1.27.0', ver === '1.27.0', ver);
+ok('线上版本 1.28.0', ver === '1.28.0', ver);
 
 if (probeOnly) {
   console.log('\n（只校验配置模式，跳过实际连接）');
