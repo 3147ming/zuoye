@@ -35,7 +35,14 @@
      返回「候选地址列表」，按优先级排列。connect() 会依次尝试，
      第一个能握手的就留下。这样线上换个部署形态（同源 / 独立 Worker）
      不用改前端，也不会因为某一个域名被 DNS 污染就整个联机不可用。
-     顺序：?ws= 参数（开发调试）→ meta wh-net（可写多个，逗号/空格分隔）→ 同源 /ws */
+     顺序：?ws= 参数（开发调试）→ 同源 /ws → meta wh-net（可写多个，逗号/空格分隔）
+
+     为什么同源排在 meta 前面（1.28.2 改）：
+     线上联机服务已经挂到 Pages 项目上（同一个 Durable Object），
+     所以 `https://<站点>/ws` 和 `wss://<worker>.workers.dev/ws` 连的是同一个房间表。
+     而 `*.workers.dev` 在国内被 DNS 污染（解析到 Facebook 的 face:b00c 段），
+     手机流量一样连不上 —— 同源的 `*.pages.dev` 却是干净的。
+     所以同源优先、workers.dev 退居备选：污染域名不再拖慢每一次连接。 */
   function parseList(raw) {
     if (!raw) return [];
     return String(raw).split(/[\s,]+/).filter(function (s) { return /^wss?:\/\//.test(s); });
@@ -46,10 +53,10 @@
     try {
       list = list.concat(parseList(new URLSearchParams(location.search).get('ws')));
     } catch (e) { /* ignore */ }
-    var meta = document.querySelector('meta[name="wh-net"]');
-    if (meta && meta.content) list = list.concat(parseList(meta.content));
     var proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
     list.push(proto + '//' + location.host + '/ws');
+    var meta = document.querySelector('meta[name="wh-net"]');
+    if (meta && meta.content) list = list.concat(parseList(meta.content));
     /* 去重但保序 */
     var seen = {};
     return list.filter(function (u) {

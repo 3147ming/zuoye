@@ -32,6 +32,10 @@ const COPY = [
   '_redirects',
   '_routes.json',
   'functions/',
+  /* server/ 是 functions 的依赖：functions/api/net.js 与 functions/ws.js
+     import 了 ../../server/protocol.js、room-core.js、games/*。
+     Pages 构建 Functions 时会解析这些 import，少一个就直接构建失败。 */
+  'server/',
   'css/',
   'js/',
   'games/',
@@ -50,10 +54,12 @@ const COPY = [
 const SKIP = [
   path.join('js', 'games'),          // 历史实现，index.html 已不加载
   path.join('tools', 'check-contrib.mjs'),
-  /* 联机（Durable Object）不进 Pages 包：Pages 不支持给 Functions 绑 DO，
-     且本文件 import 了 ../../server/*，不带 server/ 会让 Functions 构建解析失败。
-     线上联机走独立 Node 服务（node server/index.js），源码仍留在 functions/api/net.js 备查。 */
-  path.join('functions', 'api', 'net.js')
+  /* server/ 只取 Functions 真正 import 的那几个模块。
+     server/index.js 是 Node 自建服务入口（依赖 npm 的 ws 包），
+     server/selftest.mjs 是测试脚本 —— Pages 构建用不上，还会让
+     部署包多带一份没人用的东西。 */
+  path.join('server', 'index.js'),
+  path.join('server', 'selftest.mjs')
 ];
 
 const skipAbs = SKIP.map((p) => path.resolve(ROOT, p));
@@ -112,12 +118,18 @@ for (const rel of COPY) {
 
 /* 3. 注入线上联机地址
    ------------------------------------------------------------
-   源码里的 games/party/index.html 保持 <meta name="wh-net" content="">（空），
-   本地开发/自建服务走同源 /ws。线上静态站没有 /ws（Pages 不支持给 Functions
-   绑 Durable Object），联机实际跑在独立 Worker 上，所以打包时把地址写进 meta。
-   meta 只在部署包里出现，界面从不显示它——符合「UI 不暴露服务地址」的口径。
+   源码里的 games/party/index.html 的 meta 写的是 Worker 地址，
+   打包时可以用环境变量覆盖（WH_NET_ENDPOINTS="wss://a/ws wss://b/ws"）。
+
+   1.28.2 起的实际形态：
+     · 联机服务同时挂在 Pages 项目上（同源 /ws）和独立 Worker 上，
+       两边连的是同一个 Durable Object、同一张房间表；
+     · net.js 的候选顺序是「?ws= 参数 → 同源 /ws → 本 meta」，
+       所以同源（pages.dev，解析正常）永远先试；
+     · 本 meta 里的 workers.dev 退居备选 —— 它在国内被 DNS 污染，
+       手机流量也连不上，但不影响主路径。
    多个地址用空格分隔，前端会按顺序尝试，第一个能用就留下。
-   覆盖方式：环境变量 WH_NET_ENDPOINTS="wss://a/ws wss://b/ws" */
+   meta 只在部署包里出现，界面从不显示它——符合「UI 不暴露服务地址」的口径。 */
 const NET_ENDPOINTS = (process.env.WH_NET_ENDPOINTS ||
   'wss://worldhub-ws.3147456217.workers.dev/ws').trim();
 {
