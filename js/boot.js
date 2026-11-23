@@ -34,6 +34,15 @@
   SceneManager.start(document.getElementById('game'));
   SceneManager.change('world');
 
+  /* 竖屏触屏「最近来过」快捷区：等 WorldScene / Directory 都就绪再注入依赖 */
+  if (window.QuickRecent) {
+    window.QuickRecent.init({
+      getItems: function () { return (window.WorldScene && window.WorldScene.ITEMS) || []; },
+      isDirOpen: function () { return !!(window.Directory && window.Directory.isOpen()); },
+      enter: function (it) { if (window.Directory) window.Directory.enter(it); }
+    });
+  }
+
   /* ---------- 顶栏齿轮 ---------- */
   var gear = document.getElementById('gear');
   if (gear) {

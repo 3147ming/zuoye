@@ -5,17 +5,16 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>白噪音 · 专注台</title>
 <!--
-  说明（WorldHub 第四批 · 工具区）
-  上游 Kanso 是「单个 7KB HTML 文件」，但只在 Gumroad 以 Pay-What-You-Want 发放，
-  仓库 lnz79d612/kanso-desk 里只有 README，拿不到源文件。
-  这里按文章描述的功能自己实现一版（棕噪音合成 / 25·50 专注计时 / 本地便签 / 528Hz 提示音），
-  单文件、零依赖、file:// 直接可开，标题与致谢里都不冒称上游产物。
+  白噪音 · 专注台（WorldHub 自研）
+  单文件、零依赖、file:// 直接可开：
+  棕噪音合成 / 25·50 分钟专注计时 / 本地便签 / 528Hz 结束提示音。
+  音频全部由 Web Audio 实时生成，不含任何外部音频素材。
 -->
 <style>
   :root {
     --ink: #0b0a12;
     --paper: #f4e8d6;
-    --dim: rgba(244, 232, 214, 0.46);
+    --dim: rgba(244, 232, 214, 0.72);
     --tide: #7fd8c8;
     --amber: #f0a76e;
   }
@@ -184,6 +183,17 @@
     font-size: 11px;
     letter-spacing: 0.16em;
     color: var(--dim);
+  }
+
+  /* 窄屏：双列改单列，允许纵向滚动，不再互相挤压（P2-14） */
+  @media (max-width: 640px) {
+    body { overflow-y: auto; align-items: flex-start; justify-content: flex-start; padding: 14px; }
+    .app {
+      width: 100%; height: auto; min-height: 100%;
+      grid-template-columns: 1fr; grid-template-rows: auto auto 1fr;
+      gap: 12px;
+    }
+    .note { min-height: 220px; }
   }
 </style>
 </head>

@@ -9,26 +9,40 @@
   *{box-sizing:border-box}
   html,body{height:100%;margin:0}
   body{background:#0b0914;color:#f3e9da;font-family:var(--sans);display:flex;justify-content:center;overflow:auto}
-  .wrap{width:min(760px,100%);padding:24px 20px 40px;display:flex;flex-direction:column;gap:18px}
+  .wrap{width:min(760px,100%);padding:16px 14px 24px;display:flex;flex-direction:column;gap:12px}
   h1{margin:0;font-size:18px;font-weight:600;letter-spacing:.16em;color:#ffd9a8}
   .bar{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
   button{font:inherit;font-size:14px;padding:9px 18px;border-radius:10px;cursor:pointer;
     border:1px solid rgba(246,193,119,.35);background:rgba(246,193,119,.1);color:#f6c177}
   button:hover{background:rgba(246,193,119,.2)}
   button.pri{background:#f6c177;color:#1a120a;border-color:#f6c177}
-  .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(120px,1fr));gap:12px}
-  .sw{border-radius:14px;overflow:hidden;cursor:pointer;border:1px solid rgba(255,255,255,.08);
-    transition:transform .12s ease}
-  .sw:hover{transform:translateY(-3px)}
-  .chip{height:104px}
-  .meta{padding:8px 10px;background:rgba(255,255,255,.04);font-size:12px;line-height:1.5}
-  .meta b{display:block;font-size:13px;letter-spacing:.06em;color:#f3e9da}
-  .meta i{font-style:normal;color:rgba(243,233,218,.5)}
-  .hint{font-size:12px;color:rgba(243,233,218,.4)}
+  /* 第八批⑤：格子自适应 + chip 随可视高度收缩，矮舞台也不裁切 */
+  .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(104px,1fr));gap:10px;align-items:stretch}
+  .sw{border-radius:12px;overflow:hidden;cursor:pointer;border:1px solid rgba(255,255,255,.1);
+    display:flex;flex-direction:column;min-width:0;transition:transform .12s ease}
+  .sw:hover{transform:translateY(-2px)}
+  .chip{height:clamp(72px,11vh,104px);padding:10px;display:flex;flex-direction:column;
+    justify-content:space-between;font-variant-numeric:tabular-nums}
+  .c-top{display:flex;align-items:center;justify-content:space-between;gap:6px;flex-wrap:wrap}
+  .c-hex{font-size:13px;font-weight:700;letter-spacing:.04em;white-space:nowrap}
+  .c-role{font-size:10px;padding:2px 7px;border-radius:999px;letter-spacing:.08em;white-space:nowrap;
+    background:rgba(0,0,0,.2);border:1px solid rgba(255,255,255,.24)}
+  .c-hsl{font-size:11px;letter-spacing:.02em;opacity:.86;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .meta{padding:6px 10px;background:rgba(255,255,255,.045);font-size:11px;line-height:1.45;
+    color:rgba(243,233,218,.82);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .hint{font-size:12px;color:rgba(243,233,218,.82)}
   .toast{position:fixed;left:50%;bottom:28px;transform:translateX(-50%) translateY(20px);
     background:#f6c177;color:#1a120a;font-size:13px;font-weight:600;padding:9px 18px;border-radius:999px;
     opacity:0;pointer-events:none;transition:all .2s ease}
   .toast.on{opacity:1;transform:translateX(-50%) translateY(0)}
+  /* 手机竖屏：整组单列，色块压矮，保证一组 5–7 色完整落在舞台内 */
+  @media (max-width:500px){
+    .wrap{padding:12px 10px 18px;gap:10px}
+    .grid{grid-template-columns:1fr;gap:8px}
+    .chip{height:60px;padding:8px}
+    .c-hex{font-size:12px}
+    button{font-size:13px;padding:8px 14px}
+  }
 </style>
 </head>
 <body>
@@ -44,7 +58,8 @@
 <div class="toast" id="toast"></div>
 <script>
 (function(){
-  var grid=document.getElementById('grid'), toastEl=document.getElementById('toast');
+  'use strict';
+  var grid=document.getElementById('grid'), toastEl=document.getElementById('toast'), modeEl=document.getElementById('mode');
   var current=[];
 
   function hsl2hex(h,s,l){
@@ -56,6 +71,7 @@
     function to(v){return Math.round((v+m)*255).toString(16).padStart(2,'0');}
     return '#'+to(r)+to(g)+to(b);
   }
+  function wrap(h){ return ((h%360)+360)%360; }
   function toast(msg){
     toastEl.textContent=msg; toastEl.classList.add('on');
     clearTimeout(toast._t); toast._t=setTimeout(function(){toastEl.classList.remove('on');},1200);
@@ -69,32 +85,91 @@
       document.body.removeChild(ta);
     }
   }
-  function gen(){
+
+  /* 第八批⑤：去掉纯彩虹随机，只从三种和谐方案里抽。
+     全部以随机主色 hBase 为核心；饱和度 55–75、明度 45–65 且阶梯有序。 */
+  function palette(){
     var hBase=Math.floor(Math.random()*360);
-    var schemes=[
-      [0,30,60,120,180,240,300],            // 随机
-      [0,30,60,90,120,150,180].map(function(d){return hBase+d;}),  // 邻近
-      [0,180,60,240,120,300,30].map(function(d){return hBase+d;}), // 对比
-      [0,120,240,60,180,300,30].map(function(d){return hBase+d;})  // 三角
-    ];
-    var hues=schemes[Math.floor(Math.random()*schemes.length)];
+    var count=5+Math.floor(Math.random()*3);          /* 5–7 色 */
+    var sBase=55+Math.floor(Math.random()*21);        /* 55–75 */
+    var lStart=45+Math.floor(Math.random()*6);        /* 45–50 */
+    var lEnd=60+Math.floor(Math.random()*6);          /* 60–65 */
+    var step=(lEnd-lStart)/Math.max(1,count-1);
+    var scheme=['mono','analog','accent'][Math.floor(Math.random()*3)];
+    var out=[], i, l, s;
+
+    if(scheme==='mono'){
+      /* 同色系：同色相，靠饱和度与明度分层 */
+      for(i=0;i<count;i++){
+        l=Math.round(lStart+step*i);
+        s=Math.max(52,Math.min(78,sBase+((i%2)?2:-2)*i));
+        out.push({h:hBase,s:s,l:l,role:i===0?'主色':(i===1?'辅':'过渡')});
+      }
+    }else if(scheme==='analog'){
+      /* 邻近色：主色 ±20°~40° 内取色，明度同步阶梯 */
+      var spread=20+Math.floor(Math.random()*21);
+      for(i=0;i<count;i++){
+        var t=count===1?0:i/(count-1);
+        out.push({h:wrap(hBase-spread+Math.round(2*spread*t)),
+          s:Math.max(52,Math.min(78,sBase+(i%2?3:-2))),
+          l:Math.round(lStart+step*i),
+          role:i===0?'主色':(i<3?'辅':'过渡')});
+      }
+    }else{
+      /* 主辅点缀：主色 + 2 邻近辅色 + 1 小面积互补点缀 + 过渡色 */
+      var side=Math.random()<0.5?-1:1;
+      out.push({h:hBase,s:Math.min(78,sBase+6),l:Math.round((lStart+lEnd)/2),role:'主色'});
+      out.push({h:wrap(hBase+side*22),s:sBase,l:lStart+4,role:'辅'});
+      out.push({h:wrap(hBase-side*26),s:Math.max(52,sBase-4),l:lEnd-3,role:'辅'});
+      var accentAt=Math.min(count-1,3);
+      for(i=3;i<count;i++){
+        if(i===accentAt){
+          out.push({h:wrap(hBase+180),s:Math.min(78,sBase+10),l:Math.round((lStart+lEnd)/2)+4,role:'点缀'});
+        }else{
+          out.push({h:wrap(hBase+side*(30+(i-3)*8)),s:Math.max(50,sBase-6),
+            l:Math.round(lStart+step*i),role:'过渡'});
+        }
+      }
+    }
+    return { items:out, scheme:scheme };
+  }
+
+  var SCHEME_NAME={mono:'同色系',analog:'邻近色',accent:'主辅点缀'};
+
+  function gen(){
+    var p=palette();
     current=[];
     grid.innerHTML='';
-    hues.forEach(function(h,i){
-      h=((h%360)+360)%360;
-      var s=62+Math.floor(Math.random()*20), l=42+Math.floor(Math.random()*26);
-      var hex=hsl2hex(h,s,l);
+    p.items.forEach(function(it){
+      var s=Math.max(45,Math.min(80,it.s)), l=Math.max(42,Math.min(68,it.l));
+      var hex=hsl2hex(it.h,s,l);
       current.push(hex);
       var sw=document.createElement('div'); sw.className='sw';
-      sw.innerHTML='<div class="chip" style="background:'+hex+'"></div>'+
-        '<div class="meta"><b>'+hex.toUpperCase()+'</b><i>hsl('+Math.round(h)+', '+s+'%, '+l+'%)</i></div>';
+      var chip=document.createElement('div'); chip.className='chip';
+      chip.style.background=hex;
+      /* 按底色明暗自动选黑/白字，浅底深字、深底浅字 */
+      chip.style.color = l>=55 ? '#241a10' : 'rgba(255,246,235,.94)';
+      var top=document.createElement('div'); top.className='c-top';
+      var hx=document.createElement('span'); hx.className='c-hex'; hx.textContent=hex.toUpperCase();
+      var role=document.createElement('span'); role.className='c-role'; role.textContent=it.role;
+      top.appendChild(hx); top.appendChild(role);
+      var hs=document.createElement('span'); hs.className='c-hsl';
+      hs.textContent='HSL '+Math.round(it.h)+'° · '+s+'% · '+l+'%';
+      chip.appendChild(top); chip.appendChild(hs);
+      var meta=document.createElement('div'); meta.className='meta';
+      meta.textContent=it.role==='点缀' ? '点缀色 · 小面积使用' : (it.role+' · 点击复制 HEX');
+      sw.appendChild(chip); sw.appendChild(meta);
       sw.onclick=function(){ copy(hex.toUpperCase()); };
       grid.appendChild(sw);
     });
-    document.getElementById('mode').textContent='和谐配色 · 点色块复制 HEX';
+    modeEl.textContent=SCHEME_NAME[p.scheme]+' · 主色 / 辅 / 点缀 · 点色块复制 HEX';
   }
+
   document.getElementById('gen').onclick=gen;
-  document.getElementById('copyAll').onclick=function(){ copy(current.map(function(c){return c.toUpperCase();}).join('  ')); };
+  /* 按主色 → 辅色 → 点缀顺序拼接（current 已按此顺序生成） */
+  document.getElementById('copyAll').onclick=function(){
+    copy(current.map(function(c){return c.toUpperCase();}).join('  '));
+  };
   gen();
 })();
 </script>

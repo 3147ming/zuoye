@@ -21,7 +21,8 @@ var MODULES = {
   quiz: require('./quiz'),
   draw: require('./draw'),
   pitch: require('./pitch'),
-  duel: require('./duel')
+  duel: require('./duel'),
+  fist: require('./fist')
 };
 
 /* 前端要展示的目录信息（顺序 = 大厅里的排序） */
@@ -41,7 +42,9 @@ var CATALOG = [
   { id: 'pitch', name: '球场 2v2', tag: '带球射门', players: '2–4 人', glyph: 'pitch',
     desc: '推球带球射门，先进 3 球；草地与冰面两种手感 · 全流程客户端预测', color: '#7ee0c0' },
   { id: 'duel', name: '弹弹岛对战', tag: '抛物线对轰', players: '2–4 人', glyph: 'bounce',
-    desc: '真人轮流开炮：重力+横风抛物线，炸人扣血、落海出局，3 张场地 + 巡逻气球', color: '#ffd166' }
+    desc: '真人轮流开炮：重力+横风抛物线，炸人扣血、落海出局，3 张场地 + 巡逻气球', color: '#ffd166' },
+  { id: 'fist', name: '招式格斗', tag: '轻快对轰', players: '2 人', glyph: 'fight',
+    desc: 'Q 版格斗：跳跃+拳脚+三个专属技能，把对手血打空，三局两胜', color: '#ff9f6e' }
 ];
 
 function get(id) {

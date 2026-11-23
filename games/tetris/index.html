@@ -2,61 +2,71 @@
 <html lang="zh-CN">
 <head>
 <meta charset="utf-8">
-<title>俄罗斯方块 · BlockRain</title>
-<!--
-  壳页说明（WorldHub 第四批接入）：
-  上游 Aerolab/blockrain.js 的 index.html 是「多个自动演示棋盘」的宣传页，
-  不是可玩的入口，因此本文件只做最小页面骨架：
-    · 一块填满视口的棋盘容器
-    · 引入本地 jQuery（vendor/jquery.min.js）+ 上游 blockrain 的 js
-    · 一行初始化代码（autoplay:false）
-  游戏逻辑全部在上游 blockrain.jquery.min.js 里，未做任何改写。
--->
-<link rel="stylesheet" href="blockrain.css">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>俄罗斯方块</title>
+<link rel="icon" href="data:,">
 <style>
+  :root { --sans: "PingFang SC", "Microsoft YaHei", system-ui, sans-serif; }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
   html, body { height: 100%; margin: 0; }
   body {
-    display: flex; align-items: center; justify-content: center;
     background: radial-gradient(90% 70% at 50% 0%, #1d1830 0%, #0a0816 70%, #06050d 100%);
-    color: #e9e2f5;
-    font-family: "PingFang SC", "Microsoft YaHei", system-ui, sans-serif;
-    overflow: hidden;
-    user-select: none;
+    color: #e9e2f5; font-family: var(--sans);
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    gap: 1.2vmin; overflow: hidden; user-select: none; -webkit-user-select: none;
+    padding: 1.5vmin;
   }
-  .wrap { position: relative; width: 100%; height: 100%; display: flex; flex-direction: column; }
-  .board-wrap { flex: 1 1 auto; min-height: 0; display: flex; align-items: center; justify-content: center; }
-  /* 10 列 × 26px = 260，20 行 × 26px = 520：棋盘容器给准尺寸，canvas 才是 1:1 不被拉伸 */
-  #board { width: 260px; height: 520px; }
-  .hint {
-    flex: 0 0 auto;
-    padding: 8px 0 10px;
-    text-align: center;
-    font-size: 13px;
-    letter-spacing: 0.12em;
-    color: rgba(233, 226, 245, 0.45);
+  h1 { margin: 0; font-size: clamp(17px, 2.8vmin, 26px); font-weight: 700; letter-spacing: .14em; color: #c8b6ff; }
+  .row { display: flex; align-items: flex-start; gap: 1.4vmin; }
+  .board-wrap { padding: 4px; background: rgba(255,255,255,.07); border-radius: 10px; position: relative; }
+  #cv { display: block; border-radius: 6px; }
+  .side { display: flex; flex-direction: column; gap: .9vmin; min-width: 118px; }
+  .box { background: rgba(255,255,255,.07); border-radius: 10px; padding: .7vmin .9vmin; }
+  .box h3 { margin: 0 0 .3vmin; font-size: clamp(9px, 1.4vmin, 12px); font-weight: 600; opacity: .6; letter-spacing: .1em; }
+  .val { font-size: clamp(17px, 3vmin, 28px); font-weight: 800; font-variant-numeric: tabular-nums; color: #ffd166; }
+  #next { display: block; width: 100px; height: 100px; }
+  #msg {
+    position: absolute; left: 50%; top: 42%; transform: translate(-50%,-50%);
+    background: rgba(10,8,22,.9); padding: 1.2vmin 3vmin; border-radius: 12px;
+    font-size: clamp(15px, 2.6vmin, 24px); font-weight: 700; display: none; pointer-events: none;
   }
+  .hint { font-size: clamp(10px, 1.5vmin, 13px); opacity: .5; letter-spacing: .08em; text-align: center; }
+  #touch { display: none; gap: .7vmin; }
+  #touch button {
+    min-width: 50px; min-height: 42px; border-radius: 12px; border: 0; font-size: 16px; font-weight: 700;
+    background: rgba(255,255,255,.12); color: #e9e2f5; touch-action: none; font-family: var(--sans);
+  }
+  #touch button:active { background: #c8b6ff; color: #14102a; }
+  @media (max-width: 700px), (pointer: coarse) { #touch { display: flex; } }
 </style>
 </head>
 <body>
-  <div class="wrap">
-    <div class="board-wrap"><div id="board"></div></div>
-    <div class="hint">← → 移动 · ↑ 旋转 · ↓ 加速 · 空格 直落 · P 暂停</div>
-  </div>
+<h1>俄罗斯方块</h1>
 
-  <script src="vendor/jquery.min.js"></script>
-  <script src="blockrain.jquery.min.js"></script>
-  <script src="blockrain.jquery.themes.js"></script>
-  <script>
-    $(function () {
-      $('#board').blockrain({
-        theme: 'candy',
-        autoplay: false,
-        autoBlockWidth: false,
-        blockWidth: 10,
-        autoBlockSize: 26,
-        showFieldOnStart: true
-      });
-    });
-  </script>
+<div class="row">
+  <div class="side">
+    <div class="box"><h3>分数</h3><div class="val" id="score">0</div></div>
+    <div class="box"><h3>消行</h3><div class="val" id="lines">0</div></div>
+    <div class="box"><h3>等级</h3><div class="val" id="level">1</div></div>
+    <div class="box"><h3>最高分</h3><div class="val" id="best">0</div></div>
+    <div class="box"><h3>下一个</h3><canvas id="next" width="100" height="100"></canvas></div>
+  </div>
+  <div class="board-wrap">
+    <canvas id="cv"></canvas>
+    <div id="msg"></div>
+  </div>
+</div>
+
+<div id="touch">
+  <button id="b-left">◀</button>
+  <button id="b-rot">⟳</button>
+  <button id="b-right">▶</button>
+  <button id="b-down">▼</button>
+  <button id="b-drop">⤓</button>
+</div>
+
+<div class="hint">← → 移动 · ↑ 旋转 · ↓ 软降 · 空格 直落 · P 暂停 · R 重开</div>
+
+<script src="js/tetris.js"></script>
 </body>
 </html>

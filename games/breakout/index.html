@@ -1,50 +1,75 @@
 <!DOCTYPE html>
 <html lang="zh-CN">
 <head>
-  <title>打砖块</title>
-  <meta http-equiv="Content-Type" content="text/html; charset=utf-8"/>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no"/>
-  <link href="breakout.css" media="screen, print" rel="stylesheet" type="text/css" />
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>打砖块</title>
+<link rel="icon" href="data:,">
+<style>
+  :root { --sans: "PingFang SC", "Microsoft YaHei", system-ui, sans-serif; }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { height: 100%; margin: 0; }
+  body {
+    background: radial-gradient(85% 65% at 50% 0%, #241c3d 0%, #12101f 60%, #08070f 100%);
+    color: #e9e2f5; font-family: var(--sans);
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    gap: 1.1vmin; overflow: hidden; user-select: none; -webkit-user-select: none;
+    padding: 1.5vmin;
+  }
+  h1 { margin: 0; font-size: clamp(17px, 2.8vmin, 26px); font-weight: 700; letter-spacing: .16em; color: #c8b6ff; }
+  .bar { display: flex; align-items: center; gap: .9vmin; flex-wrap: wrap; justify-content: center; }
+  .grp { display: flex; align-items: center; gap: .5vmin; background: rgba(255,255,255,.07); padding: .45vmin .9vmin; border-radius: 10px; }
+  .grp label { font-size: clamp(10px, 1.5vmin, 13px); opacity: .65; }
+  .val { font-weight: 800; font-variant-numeric: tabular-nums; font-size: clamp(13px, 2vmin, 18px); }
+  #lives { color: #ff8fb1; letter-spacing: .1em; }
+  #level { color: #8ff0b5; }
+  button {
+    font-family: var(--sans); font-size: clamp(11px, 1.7vmin, 14px);
+    background: rgba(255,255,255,.12); color: #e9e2f5;
+    border: 1px solid rgba(255,255,255,.16); border-radius: 8px; padding: .4vmin .9vmin; cursor: pointer;
+  }
+  button:hover { background: rgba(255,255,255,.2); }
+  #cv { display: block; border-radius: 10px; box-shadow: 0 16px 40px -18px rgba(0,0,0,.9); max-width: 96vw; max-height: 64vh; }
+  #msg {
+    position: fixed; inset: 0; display: none; flex-direction: column; gap: 1.4vmin;
+    align-items: center; justify-content: center; background: rgba(12,10,24,.8); backdrop-filter: blur(3px);
+  }
+  #msg .m-title { font-size: clamp(20px, 4vmin, 38px); font-weight: 800; color: #ffd166; }
+  #touch { display: none; gap: .6vmin; }
+  #touch button {
+    min-width: 52px; min-height: 44px; border-radius: 12px; font-size: 16px; font-weight: 700;
+    background: rgba(255,255,255,.1); color: #e9e2f5; touch-action: none;
+  }
+  #touch button:active { background: #c8b6ff; color: #14102a; }
+  .hint { font-size: clamp(10px, 1.5vmin, 13px); opacity: .5; text-align: center; }
+</style>
 </head>
-
 <body>
+<h1>打砖块</h1>
 
-  <div id="breakout">
-    <canvas id="canvas">
-      <div class='unsupported'>
-        抱歉，你的浏览器不支持 &lt;canvas&gt;，这个游戏跑不起来
-      </div>
-    </canvas>
-    <div id="levels">
-      <img id="next" class="disabled" src="images/up.png"   title="下一关">
-      <img id="prev" class="disabled" src="images/down.png" title="上一关">
-      <span id="label">关卡：</span><span id="level"></span>
-    </div>
-    <div id="controls">
-      <input id='sound' type='checkbox' />
-      <label for='sound'>音效</label>
-    </div>
-    <div id="instructions" style='display:none;'>
-      <div class='keyboard'>
-        <b>空格</b> 开始<br>
-        <b>左右键</b> 移动挡板<br>
-        <b>上下键</b> 切换关卡
-      </div>
-      <div class='touch'>
-        <b>点击这里</b> 开始<br>
-        <b>拖动</b> 移动挡板<br>
-      </div>
-    </div>
-  </div>
+<div class="bar">
+  <div class="grp"><label>分数</label><span class="val" id="score">0</span></div>
+  <div class="grp"><label>命</label><span class="val" id="lives">♥♥♥</span></div>
+  <div class="grp"><label>关卡</label><span class="val" id="level">1 / 8</span></div>
+  <div class="grp"><label>状态</label><span class="val" id="state">—</span></div>
+  <div class="grp"><button id="btn-new">重开</button></div>
+</div>
 
-  <script src="game.js"></script>
-  <script src="breakout.js"></script>
-  <script src="levels.js"></script>
-  <script>
-  Game.ready(function() {
-    var game = Game.start('canvas', Breakout);
-  });
-  </script>
+<canvas id="cv"></canvas>
 
+<div id="touch">
+  <button id="b-left">◀</button>
+  <button id="b-fire">发球</button>
+  <button id="b-right">▶</button>
+</div>
+
+<div class="hint">← → 移动挡板 · 空格 发球 · R 重开 · 吃到道具会加长/多球/激光</div>
+
+<div id="msg">
+  <div class="m-title"></div>
+  <button>继续</button>
+</div>
+
+<script src="js/breakout.js"></script>
 </body>
 </html>

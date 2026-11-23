@@ -39,6 +39,8 @@
     _last: 0,
     _boundFrame: null,
     _boundResize: null,
+    _boundVis: null,
+    _hiddenPaused: false,
     _ro: null,
 
     /* ---------- 注册 ---------- */
@@ -107,6 +109,9 @@
 
       this._boundFrame = this._boundFrame || this._frame.bind(this);
       this._boundResize = this._boundResize || this._resize.bind(this);
+      /* 切后台暂停 rAF：回到前台再恢复，避免后台无谓跑动画/粒子（第八批⑦） */
+      this._boundVis = this._boundVis || this._onVisibility.bind(this);
+      if (global.document) global.document.addEventListener('visibilitychange', this._boundVis);
 
       this._resize();
       /* 舞台宽度是 min() 算出来的，窗口变化由 ResizeObserver 统一回调；
@@ -132,9 +137,29 @@
       this.running = false;
       if (this._raf) global.cancelAnimationFrame(this._raf);
       this._raf = 0;
+      this._hiddenPaused = false;
       if (this._ro) { try { this._ro.disconnect(); } catch (e) {} this._ro = null; }
       if (this._boundResize) global.removeEventListener('resize', this._boundResize);
+      if (this._boundVis && global.document) global.document.removeEventListener('visibilitychange', this._boundVis);
       return this;
+    },
+
+    /* 页面切到后台：暂停主循环；回到前台：从当前时刻续跑，dt 不会因停顿而变大 */
+    _onVisibility: function () {
+      if (!global.document) return;
+      if (global.document.hidden) {
+        if (this.running && !this._hiddenPaused) {
+          if (this._raf) global.cancelAnimationFrame(this._raf);
+          this._raf = 0;
+          this._hiddenPaused = true;
+        }
+      } else if (this._hiddenPaused) {
+        this._hiddenPaused = false;
+        if (this.running) {
+          this._last = (global.performance && performance.now) ? performance.now() : Date.now();
+          if (!this._raf) this._raf = global.requestAnimationFrame(this._boundFrame);
+        }
+      }
     },
 
     /* ---------- 内部：后备缓冲对齐「舞台实际像素」----------
@@ -155,6 +180,12 @@
 
     /* ---------- 主循环 ---------- */
     _frame: function (now) {
+      /* 后台防御：即便浏览器仍投递 rAF，隐藏时也直接停排，等 visibilitychange 恢复 */
+      if (global.document && global.document.hidden) {
+        this._raf = 0;
+        this._hiddenPaused = true;
+        return;
+      }
       this._raf = global.requestAnimationFrame(this._boundFrame);
 
       var dt = (now - this._last) / 1000;

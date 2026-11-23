@@ -2,25 +2,146 @@
 <html lang="zh-CN">
 <head>
 <meta charset="utf-8">
-<title>番茄钟</title>
-<!--
-  入口壳：上游的入口文件叫 timer.html（内部 pet.html 也链接回 timer.html），
-  而 WorldHub 的区块门统一指向 <目录>/index.html。
-  这里不复制一份 app（避免两个状态源），只做一次同目录跳转。
--->
-<meta http-equiv="refresh" content="0; url=timer.html">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>番茄钟 · 专注台</title>
+<link rel="icon" href="data:,">
 <style>
-  html, body { height: 100%; margin: 0; background: #0d0b14; }
+  :root { --sans: "PingFang SC", "Microsoft YaHei", system-ui, sans-serif;
+    --bg1: #1a1526; --bg2: #0e0b16; --card: rgba(255,255,255,.06); --ink: #f0e9f8;
+    --dim: rgba(240,233,248,.6); --accent: #ff8fb1; --ok: #8ff0b5; --warn: #ffd166; }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { height: 100%; margin: 0; }
   body {
-    display: flex; align-items: center; justify-content: center;
-    color: rgba(233, 226, 245, 0.6);
-    font-family: "PingFang SC", "Microsoft YaHei", system-ui, sans-serif;
-    font-size: 14px; letter-spacing: 0.16em;
+    background: radial-gradient(90% 70% at 50% 0%, var(--bg1) 0%, var(--bg2) 70%, #070610 100%);
+    color: var(--ink); font-family: var(--sans);
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    gap: 1.2vmin; overflow: hidden; user-select: none; -webkit-user-select: none;
+    padding: 2vmin;
   }
-  a { color: #ffd9a8; }
+  h1 { margin: 0; font-size: clamp(17px, 2.6vmin, 26px); font-weight: 700; letter-spacing: .14em; color: #c8b6ff; }
+
+  .card {
+    width: min(94vw, 880px); background: var(--card); border-radius: 18px;
+    padding: 2vmin; display: flex; gap: 2vmin; align-items: stretch;
+    border: 1px solid rgba(255,255,255,.08);
+  }
+  .left { flex: 1 1 auto; display: flex; flex-direction: column; gap: 1vmin; min-width: 0; }
+  .right { flex: 0 0 210px; display: flex; flex-direction: column; gap: 1vmin; }
+
+  .catwrap { position: relative; display: flex; align-items: center; justify-content: center; }
+  #catBox { width: 130px; height: 120px; }
+  .cat-svg { width: 100%; height: 100%; }
+  #ring {
+    position: absolute; inset: -14px; border-radius: 50%;
+    background: radial-gradient(circle, rgba(255,143,177,.22), transparent 62%);
+    opacity: 0; transition: opacity .6s; pointer-events: none;
+  }
+  #ring.on { opacity: 1; animation: breathe 5.5s ease-in-out infinite; }
+  @keyframes breathe { 0%,100% { transform: scale(.94); opacity: .5; } 50% { transform: scale(1.06); opacity: 1; } }
+
+  .mode { text-align: center; font-size: clamp(12px, 1.9vmin, 17px); color: var(--accent); font-weight: 700; letter-spacing: .1em; }
+  .timer { text-align: center; font-size: clamp(46px, 11vmin, 104px); font-weight: 800; font-variant-numeric: tabular-nums; line-height: 1.05; letter-spacing: .02em; }
+  .round { text-align: center; font-size: clamp(11px, 1.6vmin, 14px); color: var(--dim); }
+  .bar { height: 7px; background: rgba(255,255,255,.1); border-radius: 4px; overflow: hidden; margin-top: .6vmin; }
+  .bar i { display: block; height: 100%; width: 0; background: linear-gradient(90deg, var(--accent), #ffd166); border-radius: 4px; transition: width .25s linear; }
+
+  .taskline { text-align: center; font-size: clamp(11px, 1.7vmin, 15px); color: var(--warn); min-height: 1.5em; }
+
+  .btns { display: flex; gap: .7vmin; justify-content: center; flex-wrap: wrap; }
+  button {
+    font-family: var(--sans); font-size: clamp(11px, 1.7vmin, 14px); font-weight: 600;
+    background: rgba(255,255,255,.11); color: var(--ink);
+    border: 1px solid rgba(255,255,255,.15); border-radius: 10px; padding: .55vmin 1.2vmin; cursor: pointer;
+  }
+  button:hover { background: rgba(255,255,255,.2); }
+  button:disabled { opacity: .4; cursor: default; }
+  button.pri { background: linear-gradient(135deg, #ff8fb1, #ff6b8a); color: #fff; border-color: transparent; }
+
+  .panel { background: rgba(255,255,255,.05); border-radius: 12px; padding: 1vmin; }
+  .panel h3 { margin: 0 0 .6vmin; font-size: clamp(10px, 1.5vmin, 13px); font-weight: 600; color: var(--dim); letter-spacing: .1em; }
+
+  .settings { display: none; flex-direction: column; gap: .6vmin; }
+  .srow { display: flex; align-items: center; gap: .6vmin; font-size: clamp(10px, 1.6vmin, 14px); }
+  .srow label { flex: 1; color: var(--dim); }
+  .srow input { width: 62px; background: rgba(255,255,255,.1); color: var(--ink); border: 1px solid rgba(255,255,255,.15); border-radius: 7px; padding: .3vmin .5vmin; font-family: var(--sans); font-size: 13px; }
+  .err { color: #ff9f9f; font-size: 11px; min-height: 1.2em; }
+
+  .addrow { display: flex; gap: .5vmin; }
+  .addrow input { flex: 1; background: rgba(255,255,255,.1); color: var(--ink); border: 1px solid rgba(255,255,255,.15); border-radius: 8px; padding: .45vmin .7vmin; font-family: var(--sans); font-size: 13px; }
+  .task { display: flex; align-items: center; gap: .5vmin; font-size: clamp(11px, 1.6vmin, 14px); padding: .25vmin 0; }
+  .task .name { flex: 1; cursor: pointer; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .task.done .name { text-decoration: line-through; opacity: .45; }
+  .task.pinned .name { color: var(--warn); font-weight: 700; }
+  .task-del { border: 0; background: none; color: rgba(255,255,255,.35); font-size: 15px; padding: 0 .2vmin; }
+  .task-del:hover { color: #ff9f9f; background: none; }
+
+  .chart { display: flex; gap: .4vmin; align-items: flex-end; height: 78px; }
+  .col { flex: 1; display: flex; flex-direction: column; align-items: center; gap: .2vmin; height: 100%; }
+  .barwrap { flex: 1; width: 100%; display: flex; align-items: flex-end; background: rgba(255,255,255,.05); border-radius: 4px; overflow: hidden; }
+  .barwrap i { display: block; width: 100%; background: linear-gradient(180deg, #ffd166, #ff8fb1); border-radius: 4px; transition: height .3s; }
+  .col span { font-size: 10px; opacity: .6; }
+  .col b { font-size: 10px; color: var(--warn); }
+  .goal { font-size: 11px; color: var(--dim); text-align: center; margin-top: .3vmin; }
 </style>
 </head>
 <body>
-  <p>正在打开番茄钟 · <a href="timer.html">如果没有跳转请点这里</a></p>
+<h1>番茄钟 · 专注台</h1>
+
+<div class="card">
+  <div class="left">
+    <div class="catwrap">
+      <div id="ring"></div>
+      <div id="catBox"></div>
+    </div>
+    <div class="mode" id="modeLabel">专注中</div>
+    <div class="timer" id="timerDisplay">25:00</div>
+    <div class="round" id="roundInfo">第 1 / 8 轮</div>
+    <div class="bar"><i id="progressBar"></i></div>
+    <div class="taskline" id="activeTaskText">未设置本轮任务</div>
+    <div class="btns">
+      <button class="pri" id="btnStart">开始</button>
+      <button id="btnPause" disabled>暂停</button>
+      <button id="btnReset">重置</button>
+      <button id="btnSkip">跳过本段</button>
+      <button id="btnNoise">🔇 噪音关</button>
+      <button id="btnFull">⛶ 全屏</button>
+    </div>
+  </div>
+
+  <div class="right">
+    <div class="panel">
+      <h3>本轮任务</h3>
+      <div class="addrow">
+        <input id="taskInput" placeholder="加一个任务…" maxlength="40">
+        <button id="btnAddTask">加</button>
+      </div>
+      <div id="taskList" style="margin-top:.5vmin; max-height:26vh; overflow:auto"></div>
+    </div>
+
+    <div class="panel">
+      <h3>本周完成</h3>
+      <div id="weeklyChart"></div>
+      <div class="goal">累计 <b id="goalCount">0 轮</b></div>
+    </div>
+
+    <div class="panel">
+      <h3>设置</h3>
+      <div class="settings" id="settingsPanel">
+        <div class="srow"><label>专注（分钟）</label><input id="inFocus" type="number" min="1" max="180"></div>
+        <div class="srow"><label>短休息</label><input id="inBreak" type="number" min="1" max="60"></div>
+        <div class="srow"><label>长休息</label><input id="inLong" type="number" min="1" max="120"></div>
+        <div class="srow"><label>目标轮数</label><input id="inGoal" type="number" min="1" max="12"></div>
+        <div class="err" id="settingsError"></div>
+        <button id="btnApply" style="width:100%">应用</button>
+      </div>
+      <div class="btns" style="margin-top:.5vmin">
+        <button id="btnSettings">⚙ 时长设置</button>
+        <button id="btnCat">🙈</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="js/pomodoro.js"></script>
 </body>
 </html>

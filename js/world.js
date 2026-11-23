@@ -140,7 +140,7 @@
   var ITEMS = [
     { id: 'noise', cat: 'tools', name: '白噪音', src: 'tools/noise/index.html',
       color: '#7fd8c8', glyph: 'noise', desc: '棕噪音 · 计时 · 便签', seed: 1103, ratio: 'auto' },
-    { id: 'pomodoro', cat: 'tools', name: '番茄钟', src: 'tools/pomodoro/timer.html',
+    { id: 'pomodoro', cat: 'tools', name: '番茄钟', src: 'tools/pomodoro/index.html',
       color: '#f07167', glyph: 'pomodoro', desc: '专注计时 · 陪伴小猫', seed: 1104, ratio: 'auto' },
     { id: 'focus', cat: 'tools', name: '专注模式', src: 'tools/focus/index.html',
       color: '#8fd8c8', glyph: 'noise', desc: '番茄钟 + 棕噪音 · 一键开始', seed: 1125, ratio: 'auto' },
@@ -179,7 +179,7 @@
     { id: 'tetris', cat: 'games', group: '🕹 开源小游戏', name: '俄罗斯方块', src: 'games/tetris/index.html',
       color: '#9b8afb', glyph: 'tetris', desc: '方块下落 · 消行', seed: 1107, ratio: '16/9' },
     { id: 'fight', cat: 'games', group: '🕹 开源小游戏', name: '格斗', src: 'games/fight/index.html',
-      color: '#e8545f', glyph: 'fight', desc: '本地双人 · 出招掉血', seed: 1108, ratio: '16/9' },
+      color: '#e8545f', glyph: 'fight', desc: 'Q 版对轰 · 本地 / 联机', seed: 1108, ratio: '16/9' },
     { id: 'mine', cat: 'games', group: '🕹 开源小游戏', name: '扫雷', src: 'games/mine/index.html',
       color: '#6fc2ef', glyph: 'mine', desc: '翻格子 · 插旗', seed: 1109, ratio: '4/3' },
     { id: 'gomoku', cat: 'games', group: '🕹 开源小游戏', name: '五子棋', src: 'games/gomoku/index.html',

@@ -29,19 +29,21 @@
     'iframe-仓库行动': { cross: true },
     /* 本地开源门（同源）：派发合成键盘事件 */
     'iframe-俄罗斯方块': { keys: [
+      /* 键盘键位：← → 移动、↑ 旋转、↓ 软降、空格硬降 */
       K('←', 'ArrowLeft', 'ArrowLeft', 37, 'L'), K('→', 'ArrowRight', 'ArrowRight', 39, 'L'),
-      K('↻', 'ArrowUp', 'ArrowUp', 38, 'R'), K('▼', 'ArrowDown', 'ArrowDown', 40, 'R')
+      K('↻', 'ArrowUp', 'ArrowUp', 38, 'R'), K('▼', 'ArrowDown', 'ArrowDown', 40, 'R'),
+      K('⤓', 'Space', ' ', 32, 'R')
     ] },
     'iframe-格斗': { keys: [
-      /* 左组：P1 移动（mk.js 实际键位：方向键移动，A/S/D/F 攻击，Shift 防御）
-         说明文字已同步改为与 mk.js 一致；P2 暂无键盘控制器（上游需摄像头）。 */
-      K('←', 'ArrowLeft', 'ArrowLeft', 37, 'L'), K('→', 'ArrowRight', 'ArrowRight', 39, 'L'),
-      K('↑', 'ArrowUp', 'ArrowUp', 38, 'L'), K('↓', 'ArrowDown', 'ArrowDown', 40, 'L'),
-      /* 右组：P1 攻击 + 防御 */
-      K('A', 'KeyA', 'a', 65, 'R'), K('S', 'KeyS', 's', 83, 'R'),
-      K('D', 'KeyD', 'd', 68, 'R'), K('F', 'KeyF', 'f', 70, 'R'),
-      K('SHIFT', 'ShiftLeft', 'Shift', 16, 'R')
-    ], note: '双人对战建议电脑端（P2 暂无键盘控制器）' },
+      /* 1P 键位：W/A/S/D 移动跳跃 + J 直拳 + K 小踢 + U/I/O 三个技能。
+         绝不能派发方向键——那是 2P 的位置（同屏双人共用一张键盘）。 */
+      K('◀', 'KeyA', 'a', 65, 'L'), K('▶', 'KeyD', 'd', 68, 'L'),
+      K('▲', 'KeyW', 'w', 87, 'L'), K('▼', 'KeyS', 's', 83, 'L'),
+      /* 右组：拳 / 踢 / 技能 1-3 */
+      K('拳', 'KeyJ', 'j', 74, 'R'), K('踢', 'KeyK', 'k', 75, 'R'),
+      K('技1', 'KeyU', 'u', 85, 'R'), K('技2', 'KeyI', 'i', 73, 'R'),
+      K('技3', 'KeyO', 'o', 79, 'R')
+    ], note: '手机端操作 1P；2P 请用电脑键盘' },
     'iframe-打砖块': { swipe: true, keys: [ K('开球', 'Space', ' ', 32, 'R') ] }
     /* 其余（2048 / 五子棋 / 扫雷 / 白噪音 / 番茄钟）：原生触摸即可，只保留返回键 */
   };

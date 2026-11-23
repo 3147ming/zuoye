@@ -1,12 +1,64 @@
 <!DOCTYPE html>
 <html lang="zh-CN">
 <head>
-	<meta charset="UTF-8">
-	<title>五子棋</title>
-	<link rel="stylesheet" type="text/css" href="css/style.css">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>五子棋</title>
+<link rel="icon" href="data:,">
+<style>
+  :root { --sans: "PingFang SC", "Microsoft YaHei", system-ui, sans-serif; }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { height: 100%; margin: 0; }
+  body {
+    background: radial-gradient(80% 60% at 50% 10%, #4a3c2c 0%, #2a2119 60%, #171310 100%);
+    color: #efe6d4; font-family: var(--sans);
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    gap: 1.2vmin; overflow: hidden; user-select: none; -webkit-user-select: none;
+    padding: 1.6vmin;
+  }
+  h1 { margin: 0; font-size: clamp(18px, 3vmin, 28px); font-weight: 700; letter-spacing: .16em; color: #e8cf9e; }
+  .bar { display: flex; align-items: center; gap: 1vmin; flex-wrap: wrap; justify-content: center; }
+  .grp { display: flex; align-items: center; gap: .5vmin; background: rgba(255,255,255,.08); padding: .45vmin .9vmin; border-radius: 10px; }
+  .grp label { font-size: clamp(10px, 1.5vmin, 13px); opacity: .7; }
+  button, select {
+    font-family: var(--sans); font-size: clamp(11px, 1.7vmin, 14px);
+    background: rgba(255,255,255,.13); color: #efe6d4;
+    border: 1px solid rgba(255,255,255,.17); border-radius: 8px; padding: .4vmin .9vmin; cursor: pointer;
+  }
+  button:hover, select:hover { background: rgba(255,255,255,.22); }
+  #turn { font-weight: 700; font-size: clamp(12px, 1.9vmin, 16px); min-width: 6em; }
+  #score { font-variant-numeric: tabular-nums; font-weight: 700; color: #e8cf9e; }
+  #status { font-size: clamp(13px, 2.2vmin, 19px); font-weight: 700; min-height: 1.6em; color: #8ff0b5; }
+  #status.lose { color: #ff9f9f; }
+  #status.draw { color: #ffd166; }
+  #chess { display: block; border-radius: 12px; box-shadow: 0 18px 44px -18px rgba(0,0,0,.9); max-width: 92vw; max-height: 68vh; }
+  .hint { font-size: clamp(10px, 1.5vmin, 13px); opacity: .55; text-align: center; }
+</style>
 </head>
 <body>
-	<canvas id="chess" width="450px" height="450px"></canvas>
-	<script type="text/javascript" src="js/main.js"></script>
+<h1>五子棋</h1>
+
+<div class="bar">
+  <div class="grp"><span id="turn">你（黑）</span></div>
+  <div class="grp"><label>比分</label><span id="score">0 : 0</span></div>
+  <div class="grp">
+    <label>难度</label>
+    <select id="diff">
+      <option value="easy">简单</option>
+      <option value="normal" selected>普通</option>
+      <option value="hard">困难</option>
+    </select>
+  </div>
+  <div class="grp">
+    <button id="btn-undo">悔棋</button>
+    <button id="btn-new">重开</button>
+  </div>
+</div>
+
+<div id="status"></div>
+<canvas id="chess"></canvas>
+<div class="hint">黑棋先行 · 连成五子获胜 · 落点有橙圈标记最近一步</div>
+
+<script src="js/gomoku.js"></script>
 </body>
 </html>

@@ -26,6 +26,11 @@
   }
   #q.good { background: rgba(79,208,138,.18); }
   #q.bad { animation: shake 300ms; background: rgba(255,159,159,.18); }
+  .answer-tip { font-size: clamp(14px, 2.2vmin, 20px); min-height: 1.3em; letter-spacing: .06em; }
+  .answer-tip.bad { color: #ff9f9f; }
+  .answer-tip.good { color: #7fd8c8; }
+  #pad.locked { opacity: .45; pointer-events: none; }
+  #ans:disabled { opacity: .5; cursor: not-allowed; }
   @keyframes shake {
     0%,100% { transform: translateX(0); } 20% { transform: translateX(-10px); }
     40% { transform: translateX(8px); } 60% { transform: translateX(-6px); }
@@ -75,6 +80,7 @@
     <span>最高分 <b id="best">—</b></span>
   </div>
   <div id="q">12 + 7 = ?</div>
+  <div class="answer-tip" id="answerTip" aria-live="polite"></div>
   <div id="combo"></div>
   <div class="answer">
     <input id="ans" type="text" inputmode="numeric" autocomplete="off" aria-label="答案输入">
@@ -100,6 +106,7 @@
   'use strict';
   var qEl = document.getElementById('q');
   var ansEl = document.getElementById('ans');
+  var tipEl = document.getElementById('answerTip');
   var leftEl = document.getElementById('left');
   var clockEl = document.getElementById('clock');
   var scoreEl = document.getElementById('score');
@@ -115,6 +122,8 @@
 
   var tier = 1, score = 0, right = 0, asked = 0, streak = 0;
   var left = DURATION, tick = 0, playing = false, cur = null;
+  /* 第八批⑤：判定后到下一题就绪前锁输入，回车/小键盘都不能重复计分或跳题 */
+  var locked = false;
   var used = {};
 
   function rnd(a, b) { return a + Math.floor(Math.random() * (b - a + 1)); }
@@ -151,10 +160,23 @@
     return { text: '3 + 4 = ?', ans: 7 };
   }
 
+  /* 第八批⑤：换题彻底复位——输入、反馈、样式、锁全部清干净 */
   function next() {
     cur = gen();
     qEl.textContent = cur.text;
+    qEl.classList.remove('good', 'bad');
+    tipEl.textContent = '';
+    tipEl.className = 'answer-tip';
     ansEl.value = '';
+    ansEl.disabled = false;
+    pad.classList.remove('locked');
+    locked = false;
+  }
+
+  function lockInput(on) {
+    locked = on;
+    ansEl.disabled = on;
+    if (on) pad.classList.add('locked'); else pad.classList.remove('locked');
   }
 
   function setTier() {
@@ -162,7 +184,7 @@
   }
 
   function submit() {
-    if (!playing) return;
+    if (!playing || locked) return;
     var raw = ansEl.value.trim();
     if (raw === '' || raw === '-') return;
     var v = parseInt(raw, 10);
@@ -185,9 +207,15 @@
       streak = 0;
       tier = Math.max(1, tier - 1);
       comboEl.textContent = '';
+      /* 题目行保持当前算式；答案只进独立反馈区，绝不再拼进 qEl */
       qEl.classList.add('bad');
-      qEl.textContent = cur.text + ' ' + cur.ans;
-      setTimeout(function () { qEl.classList.remove('bad'); next(); }, 900);
+      tipEl.textContent = '✗ 正确答案：' + cur.ans;
+      tipEl.className = 'answer-tip bad';
+      lockInput(true);
+      setTimeout(function () {
+        qEl.classList.remove('bad');
+        next();   /* next() 内统一解锁并清空反馈 */
+      }, 900);
     }
   }
 
@@ -207,7 +235,7 @@
   pad.innerHTML = padHtml;
   pad.addEventListener('pointerdown', function (e) {
     var b = e.target.closest && e.target.closest('button.key');
-    if (!b || !playing) return;
+    if (!b || !playing || locked) return;
     var k = b.getAttribute('data-k');
     if (k === 'del') ansEl.value = ansEl.value.slice(0, -1);
     else if (k === 'ent') submit();
@@ -238,6 +266,7 @@
 
   function finish() {
     playing = false;
+    lockInput(true);   /* 结算期间输入框与小键盘一并停掉 */
     clearInterval(tick);
     startPanel.style.display = 'none';
     endPanel.style.display = 'flex';

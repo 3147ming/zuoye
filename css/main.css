@@ -127,8 +127,12 @@ body::before {
 .hud-title p {
   margin: 0.45cqw 0 0;
   font-size: 0.85cqw;
-  letter-spacing: 0.22em;
-  color: rgba(244, 232, 214, 0.42);
+  letter-spacing: 0.12em;
+  line-height: 1.5;
+  max-width: 46cqw;
+  white-space: normal;
+  overflow-wrap: break-word;
+  color: rgba(244, 232, 214, 0.52);
 }
 
 .hud-keys {
@@ -301,13 +305,21 @@ body[data-scene]:not([data-scene="world"]) .hud-keys {
   display: flex; align-items: center; justify-content: center; gap: 0.9cqw;
   background: #07060c;
   color: rgba(255, 233, 208, 0.72);
-  font-family: var(--sans); font-size: 1.1cqw; letter-spacing: 0.08em;
+  font-family: var(--sans); font-size: 1.22cqw; letter-spacing: 0.08em;
   pointer-events: none;
 }
 .iframe-loading::before {
   content: ''; width: 1.4cqw; height: 1.4cqw; flex-shrink: 0;
   border: 2px solid rgba(255, 214, 170, 0.25); border-top-color: rgba(255, 214, 170, 0.9);
   border-radius: 50%; animation: iframe-spin 0.9s linear infinite;
+}
+/* 秒数会不断变宽（1s → 18s），主行定宽，避免转圈图标左右抖 */
+.iframe-loading-txt { display: inline-block; min-width: 9.6cqw; text-align: left; font-variant-numeric: tabular-nums; }
+/* 提示语单独一行，绝对定位在主行下方：出现/消失都不改变主行宽度 */
+.iframe-loading-hint {
+  position: absolute; left: 50%; top: calc(50% + 1.9cqw); transform: translateX(-50%);
+  font-size: 1.02cqw; letter-spacing: 0.06em; color: rgba(255, 233, 208, 0.56);
+  white-space: nowrap; pointer-events: none;
 }
 @keyframes iframe-spin { to { transform: rotate(360deg); } }
 
@@ -319,13 +331,14 @@ body[data-scene]:not([data-scene="world"]) .hud-keys {
   padding: 0.78cqw 1.5cqw;
   border-radius: 999px;
   border: 1px solid rgba(255, 214, 170, 0.42);
-  background: rgba(14, 11, 24, 0.72);
-  color: rgba(255, 233, 208, 0.92);
+  background: rgba(12, 9, 20, 0.86);
+  color: rgba(255, 233, 208, 0.96);
   font-family: var(--sans);
   font-size: 0.92cqw;
   letter-spacing: 0.12em;
   cursor: pointer;
-  opacity: 0.55;
+  /* 0.55 太淡：压在游戏的浅色条上几乎看不清，找不到返回入口 */
+  opacity: 0.9;
   transition: opacity 160ms ease, transform 160ms ease, border-color 160ms ease, background 160ms ease;
   box-shadow: 0 10px 26px -14px rgba(0, 0, 0, 0.95);
   backdrop-filter: blur(6px);
@@ -366,6 +379,53 @@ body[data-scene]:not([data-scene="world"]) .hud-keys {
   border: 1px solid rgba(255, 180, 120, 0.42);
   pointer-events: none;
   backdrop-filter: blur(6px);
+}
+
+/* ---------- 第八批③：加载超时 / 失败 / 不存在的结果层 ---------- */
+.iframe-result {
+  position: absolute; inset: 0; z-index: 34;
+  display: flex; align-items: center; justify-content: center;
+  padding: 24px; box-sizing: border-box;
+  background: rgba(7, 6, 12, 0.96);
+}
+.iframe-result-card {
+  width: min(92cqw, 440px); box-sizing: border-box;
+  padding: clamp(20px, 3cqw, 34px);
+  border-radius: 16px;
+  border: 1px solid rgba(255, 214, 170, 0.36);
+  background: linear-gradient(160deg, #1b1430, #120d22);
+  color: #f6ede0;
+  font-family: var(--sans);
+  text-align: center;
+  box-shadow: 0 24px 70px -20px rgba(0, 0, 0, 0.9);
+}
+.iframe-result-title {
+  margin-bottom: 10px; font-weight: 700; color: #ffe3bd;
+  font-size: clamp(18px, 2.2cqw, 24px);
+}
+.iframe-result-msg {
+  margin: 0 0 22px; line-height: 1.7;
+  color: rgba(246, 237, 224, 0.82);
+  font-size: clamp(13px, 1.4cqw, 16px);
+  white-space: pre-wrap; word-break: break-word;
+}
+.iframe-result-btns { display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; }
+.iframe-result-btn {
+  min-width: 104px; min-height: 44px; padding: 0 20px;
+  border-radius: 999px; cursor: pointer; font: inherit;
+  letter-spacing: 0.06em;
+  font-size: clamp(13px, 1.2cqw, 15px);
+  border: 1px solid rgba(255, 214, 170, 0.42);
+  background: rgba(255, 214, 170, 0.08);
+  color: #ffe3bd;
+  transition: transform 120ms ease, background 160ms ease;
+}
+.iframe-result-btn:hover { background: rgba(255, 214, 170, 0.18); }
+.iframe-result-btn:active { transform: scale(0.97); }
+.iframe-result-btn:focus-visible { outline: 2px solid rgba(255, 214, 170, 0.9); outline-offset: 2px; }
+.iframe-result-btn.primary {
+  background: linear-gradient(135deg, #f0a76e, #e07a4f);
+  color: #241206; border-color: transparent; font-weight: 700;
 }
 
 /* 触屏没有 hover：直接把按钮做成常亮 */
@@ -454,6 +514,26 @@ body[data-scene]:not([data-scene="world"]) .hud-keys {
   .t-grp-l { left: auto; }
   .t-grp-r { right: auto; }
   .t-cross-hint { position: fixed; bottom: 18cqw; }
+
+  /* 触控目标 ≥ 44px（H / O 是固定层，手指最容易点空的两个） */
+  .t-util {
+    width: 44px; height: 44px;
+    min-width: 44px; min-height: 44px;
+    font-size: 17px;
+  }
+  .t-back {
+    width: 48px; height: 48px;
+    min-width: 44px; min-height: 44px;
+  }
+
+  /* 刘海屏安全区：依赖 index.html 的 viewport-fit=cover */
+  .t-back, .t-top { top: max(10px, env(safe-area-inset-top, 0px)); }
+
+  /* 画布从按钮带之下开始（fixed 的 ⤾ / H / O 约占顶部 64px），
+     画布内的目录 / 齿轮随画布下移，不再与固定按钮同区 */
+  body { align-items: flex-start; }
+  .frame { gap: 8px; }
+  .stage { margin-top: calc(56px + env(safe-area-inset-top, 0px)); flex: 0 0 auto; }
 }
 
 /* ---------- 顶栏齿轮（设置入口）---------- */
@@ -1093,6 +1173,9 @@ body[data-scene]:not([data-scene="world"]) .gear {
   border: 1px solid rgba(240, 167, 110, 0.42);
   box-shadow: 0 24px 60px -18px rgba(0, 0, 0, 0.92);
 }
+/* 桌面宽屏：卡片信息多（时长/难度/人数/离线/操作），给两列留出呼吸宽度 */
+@media (min-width: 900px) { .dir-card { width: min(880px, 94vw); } }
+.dir-head, .dir-search, .dir-chips, .dir-foot { flex: none; }   /* 列向 flex 里别让头部被压扁 */
 .dir-head { position: relative; padding: 14px 16px 6px; }
 .dir-head h2 { margin: 0; font-family: var(--serif); font-size: 17px; font-weight: 600; color: #ffe3bd; letter-spacing: 0.06em; }
 .dir-sub { margin: 4px 0 0; font-size: 11px; color: rgba(243, 233, 218, 0.55); }
@@ -1154,6 +1237,24 @@ body[data-scene]:not([data-scene="world"]) .gear {
   flex: none; font-size: 10px; color: rgba(243, 233, 218, 0.5);
   border: 1px solid rgba(255, 220, 180, 0.16); border-radius: 6px; padding: 2px 6px;
 }
+.dir-item-wrap { display: flex; align-items: stretch; gap: 6px; min-width: 0; }
+.dir-item-wrap.dir-wide { grid-column: 1 / -1; }
+.dir-item-wrap .dir-item { flex: 1 1 auto; width: 100%; min-width: 0; }
+.dir-fav {
+  flex: none; width: 40px; min-width: 40px; min-height: 44px;
+  border: 1px solid rgba(255, 220, 180, 0.14); border-radius: 10px;
+  background: rgba(255, 255, 255, 0.025); color: rgba(243, 233, 218, 0.48);
+  font-size: 19px; cursor: pointer;
+}
+.dir-fav:hover, .dir-fav:focus-visible { background: rgba(240, 167, 110, 0.12); color: #ffd166; }
+.dir-fav.on { color: #ffd166; border-color: rgba(255, 209, 102, 0.42); }
+.dir-meta {
+  display: block; margin-top: 4px; font-size: 10px; line-height: 1.45;
+  color: rgba(243, 233, 218, 0.42); white-space: normal;
+}
+.dir-continue { border-color: rgba(127, 216, 200, 0.36); background: rgba(127, 216, 200, 0.07); }
+.dir-runner { border-color: rgba(155, 138, 251, 0.36); background: rgba(155, 138, 251, 0.07); }
+.dir-empty { grid-column: 1 / -1; padding: 28px 8px; text-align: center; font-size: 13px; color: rgba(243, 233, 218, 0.55); }
 .dir-foot {
   display: flex; align-items: center; justify-content: space-between; gap: 10px;
   padding: 10px 16px 12px; border-top: 1px solid rgba(255, 220, 180, 0.1);
@@ -1165,6 +1266,29 @@ body[data-scene]:not([data-scene="world"]) .gear {
 }
 .dir-hall:hover { background: rgba(240, 167, 110, 0.14); }
 .dir-foot-tip { font-size: 10px; color: rgba(243, 233, 218, 0.4); text-align: right; }
+
+/* 手机横屏（高度很矮）：目录改三列、隐去次要信息，保证一屏能点 */
+@media (max-height: 520px) and (orientation: landscape) {
+  .dir { padding: 8px; }
+  .dir-card { width: min(980px, 96vw); border-radius: 12px; }
+  .dir-head { padding: 9px 16px 2px; }
+  .dir-head h2 { font-size: 15px; }
+  .dir-sub { display: none; }
+  .dir-x { top: 6px; right: 8px; width: 28px; height: 28px; }
+  .dir-search { padding: 4px 16px 4px; }
+  .dir-search input { min-height: 34px; padding: 7px 10px; font-size: 13px; }
+  .dir-chips { flex: none; flex-wrap: nowrap; overflow-x: auto; overflow-y: hidden; gap: 5px; padding: 0 16px 6px; scrollbar-width: none; }
+  .dir-chips::-webkit-scrollbar { display: none; }
+  .dir-chip { flex: none; min-height: 28px; padding: 4px 10px; }
+  .dir-list { grid-template-columns: repeat(3, 1fr); gap: 6px; }
+  .dir-sec-h { padding: 4px 4px 0; }
+  .dir-item { min-height: 46px; padding: 7px 10px; }
+  .dir-txt b { font-size: 13px; }
+  .dir-meta { display: none; }
+  .dir-fav { width: 38px; min-width: 38px; border-radius: 9px; }
+  .dir-foot { padding: 6px 16px 8px; }
+  .dir-hall { min-height: 34px; padding: 6px 12px; }
+}
 
 /* ---------- HUD「目录」直达按钮（紧挨齿轮左侧） ---------- */
 .dirbtn {
@@ -1227,7 +1351,9 @@ body[data-scene]:not([data-scene="world"]) .dirbtn { display: none; }
     height: 34px; font-size: 12px;
   }
   .hud-title h1 { font-size: 15px; }
-  .hud-title p { font-size: 10px; }
+  .hud-title p { font-size: 10px; letter-spacing: 0.06em; max-width: 62vw; line-height: 1.55; }
+  /* 标题下移，避开左上角 ⤾ / H / O 触控按钮带（safe-area 10px + ⤾46 + H/O44） */
+  .hud-title { top: 64px; }
   .toast { font-size: 12px; padding: 7px 14px; bottom: 72px; }
   .dialogue {
     width: min(560px, 86%);
@@ -1242,6 +1368,9 @@ body[data-scene]:not([data-scene="world"]) .dirbtn { display: none; }
 
 /* 竖屏触屏：目录整屏铺满（.dir 已 fixed，卡片高度锁死视口，列表内部滚动） */
 @media (orientation: portrait) and (hover: none) {
+  .dir-chip { min-height: 40px; padding: 7px 12px; }
+  .dir-x { width: 40px; height: 40px; }
+  .dir-fav { width: 44px; min-width: 44px; }
   .dir { padding: 0; align-items: stretch; }
   .dir-card {
     width: 100%; max-width: none; height: 100%; max-height: none;
@@ -1249,6 +1378,50 @@ body[data-scene]:not([data-scene="world"]) .dirbtn { display: none; }
     padding-top: env(safe-area-inset-top, 0px);
     padding-bottom: env(safe-area-inset-bottom, 0px);
   }
+}
+
+/* ---------- 「最近来过」快捷区（竖屏触屏专属） ----------
+   DOM 由 js/quickRecent.js 创建并切换 .on；只在「竖屏 + 触屏 + 大厅 + 目录已关」时出现，
+   填充画布下方原本闲置的空白，点卡片直接进区块（比呼出目录再找更快）。
+   取代原 assets/fix.*.css 里同名的一段，选择器与源工程同上下文，不需要 !important。 */
+@media (orientation: portrait) and (hover: none) {
+  .qrec {
+    width: min(560px, 100%);
+    display: none;
+    flex-direction: column;
+    gap: 8px;
+    padding: 4px 2px calc(96px + env(safe-area-inset-bottom, 0px));  /* 底部给固定虚拟键让位 */
+  }
+  .qrec.on { display: flex; }
+  .qrec-title {
+    margin: 6px 2px 0;
+    font-size: 11px;
+    letter-spacing: .18em;
+    color: rgba(244, 232, 214, .55);
+  }
+  .qrec-list { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .qrec-item {
+    display: flex; align-items: center; gap: 10px;
+    min-height: 52px;
+    padding: 8px 12px;
+    border-radius: 12px;
+    border: 1px solid rgba(255, 220, 180, .14);
+    background: rgba(255, 255, 255, .045);
+    color: #f6ede0;
+    font: inherit; text-align: left;
+    cursor: pointer;
+  }
+  .qrec-item:active { transform: scale(.985); }
+  .qrec-item:focus-visible { border-color: rgba(240, 167, 110, .55); outline: none; }
+  .qrec-dot {
+    flex: none; width: 10px; height: 10px; border-radius: 50%;
+    background: var(--c, #f0a76e);
+    box-shadow: 0 0 8px var(--c, #f0a76e);
+  }
+  .qrec-txt { flex: 1; min-width: 0; }
+  .qrec-txt b { display: block; font-size: 14px; font-weight: 600; color: #ffe3bd; }
+  .qrec-txt i { display: block; font-style: normal; font-size: 11px; color: rgba(243, 233, 218, .55);
+                overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 }
 
 /* ---------- 开发者选项（设置面板，默认收起） ---------- */
@@ -1262,3 +1435,79 @@ body[data-scene]:not([data-scene="world"]) .dirbtn { display: none; }
 }
 .set-dev[open] summary { color: rgba(243, 233, 218, 0.75); margin-bottom: 6px; }
 .set-dev .set-tip { display: block; margin: 6px 0 0; }
+
+/* ============================================================
+ * 第八批① · 响应式等比适配层
+ * 进游戏/工具时，舞台脱离大厅的 16:9 硬约束，铺满可用区（深色底）；
+ * 真正的游戏画面由 .iframe-fit 按各门 ratio 等比内接居中，绝不拉伸。
+ * 大厅 canvas 仍是 16:9，本规则只在进了 iframe 场景（.stage--iframe）后生效。
+ * ============================================================ */
+.stage--iframe {
+  position: fixed;
+  inset: 0;
+  width: auto;
+  height: auto;
+  max-width: none;
+  aspect-ratio: auto;
+  margin: 0 !important;
+  border-radius: 0;
+  box-shadow: none;
+  z-index: 10;
+  background: #0b0817;
+}
+
+/* 等比装裱盒：JS 写入 width/height/transform，iframe 铺满它 */
+.iframe-fit {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  max-width: 100%;
+  max-height: 100%;
+  background: #07060c;
+  box-shadow: 0 0 60px -18px rgba(0, 0, 0, 0.9);
+}
+.iframe-fit--auto {
+  position: absolute;
+  inset: 0;
+  transform: none;
+  width: 100%;
+  height: 100%;
+  overflow: auto;
+}
+.iframe-fit .iframe-scene { width: 100%; height: 100%; }
+
+/* 竖屏：给顶部返回/H/O 栏留出空间，游戏区从栏下开始；触屏按钮仍浮在底部 */
+@media (orientation: portrait) and (max-width: 720px) {
+  .stage--iframe { top: calc(72px + env(safe-area-inset-top, 0px)); }
+
+  /* 小屏装裱盒里的返回按钮 / 加载字改用 px，避免 cqw 过小读不清 */
+  .stage--iframe .iframe-back { padding: 8px 14px; font-size: 12px; top: 10px; }
+  .stage--iframe .iframe-back-prev { left: 10px; }
+  .stage--iframe .iframe-back:not(.iframe-back-prev) { right: 10px; }
+  .stage--iframe .iframe-loading { font-size: 14px; gap: 10px; }
+  .stage--iframe .iframe-loading::before { width: 18px; height: 18px; }
+  .stage--iframe .iframe-loading-txt { min-width: 88px; }
+  .stage--iframe .iframe-loading-hint { font-size: 12px; top: calc(50% + 28px); }
+  .stage--iframe .iframe-offline { font-size: 12px; padding: 8px 14px; top: 64px; }
+  .iframe-result-btns { flex-direction: column; }
+  .iframe-result-btn { width: 100%; }
+}
+
+/* ============================================================
+ * 第八批② · 长按与文本选择全局拦截
+ * 游戏区、大厅卡片、按钮、iframe 容器一律禁选中/长按气泡；
+ * 输入类元素（输入框/文本域/下拉/可编辑区）显式放行，保证可输入可复制。
+ * JS 侧 contextmenu/selectstart 拦截见 js/gestureGuard.js。
+ * ============================================================ */
+html, body {
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+}
+body input, body textarea, body select,
+body [contenteditable]:not([contenteditable="false"]) {
+  -webkit-user-select: text;
+  user-select: text;
+  -webkit-touch-callout: default;
+}

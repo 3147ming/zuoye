@@ -41,10 +41,14 @@ const CORE_SCRIPTS = [
   'js/bgm.js',
   'js/gatePanel.js',
   'js/settings.js',
+  'js/modal.js',
   'js/world.js',
   'js/iframeScene.js',
+  'js/keyboardFit.js',
+  'js/gestureGuard.js',
   'js/touch.js',
   'js/directory.js',
+  'js/quickRecent.js',
   'js/boot.js'
 ];
 /* 懒加载包：按 P 进跑酷前才取 */
@@ -56,7 +60,12 @@ const hash10 = (s) => crypto.createHash('sha256').update(s).digest('hex').slice(
 /* ---------- 0. 版本单一数据源 ---------- */
 const pkg = JSON.parse(read('package.json'));
 const VERSION = pkg.version;
-const BUILD_DATE = new Date().toISOString().slice(0, 10);
+/* 构建日期取本地时区：toISOString 是 UTC，晚上 8 点后在中国会写成「昨天」 */
+const BUILD_DATE = (() => {
+  const d = new Date();
+  const p = (n) => String(n).padStart(2, '0');
+  return d.getFullYear() + '-' + p(d.getMonth() + 1) + '-' + p(d.getDate());
+})();
 
 function patchConfig(src) {
   let s = src;
@@ -144,6 +153,10 @@ fs.writeFileSync(path.join(ASSETS, cssFile), cssMin, 'utf8');
   h = h.replace(/[ \t]*<script src="(?:js\/[^"]+|contrib\/manifest\.js|assets\/app\.[0-9a-f]+\.js)" defer><\/script>\r?\n/g, '');
   h = h.replace(/<\/body>/, '  <script src="assets/' + coreFile + '" defer></script>\n</body>');
 
+  /* 预加载：必须跟着 app 的 hash 一起换，否则旧 hash 404 */
+  h = h.replace(/<link rel="preload" href="assets\/app\.[0-9a-f]+\.js" as="script">/,
+    '<link rel="preload" href="assets/' + coreFile + '" as="script">');
+
   /* preconnect：跨域游戏域名（幂等） */
   if (h.indexOf('rel="preconnect"') < 0) {
     h = h.replace(/<link rel="manifest" href="manifest.webmanifest">/,
@@ -163,31 +176,12 @@ fs.writeFileSync(path.join(ASSETS, cssFile), cssMin, 'utf8');
   fs.writeFileSync(path.join(ROOT, 'index.html'), h, 'utf8');
 }
 
-/* ---------- 4. 重写 sw.js：VERSION + CORE 预缓存清单 ---------- */
-{
-  let sw = read('sw.js');
-  sw = sw.replace(/const VERSION = '[^']*';/, "const VERSION = 'worldhub-v" + VERSION + '-' + coreHash + "';");
-
-  /* 本地 games/ tools/ 入口页也预缓存，离线可进（文件本身自带资源内联） */
-  const entries = [];
-  for (const dir of ['games', 'tools']) {
-    const base = path.join(ROOT, dir);
-    if (!fs.existsSync(base)) continue;
-    for (const d of fs.readdirSync(base)) {
-      if (fs.existsSync(path.join(base, d, 'index.html'))) entries.push('/' + dir + '/' + d + '/index.html');
-    }
-  }
-  const core = [
-    '/',
-    '/index.html',
-    '/manifest.webmanifest',
-    '/assets/' + cssFile,
-    '/assets/' + coreFile
-    /* extra 懒加载包不预缓存：用到时走运行时缓存 */
-  ].concat(entries.sort());
-  const list = core.map((u) => "  '" + u + "'").join(',\n');
-  sw = sw.replace(/const CORE = \[[\s\S]*?\];/, 'const CORE = [\n' + list + '\n];');
-  fs.writeFileSync(path.join(ROOT, 'sw.js'), sw, 'utf8');
+/* ---------- 4. 生成 sw.js：交给 tools/gen-sw.mjs（CORE 清单 + 内容摘要版本号） ---------- */
+/* 不再在这里手拼清单：清单与版本由工程现状扫描得出，产物不变版本不变 */
+try {
+  spawnSync(process.execPath, [path.join(ROOT, 'tools/gen-sw.mjs')], { cwd: ROOT, stdio: 'inherit' });
+} catch (e) {
+  console.error('[build] gen-sw 失败，sw.js 未更新：' + e.message);
 }
 
 /* ---------- 5. 摘要 ---------- */

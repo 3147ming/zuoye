@@ -13,9 +13,9 @@
   'use strict';
 
   var CONFIG = {
-    version: '1.27.0',
+    version: '1.28.0',
     build: '2026-11-23',
-    stage: '第十四批·跑酷两加：四连彩虹之力分四种分支、萤火虫按主题变色',
+    stage: '第十五批·招式格斗联机上线 + 九门游戏自研重写',
 
     /* assets/bg/ 下的图片文件名。留空则设置里的下拉只有「默认」。
        例：['plaza.jpg', 'forest.png'] */

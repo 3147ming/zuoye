@@ -17,7 +17,7 @@
   /* 内容元信息只服务于展示与筛选；离线指页面本身可离线，不含共享数据。 */
   var META = {
     noise:    { tags: ['专注效率', '1分钟解压'], time: '1–50 分钟', level: '轻松', players: '单人', offline: true,  control: '点击 / 滑条' },
-    pomodoro: { tags: ['专注效率'],             time: '25 / 50 分钟', level: '轻松', players: '单人', offline: true,  control: '点击 / 触屏' },
+    pomodoro: { tags: ['专注效率'],             time: '25 分钟起 · 可调', level: '轻松', players: '单人', offline: true,  control: '点击 / 触屏' },
     focus:    { tags: ['专注效率'],             time: '25 分钟起', level: '轻松', players: '单人', offline: true,  control: '一键开始' },
     links:    { tags: ['实用工具'],             time: '1–5 分钟', level: '轻松', players: '单人', offline: false, control: '点击 / 搜索' },
     board:    { tags: ['实用工具', '1分钟解压'], time: '1–3 分钟', level: '轻松', players: '单人', offline: false, control: '键盘输入' },

@@ -30,6 +30,8 @@ const COPY = [
   'sw.js',
   '_headers',
   '_redirects',
+  '_routes.json',
+  'functions/',
   'css/',
   'js/',
   'games/',
@@ -47,7 +49,11 @@ const COPY = [
 /* 即使在白名单目录内也要跳过的东西 */
 const SKIP = [
   path.join('js', 'games'),          // 历史实现，index.html 已不加载
-  path.join('tools', 'check-contrib.mjs')
+  path.join('tools', 'check-contrib.mjs'),
+  /* 联机（Durable Object）不进 Pages 包：Pages 不支持给 Functions 绑 DO，
+     且本文件 import 了 ../../server/*，不带 server/ 会让 Functions 构建解析失败。
+     线上联机走独立 Node 服务（node server/index.js），源码仍留在 functions/api/net.js 备查。 */
+  path.join('functions', 'api', 'net.js')
 ];
 
 const skipAbs = SKIP.map((p) => path.resolve(ROOT, p));
@@ -104,7 +110,41 @@ for (const rel of COPY) {
   console.log('  + ' + rel);
 }
 
-/* 3. 校验 version.json */
+/* 3. 注入线上联机地址
+   ------------------------------------------------------------
+   源码里的 games/party/index.html 保持 <meta name="wh-net" content="">（空），
+   本地开发/自建服务走同源 /ws。线上静态站没有 /ws（Pages 不支持给 Functions
+   绑 Durable Object），联机实际跑在独立 Worker 上，所以打包时把地址写进 meta。
+   meta 只在部署包里出现，界面从不显示它——符合「UI 不暴露服务地址」的口径。
+   多个地址用空格分隔，前端会按顺序尝试，第一个能用就留下。
+   覆盖方式：环境变量 WH_NET_ENDPOINTS="wss://a/ws wss://b/ws" */
+const NET_ENDPOINTS = (process.env.WH_NET_ENDPOINTS ||
+  'wss://worldhub-ws.3147456217.workers.dev/ws').trim();
+{
+  const partyPath = path.join(OUT, 'games', 'party', 'index.html');
+  if (!fs.existsSync(partyPath)) {
+    fail('deploy 包里没有 games/party/index.html，联机地址无处注入');
+  } else {
+    const src = fs.readFileSync(partyPath, 'utf8');
+    const tag = '<meta name="wh-net" content="';
+    if (!src.includes(tag)) {
+      fail('games/party/index.html 缺少 <meta name="wh-net">，联机地址无法注入');
+    } else {
+      let hit = 0;
+      const out = src.replace(/<meta name="wh-net" content="[^"]*">/, () => {
+        hit += 1;
+        return '<meta name="wh-net" content="' + NET_ENDPOINTS + '">';
+      });
+      if (hit !== 1) fail('games/party/index.html 里 wh-net meta 数量异常：' + hit);
+      else {
+        fs.writeFileSync(partyPath, out);
+        console.log('  · 联机地址已注入 → ' + NET_ENDPOINTS);
+      }
+    }
+  }
+}
+
+/* 4. 校验 version.json */
 const vj = path.join(OUT, 'version.json');
 if (!fs.existsSync(vj)) fail('deploy/version.json 不在，「检查更新」会报读不到');
 else {
@@ -117,7 +157,7 @@ else {
   }
 }
 
-/* 4. 页面里引用的脚本/样式是否都在包里 */
+/* 5. 页面里引用的脚本/样式是否都在包里 */
 const html = fs.readFileSync(path.join(OUT, 'index.html'), 'utf8');
 const refs = [];
 const re = /(?:src|href)\s*=\s*["']([^"']+)["']/gi;
@@ -129,12 +169,17 @@ while ((m = re.exec(html))) {
 }
 for (const r of refs) {
   const rel = r.startsWith('/') ? r.slice(1) : r;          /* 处理绝对路径引用，如 /assets/icon.svg */
-  const abs = path.resolve(OUT, rel.split('?')[0]);
-  if (!fs.existsSync(abs)) fail('index.html 引用了包里没有的文件：' + r);
+  const clean = rel.split('?')[0];
+  const abs = path.resolve(OUT, clean);
+  /* Cloudflare Pages 的 HTML 美容：/directory → /directory.html、/foo/ → /foo/index.html */
+  const ok = fs.existsSync(abs) ||
+    (/\/$/.test(clean) ? fs.existsSync(path.join(abs, 'index.html'))
+                       : fs.existsSync(abs + '.html'));
+  if (!ok) fail('index.html 引用了包里没有的文件：' + r);
 }
 console.log('  · index.html 引用的 ' + refs.length + ' 个本地资源全部在包内');
 
-/* 5. 统计 */
+/* 6. 统计 */
 const tot = countTree(OUT);
 console.log('\n文件 ' + tot.files + ' 个，合计 ' + (tot.bytes / 1024 / 1024).toFixed(1) + 'MB');
 console.log(bad ? '\n=== 结果：' + bad + ' 处问题 ===' : '\n=== 结果：deploy/ 可以上传 ===');

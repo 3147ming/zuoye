@@ -111,7 +111,8 @@ if (isFile(partyHtml)) {
     'js/party/net.js', 'js/party/kit.js', 'js/party/lobby.js',
     'js/party/games.js', 'js/party/games.bounce.js', 'js/party/games.balloon.js',
     'js/party/games.tank.js', 'js/party/games.snake.js', 'js/party/games.quiz.js',
-    'js/party/games.draw.js', 'js/party/games.pitch.js', 'js/party/games.duel.js'
+    'js/party/games.draw.js', 'js/party/games.pitch.js', 'js/party/games.duel.js',
+    'js/party/games.fist.js'
   ];
   for (const f of PARTY_JS) {
     if (!html.includes('/' + f)) problems.push('联机页缺少引用：' + f);

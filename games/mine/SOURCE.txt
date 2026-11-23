@@ -1,13 +1,19 @@
-名称：minesweeper（扫雷）
-仓库：https://github.com/michaelbutler/minesweeper
-许可：GPL-3.0（仓库内 license.txt 已原样保留）
+名称：扫雷
+性质：自研实现（WorldHub 原创）
 本地目录：games/mine/
-接入改动（3 处，均已在源码注释中标明「WorldHub 接入补丁」）：
-  1. jQuery 由 Google CDN（ajax.googleapis.com 1.7.2）改为本地 vendor/jquery.min.js（3.7.1）。
-  2. 移除右上角 GitHub 角标 <img>（s3.amazonaws.com 外链，离线必然 404；纯装饰）。
-  3. js/MineSweeper.js 的 initWorkers()：file:// 直开时页面为不透明源（origin 'null'），
-     浏览器拒绝 Worker 加载本地脚本（SecurityError），改为捕获后回落到主线程等价实现
-     （localRun/localTouch/localAdjacent/localCalcWin，算法逐行对应 js/cell_toucher.js）；
-     http(s) 下仍构造真 Worker，行为不变。
-  其余 index.html / css / js / images / load.gif 原样。
-说明：因改动过源码，本目录内文件以 GPL-3.0 而非项目统一许可分发。
+
+组成：
+  index.html      页面骨架、样式（深色主题）
+  js/mine.js      全部逻辑：铺雷、连锁展开、插旗、计时、纪录、触摸长按
+
+机制：
+  · 四档难度：初级 9×9/10 雷、中级 16×16/40 雷、高级 30×16/99 雷、自定义（宽高雷数可填）
+  · 左键挖开、右键插旗；手机短按挖开、长按插旗
+  · 数字提示 1–8，按颜色区分
+  · 剩余雷数 = 总雷数 − 旗数；计时器从第一步开始走
+  · 每档难度记录本地最佳用时
+  · 第一下永远安全（雷避开首点及其 8 邻域），首点若是 0 则连锁展开一片
+
+设计说明：
+  「扫雷」这个玩法类型本身是通用游戏设计（ minesweeper 是几十年前的通用玩法），
+  与任何具体作品无关；具体代码、界面、数值均为本项目独立编写。

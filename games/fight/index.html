@@ -1,127 +1,131 @@
 <!DOCTYPE html>
 <html lang="zh-CN">
 <head>
-    <meta charset="utf-8">
-    <title>mk.js · 格斗</title>
-    <!--
-      适配说明（WorldHub 第四批接入，仅此三处，玩法代码零改动）：
-      1) 删除上游的 <script src="/socket.io/socket.io.js"></script>：
-         file:// 下没有 socket 服务端，保留会 404 并让 io 未定义。
-      2) mk.start 的 gameType 由 'network' 改为 'multiplayer'：
-         上游 demo 页只有联机入口，multiplayer 是 mk.js 自带的本地双人控制器。
-      3) 去掉「是否做房主 / 房间名」两个 prompt 与摄像头列、长说明，
-         改成 1280×720 里放得下的单屏版式（纯排版，不含逻辑）。
-      按键（实际键位以 mk.js 的 keys.p1 / keys.p2 为准）：1P W/A/S/D 移动跳跃 · J 高拳 · K 低拳 · L 踢 · Shift 防御
-                          2P ←/→/↑/↓ 移动跳跃 · [ 低拳 · ] 低踢 · \ 高拳 · Ctrl 防御
-    -->
-    <script src="src/movement.js"></script>
-    <script src="src/mk.js"></script>
-    <link rel="stylesheet" href="styles/styles.css">
-    <style>
-        html, body { height: 100%; margin: 0; background: #07060c; }
-        body {
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            gap: 10px;
-            overflow: hidden;
-            font-family: "PingFang SC", "Microsoft YaHei", system-ui, sans-serif;
-        }
-        #parent { flex: 0 0 auto; }
-        .keys {
-            display: flex;
-            gap: 26px;
-            font-size: 12px;
-            letter-spacing: 0.06em;
-            color: rgba(233, 226, 245, 0.62);
-            text-align: center;
-        }
-        .keys b { color: #ffd9a8; font-weight: 600; }
-        .keys span { white-space: nowrap; }
-    </style>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>招式格斗 · 轻快对战</title>
+<link rel="icon" href="data:,">
+<style>
+  :root { --sans: "PingFang SC", "Microsoft YaHei", system-ui, sans-serif; }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { height: 100%; margin: 0; }
+  body {
+    background: linear-gradient(160deg, #ffe9d6 0%, #ffd3d9 45%, #cfe6ff 100%);
+    color: #3a3340;
+    font-family: var(--sans);
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    gap: 1.6vmin; overflow: hidden; user-select: none; -webkit-user-select: none;
+  }
+  h1 { margin: 0; font-size: clamp(18px, 3.2vmin, 30px); font-weight: 700; letter-spacing: .1em; color: #4a3f52; }
+  .sub { color: rgba(74,63,82,.6); font-size: clamp(11px, 1.6vmin, 14px); letter-spacing: .06em; }
+
+  #app { width: min(96vw, 1180px); height: min(92vh, 760px); display: flex; flex-direction: column; gap: .8vmin; }
+
+  /* ---- 选角 ---- */
+  #pick { flex: 1; overflow: auto; display: flex; flex-direction: column; align-items: center; gap: 1.4vmin; padding: 1vmin; }
+  .pk-head { text-align: center; }
+  .pk-head h2 { margin: 0 0 .4vmin; font-size: clamp(16px, 2.6vmin, 24px); color: #4a3f52; }
+  .pk-tip { margin: 0; font-size: clamp(11px, 1.6vmin, 14px); color: rgba(74,63,82,.66); }
+  .pk-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 1.4vmin; width: 100%; max-width: 900px; }
+  .pk-card {
+    background: rgba(255,255,255,.72); border: 2px solid rgba(255,255,255,.9);
+    border-radius: 16px; padding: 1.4vmin; cursor: pointer; transition: transform .15s, box-shadow .15s;
+    box-shadow: 0 6px 18px -8px rgba(80,60,90,.35); position: relative; overflow: hidden;
+  }
+  .pk-tag {
+    position: absolute; top: 8px; right: 9px; font-size: 11px; font-weight: 800;
+    padding: 2px 7px; border-radius: 999px; opacity: 0; transition: opacity .15s; pointer-events: none;
+  }
+  .pk-tag.p1t { background: #ff8fb1; color: #fff; top: 8px; right: 9px; }
+  .pk-tag.p2t { background: #6fb8e8; color: #fff; top: auto; right: auto; bottom: 9px; left: 9px; }
+  .pk-card.p1 { border-color: #ff8fb1; box-shadow: 0 0 0 3px #ff8fb1, 0 10px 22px -10px rgba(80,60,90,.4); }
+  .pk-card.p2 { border-color: #6fb8e8; box-shadow: 0 0 0 3px #6fb8e8, 0 10px 22px -10px rgba(80,60,90,.4); }
+  .pk-card.both { box-shadow: 0 0 0 3px #ff8fb1, 0 0 0 6px #6fb8e8, 0 10px 22px -10px rgba(80,60,90,.4); }
+  .pk-name { font-size: clamp(15px, 2.4vmin, 21px); font-weight: 700; color: #443a4e; }
+  .pk-title { font-size: clamp(10px, 1.5vmin, 13px); color: rgba(74,63,82,.62); margin-bottom: .8vmin; }
+  .pk-stat { display: flex; align-items: center; gap: .6vmin; font-size: clamp(9px, 1.4vmin, 12px); margin-bottom: .35vmin; }
+  .pk-stat-k { width: 3.2em; color: rgba(74,63,82,.7); flex: none; }
+  .pk-bar { flex: 1; height: 6px; border-radius: 3px; background: rgba(74,63,82,.14); overflow: hidden; }
+  .pk-bar i { display: block; height: 100%; background: var(--c); border-radius: 3px; }
+  .pk-go {
+    margin-top: .6vmin; padding: .9vmin 3vmin; font-size: clamp(13px, 2vmin, 17px); font-weight: 700;
+    color: #fff; background: linear-gradient(135deg, #ff9f6e, #ff6b8a); border: 0; border-radius: 999px;
+    cursor: pointer; font-family: var(--sans); box-shadow: 0 8px 20px -8px rgba(255,107,138,.9);
+  }
+  .pk-go:active { transform: translateY(2px); }
+
+  /* ---- 联机入口 ---- */
+  .pk-online {
+    margin-top: .9vmin; padding: .8vmin 2.4vmin; font-size: clamp(12px, 1.8vmin, 15px); font-weight: 700;
+    color: #4a3f52; background: rgba(255,255,255,.8); border: 2px solid rgba(255,255,255,.95);
+    border-radius: 999px; cursor: pointer; font-family: var(--sans);
+    box-shadow: 0 6px 16px -8px rgba(80,60,90,.5); text-decoration: none; display: inline-block;
+  }
+  .pk-online:active { transform: translateY(2px); }
+
+  /* ---- 舞台 ---- */
+  #stage { flex: 1; display: none; position: relative; align-items: center; justify-content: center; min-height: 0; }
+  #cv { border-radius: 14px; box-shadow: 0 16px 40px -18px rgba(80,60,90,.7); display: block; max-width: 100%; max-height: 100%; }
+  #hudinfo { display: none; justify-content: space-between; font-size: clamp(10px, 1.5vmin, 13px); color: rgba(74,63,82,.7); padding: 0 4px; }
+
+  /* ---- 结算 ---- */
+  #over { position: absolute; inset: 0; display: none; align-items: center; justify-content: center; background: rgba(255,255,255,.55); backdrop-filter: blur(4px); }
+  .pk-over-card { background: rgba(255,255,255,.94); border-radius: 20px; padding: 3vmin 5vmin; text-align: center; box-shadow: 0 20px 50px -20px rgba(80,60,90,.7); }
+  .pk-over-title { font-size: clamp(19px, 3.4vmin, 30px); font-weight: 800; color: #443a4e; }
+  .pk-over-sub { margin: .8vmin 0 1.4vmin; color: rgba(74,63,82,.7); font-size: clamp(12px, 1.8vmin, 16px); }
+
+  /* ---- 触屏按钮 ---- */
+  #touch { display: none; gap: .8vmin; flex-wrap: wrap; justify-content: center; }
+  #touch button {
+    min-width: 54px; min-height: 44px; border-radius: 14px; border: 0; font-size: 17px; font-weight: 700;
+    background: rgba(255,255,255,.85); color: #4a3f52; box-shadow: 0 4px 10px -4px rgba(80,60,90,.5);
+    touch-action: none; font-family: var(--sans);
+  }
+  #touch button:active { background: #ffd9a8; }
+  .tk { flex: none; }
+
+  .keys { display: flex; gap: 20px; font-size: 11px; color: rgba(74,63,82,.62); text-align: center; flex-wrap: wrap; justify-content: center; }
+  .keys b { color: #e06a8a; font-weight: 700; }
+
+  @media (max-width: 760px), (pointer: coarse) { #touch { display: flex; } }
+</style>
 </head>
 <body>
-    <table>
-        <thead>
-            <th>擂台</th>
-        </thead>
-        <tbody>
-            <tr>
-                <td>
-                    <div id="parent">
-                        <div id="utils">
-                            <div id="player1Name" class="playerName">绝对零度</div>
-                            <div id="player1LifeBar" class="lifebar"><div class="life" id="player1Life"></div></div>
-                            <div id="player2Name" class="playerName">卡诺</div>
-                            <div id="player2LifeBar" class="lifebar"><div class="life" id="player2Life"></div></div>
-                        </div>
-                        <div id="arena">
-                        </div>
-                        <div id="loading">
-                            <span class="loadingLabel">加载中…</span>
-                        </div>
-                    </div>
-                </td>
-            </tr>
-        </tbody>
-    </table>
+<div id="app">
+  <h1>招式格斗</h1>
+  <div class="sub">轻快双人 · 四位角色 · 每人三个技能</div>
 
-    <div class="keys">
-        <span>1P <b>← → ↑ ↓</b> 移动跳跃 · <b>A</b> 高拳 · <b>S</b> 低拳 · <b>D</b> 踢 · <b>F</b> 高踢 · <b>Shift</b> 防御</span>
-        <span>2P <b>W A S D</b> 移动跳跃 · <b>H</b> 高拳 · <b>J</b> 低拳 · <b>K</b> 踢 · <b>L</b> 高踢 · <b>Ctrl</b> 防御</span>
-        <span><b>空格</b> 重开</span>
-    </div>
+  <div id="pick"></div>
 
-    <script>
-        (function () {
+  <div id="stage">
+    <canvas id="cv"></canvas>
+    <div id="over"></div>
+  </div>
 
-            function $(id) {
-                return document.getElementById(id);
-            }
+  <div id="hudinfo">
+    <span>1P · W/A/S/D · J 拳 · K 踢 · U/I/O 技能</span>
+    <span>2P · 方向键 · , 拳 · . 踢 · 1/2/3 技能</span>
+  </div>
 
-            function setLife(container, life) {
-                container.style.width = life + '%';
-            }
+  <div id="touch">
+    <button class="tk" id="b-left">◀</button>
+    <button class="tk" id="b-right">▶</button>
+    <button class="tk" id="b-jump">跳</button>
+    <button class="tk" id="b-punch">拳</button>
+    <button class="tk" id="b-kick">踢</button>
+    <button class="tk" id="b-s1">技1</button>
+    <button class="tk" id="b-s2">技2</button>
+    <button class="tk" id="b-s3">技3</button>
+  </div>
 
-            /* 上游 demo 的「空格重开整页」保留：mk.js 本身不用空格 */
-            document.onkeydown = function (e) {
-                if (e.keyCode === 32) {
-                    window.location.reload();
-                }
-            };
+  <div class="keys">
+    <span>1P <b>W A S D</b> 移动跳跃 · <b>J</b> 直拳 · <b>K</b> 小踢 · <b>U I O</b> 三个技能 · <b>Shift</b> 防御</span>
+    <span>2P <b>← → ↑ ↓</b> 移动跳跃 · <b>,</b> 直拳 · <b>.</b> 小踢 · <b>1 2 3</b> 三个技能 · <b>Ctrl</b> 防御</span>
+  </div>
+</div>
 
-            (function () {
-                var startGame = function () {
-                    $('loading').style.visibility = 'hidden';
-                    $('arena').style.visibility = 'visible';
-                    $('utils').style.visibility = 'visible';
-                };
-
-                var options = {
-                    arena: {
-                        container: document.getElementById('arena'),
-                        arena: mk.arenas.types.THRONE_ROOM
-                    },
-                    fighters: [{ name: 'Subzero' }, { name: 'Kano' }],
-                    callbacks: {
-                        attack: function (f, o, l) {
-                            if (o.getName() === 'kano') {
-                                setLife($('player2Life'), o.getLife());
-                            } else {
-                                setLife($('player1Life'), o.getLife());
-                            }
-                        }
-                    },
-                    gameType: 'multiplayer'   /* 本地双人；上游此处为 'network' + socket.io */
-                };
-
-                mk.start(options).ready(function () {
-                    startGame();
-                });
-            }());
-
-        }());
-    </script>
+<script src="src/arena.js"></script>
+<script src="src/render.js"></script>
+<script src="src/main.js"></script>
 </body>
 </html>

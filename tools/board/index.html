@@ -4,6 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>留言板</title>
+<link rel="icon" href="data:,">
 <style>
   :root { --sans: "PingFang SC", "Microsoft YaHei", system-ui, sans-serif; }
   * { box-sizing: border-box; }
@@ -117,7 +118,8 @@
 
   function setMode(m) {
     mode = m;
-    modeEl.textContent = m === 'shared' ? '云端共享' : '本地模式';
+    /* 徽标只表达连接状态；「存到哪」这类语义交给本次操作的一次性提示，避免两处重复 */
+    modeEl.textContent = m === 'shared' ? '云端共享' : '离线模式';
     modeEl.className = 'mode ' + (m === 'shared' ? 'on' : 'off');
   }
 
@@ -195,7 +197,7 @@
         items = loadLocal();
         setMode('local');
         render();
-        if (!silent) hint('云端没连上，显示的是本机留言');
+        if (!silent) hint('暂时显示本机留言');
       });
   }
 
@@ -232,7 +234,8 @@
       items = arr;
       setMode('local');
       textEl.value = '';
-      hint('没存上云端，先记在本机');
+      /* 徽标已是「离线模式」，这里只说明本次结果，不重复同一句；失败态用 err 色 */
+      hint('本条已存到本机 ✓', true);
       render();
     }).then(function () { sendBtn.disabled = false; });
   });

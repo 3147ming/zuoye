@@ -1,7 +1,20 @@
-名称：javascript-snakes（贪吃蛇）
-仓库：https://github.com/jakesgordon/javascript-snakes
-许可：MIT（仓库根目录 LICENSE 文件已原样保留）
+名称：贪吃蛇
+性质：自研实现（WorldHub 原创）
 本地目录：games/snake/
-接入改动：
-  - 无。index.html / snakes.min.js / snakes.min.css / images / sounds 全部原样拷贝。
-  - 未拷贝 fonts/（装饰性 webfont，2.9MB）与 packaged/、vendor/、experiments/、js/、css/（源分片，运行时不加载）。
+
+组成：
+  index.html      页面骨架、样式、HUD、触摸方向键
+  js/snake.js      全部逻辑：移动、吃食增长、碰撞判定、穿墙模式、计分、绘制
+
+机制：
+  · 24×18 网格，蛇从左侧中部出发向右
+  · 吃一个果实 +10 分并长两节；分数越高移动越快（最快 60ms/步）
+  · 撞墙或撞到自己即结束
+  · 「穿墙」开关：开启后从一边出去会从另一边进来
+  · 不能直接反向（不能 180° 掉头自杀）
+  · 最高分本地存档；空格暂停、R 重开
+  · 方向键 / WASD / 触摸方向键均可操控
+
+设计说明：
+  「贪吃蛇」这个玩法类型本身是通用游戏设计（控制一条不断变长的蛇吃食物），
+  与任何具体作品无关；具体代码、视觉、数值均为本项目独立编写。

@@ -39,6 +39,8 @@ const PARTS = [
   'server/games/quiz.js',
   'server/games/draw.js',
   'server/games/pitch.js',
+  'server/games/duel.js',
+  'server/games/fist.js',
   'server/games/index.js',
   'server/room-core.js',
   'server/index.js'

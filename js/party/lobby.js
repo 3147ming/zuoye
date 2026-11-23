@@ -16,7 +16,8 @@
     { id: 'quiz', name: '抢答赛', tag: '同时开抢', desc: '108 道题 · 10 个分类 · 连对加成', color: '#c0a5ff', keys: '点选项 / 按 1234' },
     { id: 'draw', name: '你画我猜', tag: '画板传话', desc: '轮流当画者，96 个词，越快分越高', color: '#ff9f9f', keys: '轮到你时直接在画板上画 · 其余人打字抢猜' },
     { id: 'pitch', name: '球场 2v2', tag: '带球射门', desc: '推球 · 带球 · 射门，先进 3 球 · 草地/冰面两种手感', color: '#7ee0c0', keys: 'WASD / 摇杆跑动 · 空格射门' },
-    { id: 'duel', name: '弹弹岛对战', tag: '抛物线对轰', desc: '真人轮流开炮 · 重力+横风 · 炸人落海 · 巡逻气球', color: '#ffd166', keys: '↑↓ 角度 · ←→ 力度 · A/D 走位 · 空格开火' }
+    { id: 'duel', name: '弹弹岛对战', tag: '抛物线对轰', desc: '真人轮流开炮 · 重力+横风 · 炸人落海 · 巡逻气球', color: '#ffd166', keys: '↑↓ 角度 · ←→ 力度 · A/D 走位 · 空格开火' },
+    { id: 'fist', name: '招式格斗', tag: '轻快对轰', desc: 'Q 版格斗 · 跳跃+拳脚+三个技能 · 三局两胜', color: '#ff9f6e', keys: 'A D 移动 · W 跳 · J 拳 · K 踢 · U I O 技能' }
   ];
 
   function el(tag, cls, text) {

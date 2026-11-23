@@ -259,8 +259,14 @@
         } catch (e) { /* 浏览器不让就算了 */ }
       });
 
-      el('resetSave').addEventListener('click', function () {
-        if (!global.confirm('会清空：所在区块、所有自定义背景、音量设置、自建内容开关。\n确定要重置吗？')) return;
+      el('resetSave').addEventListener('click', async function () {
+        var okReset = global.WHModal
+          ? await global.WHModal.confirm({
+              title: '重置存档', danger: true, okText: '确定重置', cancelText: '取消',
+              message: '会清空：所在区块、所有自定义背景、音量设置、自建内容开关。\n确定要重置吗？'
+            })
+          : global.confirm('会清空：所在区块、所有自定义背景、音量设置、自建内容开关。\n确定要重置吗？');
+        if (!okReset) return;
         try {
           /* 只清本应用（worldhub.*）的键，别误伤同源其它页面（如 tools/*）的存储 */
           Object.keys(global.localStorage)

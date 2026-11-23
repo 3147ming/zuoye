@@ -21,29 +21,26 @@
  *   用户首屏后第一次点游戏，两者抢同一条带宽，越点越慢。现在 install
  *   只拿首屏必需的 4 项，区块页放到空闲队列串行取。
  * ============================================================ */
-const VERSION = 'worldhub-0a2300602f';
+const VERSION = 'worldhub-98dc47cc95';
 const SHELL = [
   '/',
   '/index.html',
   '/manifest.webmanifest',
-  '/assets/app.0d071801bd.js',
+  '/assets/app.541aab1ed8.js',
   '/assets/extra.af9188f73b.js',
   '/assets/main.f0130d185b.css'
 ];
 const LAZY = [
-  '/games/gomoku/index.html',
-  '/tools/pomodoro/index.html',
-  '/games/mine/index.html',
-  '/games/breakout/index.html',
-  '/games/tetris/index.html',
   '/games/party/index.html',
-  '/games/game2048/index.html',
-  '/games/brain-gym/index.html',
+  '/games/gomoku/index.html',
   '/games/snake/index.html',
+  '/games/tetris/index.html',
+  '/games/breakout/index.html',
+  '/games/game2048/index.html',
+  '/games/mine/index.html',
+  '/games/brain-gym/index.html',
   '/tools/unit/index.html',
-  '/games/fight/index.html',
   '/games/ff/cps-test/index.html',
-  '/tools/pomodoro/pet.html',
   '/tools/timer/index.html',
   '/games/ff/spacebar-clicker/index.html',
   '/games/ff/challenge-10-seconds/index.html',
@@ -60,16 +57,17 @@ const LAZY = [
   '/games/ff/frog-memory-leap/index.html',
   '/games/ff/digit-span/index.html',
   '/games/ff/rotating-schulte/index.html',
+  '/games/fight/index.html',
   '/games/ff/bamboo-cicada/index.html',
   '/games/ff/478-breathing/index.html',
   '/games/ff/box-breathing/index.html',
   '/games/ff/resonance-breathing/index.html',
   '/games/ff/trail-making/index.html',
   '/games/ff/focus-sudoku/index.html',
+  '/tools/pomodoro/index.html',
   '/games/reaction/index.html',
   '/games/ff/double-decision/index.html',
   '/games/ff/sbti-test/index.html',
-  '/tools/pomodoro/timer.html',
   '/tools/color/index.html',
   '/tools/focus/index.html',
   '/tools/board/index.html',
