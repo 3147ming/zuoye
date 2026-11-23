@@ -27,7 +27,7 @@ python -m http.server 5350
 
 ### 要联机
 
-**线上版（1.27.0 起）直接就能联**：打开 `https://zuoye-e0c.pages.dev` → 联机大厅 → 建房拿房号，
+**线上版（1.27.0 起）直接就能联**：打开 `https://zuoye-e0c.pages.dev` → 联机大厅 → 建房拿房号（1.28.0 起多了「招式格斗」），
 朋友输号进房。房间服务跑在 Cloudflare Worker（`wss://worldhub-ws.3147456217.workers.dev/ws`），
 玩家**不需要**装 Node、不需要起隧道、不需要填地址。
 
