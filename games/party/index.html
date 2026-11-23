@@ -26,18 +26,11 @@
 <script src="/js/party/predict.js"></script>
 <script src="/js/party/shared.js"></script>
 <script src="/js/party/kit.js"></script>
-<!-- games.js 是公共底座（WH_PARTY_GAMES），七个玩法各自一个文件；
-     顺序不能乱：底座必须最先，玩法之间互不依赖。 -->
+<!-- games.js 是公共底座（WH_PARTY_GAMES），必须最先加载；
+     各个玩法文件改成「用到才加载」（见 lobby.js 的 loadGame），
+     玩家选泡泡堂就只下泡泡堂那一份，不再一进大厅就把九份全拉下来。
+     底座本身很小，玩法之间互不依赖。 -->
 <script src="/js/party/games.js"></script>
-<script src="/js/party/games.bounce.js"></script>
-<script src="/js/party/games.balloon.js"></script>
-<script src="/js/party/games.tank.js"></script>
-<script src="/js/party/games.snake.js"></script>
-<script src="/js/party/games.quiz.js"></script>
-<script src="/js/party/games.draw.js"></script>
-<script src="/js/party/games.pitch.js"></script>
-<script src="/js/party/games.duel.js"></script>
-<script src="/js/party/games.fist.js"></script>
 <script src="/js/party/lobby.js"></script>
 <script>PartyLobby.boot();</script>
 </body>

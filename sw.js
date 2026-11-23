@@ -21,12 +21,12 @@
  *   用户首屏后第一次点游戏，两者抢同一条带宽，越点越慢。现在 install
  *   只拿首屏必需的 4 项，区块页放到空闲队列串行取。
  * ============================================================ */
-const VERSION = 'worldhub-98dc47cc95';
+const VERSION = 'worldhub-d8df0397d8';
 const SHELL = [
   '/',
   '/index.html',
   '/manifest.webmanifest',
-  '/assets/app.541aab1ed8.js',
+  '/assets/app.3ee0ce2c22.js',
   '/assets/extra.af9188f73b.js',
   '/assets/main.f0130d185b.css'
 ];

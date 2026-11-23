@@ -351,14 +351,37 @@ group('7. 客户端预测 · 接线检查');
     const ord = ['js/party/predict.js', 'js/party/shared.js', 'js/party/games.js']
       .map((f) => html.indexOf(f));
     ok(ord.every((v) => v > 0) && ord[0] < ord[2] && ord[1] < ord[2], '页面脚本顺序：predict/shared 先于 games');
-    /* 玩法文件必须在底座之后、lobby 之前：lobby 的 GAMES 表一渲染就会用到它们 */
+    /* 1.28.1 起：玩法文件改成「按需加载」，页面里不再静态 <script> 引用它们，
+       所以「玩法脚本在底座之后、lobby 之前」这条断言已经不适用。
+       换成两件事：
+         a) 底座（games.js）仍必须静态引用，且在 lobby 之前 —— lobby 一渲染就要用命名空间；
+         b) 九个玩法客户端文件必须真实存在，且各自都调用了 K.register
+            （少一个，那个玩法就开不出局）。 */
     const lobbyAt = html.indexOf('js/party/lobby.js');
     const gCoreAt = html.indexOf('/js/party/games.js');
+    ok(gCoreAt > 0 && gCoreAt < lobbyAt, '底座 games.js 在 lobby 之前加载');
+
     const perGame = ['bounce', 'balloon', 'tank', 'snake', 'quiz', 'draw', 'pitch', 'duel', 'fist']
-      .map((id) => ({ id, at: html.indexOf('/js/party/games.' + id + '.js') }));
-    ok(perGame.every((x) => x.at > gCoreAt && x.at < lobbyAt),
-      '九个玩法脚本都在底座之后、lobby 之前',
-      perGame.filter((x) => !(x.at > gCoreAt && x.at < lobbyAt)).map((x) => x.id).join(','));
+      .map((id) => {
+        /* 贪吃蛇的 id 是 snakebattle，文件名却是 games.snake.js */
+        const file = id === 'snake' ? 'snake' : id;
+        const f = path.join(ROOT, 'js/party/games.' + file + '.js');
+        const src = fs.existsSync(f) ? fs.readFileSync(f, 'utf8') : '';
+        const regId = /K\.register\('([a-z]+)'/.exec(src);
+        return { id, file, exists: fs.existsSync(f), reg: regId ? regId[1] : '' };
+      });
+    ok(perGame.every((x) => x.exists), '九个玩法客户端文件都在',
+      perGame.filter((x) => !x.exists).map((x) => x.file).join(','));
+    ok(perGame.every((x) => x.reg), '九个玩法客户端都调用了 K.register',
+      perGame.filter((x) => !x.reg).map((x) => x.file).join(','));
+    /* 贪吃蛇：文件名 snake，注册 id 必须是 snakebattle */
+    const snakeX = perGame.find((x) => x.file === 'snake');
+    ok(snakeX && snakeX.reg === 'snakebattle',
+      '贪吃蛇文件名 snake 但注册 id 是 snakebattle', snakeX && snakeX.reg);
+    /* 加载器与映射表必须在 */
+    const lobbySrc = fs.readFileSync(path.join(ROOT, 'js/party/lobby.js'), 'utf8');
+    ok(/loadGame/.test(lobbySrc), 'lobby.js 带按需加载器 loadGame');
+    ok(/snakebattle:\s*'snake'/.test(lobbySrc), 'lobby.js 有 snakebattle → snake 的文件名映射');
     ok(/WH_PREDICT/.test(gs) && /WH_SHARED/.test(gs), 'games.js 取用 WH_PREDICT / WH_SHARED');
     ok(!/var SH = global.WH_SHARED/.test(gs), '物理引用没有用 SH 这个名字（贪吃蛇场地高 SH 会撞名）');
     /* 三个连续移动玩法都要用到预测 */

@@ -89,7 +89,7 @@
         nameWrap.appendChild(el('span', 'pp-label', '你的昵称'));
         var nameIn = el('input', 'pp-input');
         nameIn.maxLength = 10;
-        nameIn.placeholder = '最多 10 个字';
+        nameIn.placeholder = '你的昵称（最多 10 个字）';
         nameIn.value = state.name;
         nameIn.oninput = function () { saveName(nameIn.value.trim()); };
         nameWrap.appendChild(nameIn);
@@ -100,11 +100,15 @@
            自建服务通过部署配置 / 网址参数指定，不作为可见信息。 */
 
         /* 游戏选择 */
+        var hint = el('div', 'pp-games-hint', '选个玩法');
+        wrap.appendChild(hint);
+
         var grid = el('div', 'pp-games');
         GAMES.forEach(function (g) {
           var card = el('button', 'pp-game' + (state.game === g.id ? ' on' : ''));
           card.type = 'button';
           card.style.setProperty('--c', g.color);
+          card.dataset.game = g.id;
           card.innerHTML =
             '<span class="pp-game-dot"></span>' +
             '<b>' + g.name + '</b>' +
@@ -114,6 +118,12 @@
           grid.appendChild(card);
         });
         wrap.appendChild(grid);
+        /* 窄屏玩法条是横向滚动的，选中的玩法可能在可视区外 —— 把它滚进来。
+           桌面端是普通网格，scrollIntoView 也无害（就地显示）。 */
+        try {
+          var sel = grid.querySelector('.pp-game.on');
+          if (sel && sel.scrollIntoView) sel.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+        } catch (e) { /* ignore */ }
 
         /* 建房 / 进房 */
         var acts = el('div', 'pp-acts');
@@ -125,7 +135,7 @@
         var passIn = el('input', 'pp-input');
         passIn.inputMode = 'numeric';
         passIn.maxLength = 4;
-        passIn.placeholder = '4 位数字';
+        passIn.placeholder = '房间密码（可留空）';
         passIn.oninput = function () {
           passIn.value = passIn.value.replace(/\D/g, '').slice(0, 4);
           state.pass = passIn.value;
@@ -163,7 +173,7 @@
         var jpassIn = el('input', 'pp-input');
         jpassIn.inputMode = 'numeric';
         jpassIn.maxLength = 4;
-        jpassIn.placeholder = '4 位数字';
+        jpassIn.placeholder = '密码（没设就留空）';
         jpassIn.oninput = function () { jpassIn.value = jpassIn.value.replace(/\D/g, '').slice(0, 4); };
         jpassField.appendChild(jpassIn);
         joinBox.appendChild(jpassField);
@@ -276,23 +286,51 @@
         app.appendChild(wrap);
       }
 
-      /* ---------- 对局中：交给具体游戏渲染 ---------- */
+      /* ---------- 对局中：交给具体游戏渲染 ----------
+       * 玩法客户端是按需加载的：进对局时才知道要玩哪个，
+       * 这时才把对应的 games.<id>.js 拉下来。加载期间舞台显示提示，
+       * 加载好了再开画布。 */
       function renderGame() {
         var wrap = el('div', 'pp-wrap pp-wrap-game');
         var stage = el('div', 'pp-stage');
         stage.id = 'ppStage';
         wrap.appendChild(stage);
         app.appendChild(wrap);
-        global.PartyKit.open(stage, net, {
-          onExit: function () {
-            net.leave();
-            state.over = null;
-            render();
-          },
-          onAgain: function () {
-            state.over = null;
-            render();
-          }
+
+        var gameId = net.room && net.room.game;
+
+        function startStage() {
+          if (!app.contains(stage)) return;   /* 玩家已经退出了，别再开画布 */
+          global.PartyKit.open(stage, net, {
+            onExit: function () {
+              net.leave();
+              state.over = null;
+              render();
+            },
+            onAgain: function () {
+              state.over = null;
+              render();
+            }
+          });
+        }
+
+        var loading = el('div', 'pp-loading', '正在加载玩法…');
+        stage.appendChild(loading);
+
+        loadGame(gameId).then(function () {
+          if (!app.contains(stage)) return;
+          stage.innerHTML = '';
+          startStage();
+        }).catch(function (e) {
+          if (!app.contains(stage)) return;
+          stage.innerHTML = '';
+          var msg = el('div', 'pp-err');
+          msg.innerHTML = '玩法加载失败：' + escapeHtml(e && e.message ? e.message : '未知原因') +
+            '<br><button class="pp-btn pp-btn-sm" type="pp-retry">重试</button>';
+          var btn = msg.querySelector('[type="pp-retry"]');
+          btn.type = 'button';
+          btn.onclick = function () { render(); };
+          stage.appendChild(msg);
         });
       }
 
@@ -408,4 +446,75 @@
       return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
     });
   }
+
+  /* ============================================================
+   * 玩法客户端按需加载
+   * ------------------------------------------------------------
+   * 九个玩法文件加起来 232KB，玩家一局只玩其中一个。
+   * 以前九份全在 index.html 里静态 <script>，进大厅就全量下载；
+   * 现在改成：确定要玩哪个玩法了，再把那个文件拉下来。
+   *
+   * 关键点：
+   *   · 加载用普通 <script> 注入（不是 ES Module），保持 file:// 双击可用；
+   *   · 同一玩法只注入一次，重复调用复用同一个 promise；
+   *   · 注入完成前不能开画布 —— 玩法文件是「注册」式的，
+   *     加载完才把 def 挂到 PartyKit.games 上，所以必须等；
+   *   · 加载失败要给出人话提示，不能让玩家对着空白画布发呆。
+   * ============================================================ */
+  var SCRIPT_BASE = '/js/party/games.';
+  /* 玩法 id → 脚本文件名。绝大多数 id 和文件名一致，
+     只有「贪吃蛇大作战」例外：它的 id 叫 snakebattle（避免和单机的 snake 撞名），
+     但客户端文件叫 games.snake.js。这里显式列出来，
+     以后新增玩法若 id 与文件名不一致，改这一处就行。 */
+  var SCRIPT_FILE = {
+    snakebattle: 'snake'
+  };
+  var _loading = {};   /* id → Promise */
+
+  function injectScript(file) {
+    return new Promise(function (resolve, reject) {
+      var s = document.createElement('script');
+      s.src = SCRIPT_BASE + file + '.js';
+      s.async = false;                 /* 保序：多个玩法同时加载时按注入顺序执行 */
+      s.onload = function () { resolve(); };
+      s.onerror = function () {
+        /* 注入失败要把这个 <script> 摘掉，否则页面里会留一个坏节点 */
+        if (s.parentNode) s.parentNode.removeChild(s);
+        reject(new Error('玩法脚本下载失败：' + file));
+      };
+      document.head.appendChild(s);
+    });
+  }
+
+  function loadGame(id) {
+    if (!id) return Promise.reject(new Error('没有玩法 id'));
+    /* 已经注册好了（脚本先前已加载过） */
+    if (global.PartyKit && global.PartyKit.games && global.PartyKit.games[id]) {
+      return Promise.resolve();
+    }
+    if (_loading[id]) return _loading[id];
+
+    var names = [SCRIPT_FILE[id] || id];
+    /* 兜底：万一映射表漏了某个玩法，再按 id 本身试一次。
+       （两套名字都试一遍，命中就停，不会多下无用文件） */
+    if (names[0] !== id) names.push(id);
+
+    _loading[id] = names.reduce(function (chain, file, idx) {
+      return chain.then(function () {
+        if (global.PartyKit && global.PartyKit.games && global.PartyKit.games[id]) return;
+        return injectScript(file).catch(function (e) {
+          if (idx === names.length - 1) throw e;
+        });
+      });
+    }, Promise.resolve()).then(function () {
+      var ok = global.PartyKit && global.PartyKit.games && global.PartyKit.games[id];
+      if (!ok) throw new Error('玩法脚本加载了但没有注册：' + id);
+    });
+
+    /* 失败不缓存，下次还能重试 */
+    _loading[id].catch(function () { delete _loading[id]; });
+    return _loading[id];
+  }
+
+  global.PartyLobby.loadGame = loadGame;
 })(typeof window !== 'undefined' ? window : globalThis);

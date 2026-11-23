@@ -179,6 +179,31 @@ body.playing .pk-wrap { flex: 1 1 auto; min-height: 0; }
 }
 .pp-game.on .pp-game-dot { opacity: 1; box-shadow: 0 0 10px var(--c, var(--warm)); }
 
+/* 玩法条提示：只在窄屏出现（桌面端不需要 telling「左右滑动」） */
+.pp-games-hint { display: none; }
+
+/* 玩法客户端按需加载时的占位提示 */
+.pp-loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 160px;
+  font-size: 13px;
+  color: var(--ink-soft);
+  letter-spacing: .08em;
+}
+.pp-loading::after {
+  content: '';
+  display: inline-block;
+  width: 12px; height: 12px;
+  margin-left: 8px;
+  border: 2px solid rgba(255, 214, 170, .3);
+  border-top-color: var(--warm);
+  border-radius: 50%;
+  animation: pp-spin .7s linear infinite;
+}
+@keyframes pp-spin { to { transform: rotate(360deg); } }
+
 /* ---------- 面板 ---------- */
 .pp-acts { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; align-items: start; }
 @media (max-width: 680px) { .pp-acts { grid-template-columns: 1fr; } }
@@ -854,6 +879,15 @@ body.playing .pk-wrap { flex: 1 1 auto; min-height: 0; }
   .pp-panel h3 { font-size: 13px; }
   .pp-tips { font-size: 11.5px; line-height: 1.6; }
 
+  /* 窄屏把「字段标签」藏掉，改由输入框的 placeholder 承载提示。
+     一个标签行（含 gap）约 24px，三个面板共 4 个字段 = 省下 96px，
+     刚好把「进入房间」按钮推进首屏。占位符文案已按字段区分，不会认错。 */
+  .pp-panel .pp-label { display: none; }
+  .pp-row .pp-label { display: none; }
+  .pp-field { gap: 0; }
+  .pp-input { padding: 9px 12px; font-size: 15px; }
+  .pp-input-code { font-size: 20px; letter-spacing: .28em; }
+
   /* ---- 对局：摇杆收一圈，画布能多出来的都给它 ---- */
   .pk-stick { width: 96px; height: 96px; }
   .pk-stick i { width: 38px; height: 38px; }
@@ -880,6 +914,88 @@ body.playing .pk-wrap { flex: 1 1 auto; min-height: 0; }
     -webkit-line-clamp: 1;
     -webkit-box-orient: vertical;
     overflow: hidden;
+  }
+}
+
+/* ============================================================
+ * 手机大厅 · 玩法条（1.28.1）
+ * ------------------------------------------------------------
+ * 上一版把「创建房间」按钮换到了首屏，但玩法选择仍然排在按钮下面
+ * （order:4 → 顶部 658px），于是玩家打开页面看到的是：
+ *   「创建房间 / 进入房间」按钮 + 看不到该选哪个玩法。
+ * 建房是「先选玩法、再建房」的两步动作，把第一步藏起来不合理。
+ *
+ * 做法：窄屏下把玩法网格从「两列方块」改成「一行横向滑动的胶囊条」。
+ *   · 高度从 317px 压到 66px，省下的 250px 全部还给首屏；
+ *   · 9 个玩法横向滑动，一屏能横向看全，不需要纵向滚动找；
+ *   · 选中项自动 scrollIntoView，从别的入口带 ?game=xxx 进来时不会
+ *     选中了却看不见选中态。
+ * 桌面端（>560px）保持原来的方块网格，一点不动。
+ * ============================================================ */
+@media (max-width: 560px) {
+  /* 重新排一遍顺序：标题 → 玩法条 → 昵称 → 建房/进房
+     （后写的规则同特异性覆盖前面那段，这里给最终顺序） */
+  .pp-wrap > .pp-net { order: 0; }
+  .pp-wrap > .pp-head { order: 1; }
+  .pp-wrap > .pp-games-hint { order: 2; }
+  .pp-wrap > .pp-games { order: 3; }
+  .pp-wrap > .pp-row { order: 4; }
+  .pp-wrap > .pp-acts { order: 5; }
+  .pp-wrap > .pp-err { order: 6; }
+  .pp-wrap > .pp-tips { order: 7; }
+
+  .pp-wrap > .pp-games {
+    display: flex;
+    gap: 8px;
+    overflow-x: auto;
+    overflow-y: hidden;
+    scroll-snap-type: x proximity;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+    margin: 0 -14px;       /* 让胶囊贴到屏幕边，滑动的手感更像原生 */
+    padding: 2px 14px 6px;
+  }
+  .pp-wrap > .pp-games::-webkit-scrollbar { display: none; }
+
+  .pp-game {
+    flex: 0 0 auto;
+    scroll-snap-align: start;
+    min-width: 132px;
+    max-width: 132px;
+    padding: 8px 12px 9px;
+    gap: 2px;
+    border-radius: 999px;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+  }
+  .pp-game b { font-size: 13px; white-space: nowrap; }
+  .pp-game em { font-size: 10px; letter-spacing: .04em; white-space: nowrap; }
+  .pp-game-desc { display: none; }
+  .pp-game-dot {
+    width: 7px; height: 7px;
+    right: 8px; top: 50%;
+    transform: translateY(-50%);
+  }
+  .pp-game.on { box-shadow: 0 0 0 1px var(--c, var(--warm)) inset; }
+
+  /* 玩法条上方的标题：一眼知道这是一排可滑的玩法 */
+  .pp-games-hint {
+    font-size: 11px;
+    color: var(--ink-soft);
+    letter-spacing: .06em;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .pp-games-hint::after {
+    content: '左右滑动';
+    font-size: 10px;
+    color: var(--ink-dim);
+    letter-spacing: .04em;
+    border: 1px solid var(--line);
+    border-radius: 999px;
+    padding: 1px 7px;
   }
 }
 

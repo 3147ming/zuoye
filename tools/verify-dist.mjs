@@ -105,18 +105,40 @@ if (fs.existsSync(assetsDir)) {
 const partyHtml = path.join(DIST, 'games/party/index.html');
 if (isFile(partyHtml)) {
   const html = fs.readFileSync(partyHtml, 'utf8');
-  /* games.js 拆过：公共底座 + 八个玩法各一个文件。少一个玩法文件就等于少一个玩法，
-     而且因为 K.register 没执行，界面上那张卡点了会真的开不出局，所以逐个查。 */
-  const PARTY_JS = [
-    'js/party/net.js', 'js/party/kit.js', 'js/party/lobby.js',
-    'js/party/games.js', 'js/party/games.bounce.js', 'js/party/games.balloon.js',
-    'js/party/games.tank.js', 'js/party/games.snake.js', 'js/party/games.quiz.js',
-    'js/party/games.draw.js', 'js/party/games.pitch.js', 'js/party/games.duel.js',
-    'js/party/games.fist.js'
+  /* 1.28.1 起：玩法文件改成「按需加载」，页面里不再静态 <script> 引用它们，
+     所以「HTML 里必须出现文件名」这条断言已经不适用了。
+     改成：底座必须静态引用（它要最先建立命名空间），
+           每个玩法文件必须真实存在于产物里（动态注入靠 URL 找文件，
+           少一个就等于那个玩法开不出局）。 */
+  const PARTY_BASE = [
+    'js/party/net.js', 'js/party/predict.js', 'js/party/shared.js',
+    'js/party/kit.js', 'js/party/games.js', 'js/party/lobby.js'
   ];
-  for (const f of PARTY_JS) {
+  for (const f of PARTY_BASE) {
     if (!html.includes('/' + f)) problems.push('联机页缺少引用：' + f);
     if (!routeExists('/' + f)) problems.push('联机页引用的文件不存在：' + f);
+  }
+
+  /* 九个玩法客户端：动态注入，必须都在产物里 */
+  const PARTY_GAMES = [
+    'js/party/games.bounce.js', 'js/party/games.balloon.js',
+    'js/party/games.tank.js', 'js/party/games.snake.js',
+    'js/party/games.quiz.js', 'js/party/games.draw.js',
+    'js/party/games.pitch.js', 'js/party/games.duel.js',
+    'js/party/games.fist.js'
+  ];
+  for (const f of PARTY_GAMES) {
+    if (!routeExists('/' + f)) problems.push('联机玩法客户端不存在：' + f);
+  }
+  /* 加载器本身必须在：少了它就一个玩法都开不出来 */
+  const lobbySrc = fs.existsSync(path.join(DIST, 'js/party/lobby.js')) ? fs.readFileSync(path.join(DIST, 'js/party/lobby.js'), 'utf8') : '';
+  if (lobbySrc && lobbySrc.indexOf('loadGame') === -1) {
+    problems.push('lobby.js 里没有 loadGame（玩法按需加载器缺失）');
+  }
+  /* 玩法 id → 文件名的映射必须和文件对得上：
+     贪吃蛇的 id 是 snakebattle、文件叫 games.snake.js，映射错一个就开不出局。 */
+  if (lobbySrc && lobbySrc.indexOf("snakebattle: 'snake'") === -1) {
+    problems.push('lobby.js 缺少 snakebattle → games.snake.js 的文件名映射');
   }
   if (!html.includes('/games/party/party.css')) problems.push('联机页缺少引用：/games/party/party.css');
   if (!routeExists('/games/party/party.css')) problems.push('联机页引用的文件不存在：/games/party/party.css');
